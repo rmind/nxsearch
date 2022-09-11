@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  lib:
+    build:
+      context: .
+      dockerfile: compose/nxsearch.Dockerfile
+    image: nxsearch
+    volumes:
+      - ./data:/data
+      - ./src:/src

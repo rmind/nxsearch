@@ -1,0 +1,8 @@
+[submodule "src/libs/rhashmap"]
+	path = src/libs/rhashmap
+	url = https://github.com/rmind/rhashmap.git
+	shallow = true
+[submodule "src/libs/CRoaring"]
+	path = src/libs/CRoaring
+	url = https://github.com/RoaringBitmap/CRoaring.git
+	shallow = true
