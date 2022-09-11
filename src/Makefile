@@ -86,6 +86,7 @@ OBJS+=		core/nxs.o
 OBJS+=		core/tokenizer.o
 OBJS+=		core/filters.o
 OBJS+=		core/filters_builtin.o
+OBJS+=		core/levdist.o
 
 OBJS+=		index/idxmap.o
 OBJS+=		index/idxterm.o
