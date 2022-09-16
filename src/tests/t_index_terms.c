@@ -7,6 +7,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "nxs.h"
 #include "strbuf.h"
 #include "index.h"
 #include "tokenizer.h"
@@ -82,8 +83,8 @@ static void
 run_terms_test(void)
 {
 	char *testdb_path = get_tmpfile(NULL);
+	tokenset_t *tokens;
 	fts_index_t idx;
-	tokenset_t *tset;
 	int ret;
 
 	memset(&idx, 0, sizeof(idx));
@@ -95,12 +96,12 @@ run_terms_test(void)
 	ret = idx_terms_open(&idx, testdb_path);
 	assert(ret == 0);
 
-	tset = get_test_tokenset(test_tokens, __arraycount(test_tokens));
-	assert(tset != NULL);
+	tokens = get_test_tokenset(test_tokens, __arraycount(test_tokens));
+	assert(tokens != NULL);
 
-	ret = idx_terms_add(&idx, tset);
+	ret = idx_terms_add(&idx, tokens);
 	assert(ret == 0);
-	tokenset_destroy(tset);
+	tokenset_destroy(tokens);
 
 	/* Check that the terms are also in-memory. */
 	check_terms(&idx);

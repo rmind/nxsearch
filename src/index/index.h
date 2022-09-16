@@ -66,6 +66,7 @@ typedef struct fts_index {
 	 * Term-document map (the reverse index).
 	 */
 	rhashmap_t *		td_map;
+	filter_pipeline_t *	fp;
 
 	/* Index name. */
 	char *			name;
@@ -110,6 +111,10 @@ int		idx_dtmap_add(fts_index_t *, doc_id_t, tokenset_t *);
 int		idx_dtmap_sync(fts_index_t *);
 void		idx_dtmap_close(fts_index_t *);
 
-int		idxdoc_get_termcount(fts_index_t *, doc_id_t, term_id_t);
+unsigned	idx_dtmap_getcount(const fts_index_t *);
+
+idxdoc_t *	idxdoc_lookup(fts_index_t *, doc_id_t);
+int		idxdoc_get_termcount(const fts_index_t *,
+		    const idxdoc_t *, term_id_t);
 
 #endif

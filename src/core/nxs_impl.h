@@ -25,8 +25,8 @@ struct nxs {
 	rhashmap_t *		indexes;
 };
 
-int		nxs_filter_register(nxs_t *, const char *, const filter_ops_t *);
-fts_index_t *	nxs_index_open(nxs_t *, const char *);
-void		nxs_index_close(nxs_t *, fts_index_t *);
+int	nxs_filter_register(nxs_t *, const char *, const filter_ops_t *);
+
+float	tf_idf(const fts_index_t *, const idxterm_t *, const idxdoc_t *);
 
 #endif

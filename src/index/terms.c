@@ -167,7 +167,8 @@ again:
 	 */
 	dataptr = MAP_GET_OFF(hdr, sizeof(idxterms_hdr_t) + data_len);
 	mmrw_init(&mm, dataptr, max_append_len);
-	TAILQ_FOREACH(token, &tokens->list, entry) {
+
+	TAILQ_FOREACH(token, &tokens->staging, entry) {
 		const char *val = token->buffer.value;
 		const size_t len = token->buffer.length;
 		idxterm_t *term;
@@ -195,13 +196,23 @@ again:
 		if (mmrw_store64(&mm, token->count) == -1) {
 			goto err;
 		}
+
+		/*
+		 * Create the term, assign the ID and also associate
+		 * the token with it.
+		 */
 		if ((term = idxterm_create(idx, val, len, offset)) == NULL) {
 			goto err;
 		}
 		id = ++idx->terms_last_id;
 		idxterm_assign(idx, term, id);
+		token->idxterm = term;
+
 		append_len += len + IDXTERMS_META_LEN;
 	}
+
+	/* All tokens are now resolved; put them back to the list. */
+	TAILQ_CONCAT(&tokens->list, &tokens->staging, entry);
 
 	/* Publish the new data length. */
 	idx->terms_consumed = data_len + append_len;

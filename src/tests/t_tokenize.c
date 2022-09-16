@@ -3,6 +3,7 @@
  * This code is in the public domain.
  */
 
+#include <sys/queue.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

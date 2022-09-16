@@ -64,6 +64,7 @@ tokenset_create(void)
 		return NULL;
 	}
 	TAILQ_INIT(&tset->list);
+	TAILQ_INIT(&tset->staging);
 	tset->map = rhashmap_create(0, RHM_NOCOPY | RHM_NONCRYPTO);
 	return tset;
 }
@@ -77,6 +78,7 @@ tokenset_destroy(tokenset_t *tset)
 		TAILQ_REMOVE(&tset->list, token, entry);
 		token_destroy(token);
 	}
+	ASSERT(TAILQ_EMPTY(&tset->staging));
 	rhashmap_destroy(tset->map);
 	free(tset);
 }

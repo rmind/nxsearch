@@ -291,6 +291,14 @@ idx_dtmap_sync(fts_index_t *idx)
 	return 0;
 }
 
+unsigned
+idx_dtmap_getcount(const fts_index_t *idx)
+{
+	const idxmap_t *idxmap = &idx->dt_memmap;
+	const idxdt_hdr_t *hdr = idxmap->baseptr;
+	return be32toh(hdr->doc_count);
+}
+
 static idxdoc_t *
 idxdoc_create(fts_index_t *idx, doc_id_t id, uint64_t offset)
 {
@@ -320,19 +328,20 @@ idxdoc_destroy(fts_index_t *idx, idxdoc_t *doc)
 	free(doc);
 }
 
+idxdoc_t *
+idxdoc_lookup(fts_index_t *idx, doc_id_t doc_id)
+{
+	return rhashmap_get(idx->dt_map, &doc_id, sizeof(doc_id_t));
+}
+
 int
-idxdoc_get_termcount(fts_index_t *idx, doc_id_t doc_id, term_id_t term_id)
+idxdoc_get_termcount(const fts_index_t *idx,
+    const idxdoc_t *doc, term_id_t term_id)
 {
 	const idxmap_t *idxmap = &idx->dt_memmap;
 	const idxdt_hdr_t *hdr = idxmap->baseptr;
-	idxdoc_t *doc;
 	unsigned n;
 	mmrw_t mm;
-
-	doc = rhashmap_get(idx->dt_map, &doc_id, sizeof(doc_id_t));
-	if (doc == NULL) {
-		return -1;
-	}
 
 	mmrw_init(&mm, MAP_GET_OFF(hdr, doc->offset),
 	    IDXDT_FILE_LEN(hdr) - doc->offset);

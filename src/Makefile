@@ -72,6 +72,8 @@ endif
 # Dependencies: compiler flags and libraries to link.
 #
 
+LDFLAGS+=	-lm
+
 # ICU library
 LDFLAGS+=	$(shell pkg-config --libs --cflags icu-uc icu-io)
 
@@ -86,6 +88,7 @@ OBJS+=		core/nxs.o
 OBJS+=		core/tokenizer.o
 OBJS+=		core/filters.o
 OBJS+=		core/filters_builtin.o
+OBJS+=		core/ranking.o
 OBJS+=		core/levdist.o
 
 OBJS+=		index/idxmap.o
@@ -100,6 +103,19 @@ OBJS+=		utils/utf8.o
 #
 # libs
 #
+
+HAVE_LIBS:=	$(shell test -d libs/rhashmap/src && echo 1 || echo 0)
+ifeq ($(HAVE_LIBS),0)
+define ERRMSG
+ERROR: src/libs/* source code is missing.
+Hint: probably did not initialize the Git submodules; consider running:
+
+git submodule update --init --recursive
+
+
+endef
+$(error $(ERRMSG))
+endif
 
 EXT_OBJS+=	libs/rhashmap/src/rhashmap.o
 EXT_OBJS+=	libs/rhashmap/src/siphash.o

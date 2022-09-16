@@ -7,6 +7,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "nxs.h"
 #include "strbuf.h"
 #include "index.h"
 #include "tokenizer.h"
@@ -60,16 +61,22 @@ prepare_terms(fts_index_t *idx, tokenset_t *tokens, bool init)
 static void
 check_term_counts(fts_index_t *idx, doc_id_t doc1_id, doc_id_t doc2_id)
 {
+	idxdoc_t *doc;
 	int tc;
 
-	tc = idxdoc_get_termcount(idx, doc1_id, 1);  // some-term-1
+	doc = idxdoc_lookup(idx, doc1_id);
+	assert(doc != NULL);
+
+	tc = idxdoc_get_termcount(idx, doc, 1);  // some-term-1
 	assert(tc == 1);
 
-	tc = idxdoc_get_termcount(idx, doc1_id, 2);  // another-term-2
+	tc = idxdoc_get_termcount(idx, doc, 2);  // another-term-2
 	assert(tc == 2);
 
 	if (doc2_id) {
-		tc = idxdoc_get_termcount(idx, doc2_id, 3); // term-3
+		doc = idxdoc_lookup(idx, doc2_id);
+		assert(doc != NULL);
+		tc = idxdoc_get_termcount(idx, doc, 3); // term-3
 		assert(tc == 1);
 	}
 }
@@ -98,6 +105,7 @@ run_dtmap_test(void)
 
 	ret = idx_dtmap_add(&idx, doc1_id, tokens1);
 	assert(ret == 0);
+	tokenset_destroy(tokens1);
 
 	check_term_counts(&idx, doc1_id, 0);
 
@@ -110,6 +118,7 @@ run_dtmap_test(void)
 
 	ret = idx_dtmap_add(&idx, doc2_id, tokens2);
 	assert(ret == 0);
+	tokenset_destroy(tokens2);
 
 	check_term_counts(&idx, doc1_id, doc2_id);
 
@@ -134,8 +143,6 @@ run_dtmap_test(void)
 	check_term_counts(&idx, doc1_id, doc2_id);
 
 	// Cleanup
-	tokenset_destroy(tokens1);
-	tokenset_destroy(tokens2);
 	idx_dtmap_close(&idx);
 	idx_terms_close(&idx);
 	idxterm_sysfini(&idx);

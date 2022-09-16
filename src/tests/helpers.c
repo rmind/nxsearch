@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "tokenizer.h"
 #include "helpers.h"
 #include "utils.h"
 
@@ -92,18 +93,21 @@ mmap_cmp_file(const char *path, const unsigned char *buf, size_t len)
 }
 
 tokenset_t *
-get_test_tokenset(const char *tokens[], size_t count)
+get_test_tokenset(const char *values[], size_t count)
 {
-	tokenset_t *tset;
+	tokenset_t *tokens;
 
-	tset = tokenset_create();
-	assert(tset != NULL);
+	tokens = tokenset_create();
+	assert(tokens != NULL);
 
 	for (unsigned i = 0; i < count; i++) {
-		const char *token = tokens[i];
-		const size_t len = strlen(token);
-		token_t *t = token_create(token, len);
-		tokenset_add(tset, t);
+		const char *val = values[i];
+		const size_t len = strlen(val);
+		token_t *t = token_create(val, len);
+		tokenset_add(tokens, t);
 	}
-	return tset;
+
+	/* Stage all tokens, as we will be adding them. */
+	TAILQ_CONCAT(&tokens->staging, &tokens->list, entry);
+	return tokens;
 }

@@ -118,7 +118,9 @@ idxterm_resolve_tokens(fts_index_t *idx, tokenset_t *tokens, bool stage)
 {
 	token_t *token;
 
-	TAILQ_FOREACH(token, &tokens->list, entry) {
+	token = TAILQ_FIRST(&tokens->list);
+	while (token) {
+		token_t *next_token = TAILQ_NEXT(token, entry);
 		const strbuf_t *sbuf = &token->buffer;
 		idxterm_t *term;
 
@@ -128,6 +130,7 @@ idxterm_resolve_tokens(fts_index_t *idx, tokenset_t *tokens, bool stage)
 			TAILQ_INSERT_TAIL(&tokens->staging, token, entry);
 		}
 		token->idxterm = term;
+		token = next_token;
 	}
 }
 

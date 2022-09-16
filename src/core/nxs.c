@@ -32,6 +32,7 @@
  *	underlying in-memory and on-disk structures.
  */
 
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
@@ -49,21 +50,32 @@ nxs_create(const char *basedir)
 {
 	nxs_t *nxs;
 	const char *s;
+	char *path = NULL;
 
 	nxs = calloc(1, sizeof(nxs_t));
 	if (nxs == NULL) {
 		return NULL;
 	}
+
 	s = basedir ? basedir : getenv("NXS_BASEDIR");
 	if (s && (nxs->basedir = strdup(s)) == NULL) {
 		goto err;
 	}
+	if (asprintf(&path, "%s/data", nxs->basedir) == -1) {
+		goto err;
+	}
+	if (mkdir(path, 0644) == -1 && errno != EEXIST) {
+		goto err;
+	}
+	free(path);
+
 	if (filters_sysinit(nxs) == -1) {
 		goto err;
 	}
 	if (filters_builtin_sysinit(nxs) == -1) {
 		goto err;
 	}
+
 	nxs->indexes = rhashmap_create(0, RHM_NONCRYPTO);
 	if (nxs->indexes == NULL) {
 		goto err;
@@ -71,6 +83,7 @@ nxs_create(const char *basedir)
 	return nxs;
 err:
 	nxs_destroy(nxs);
+	free(path);
 	return NULL;
 }
 
@@ -86,8 +99,36 @@ nxs_destroy(nxs_t *nxs)
 }
 
 fts_index_t *
+nxs_index_create(nxs_t *nxs, const char *name)
+{
+	char *path;
+
+	/*
+	 * Create the index directory.
+	 */
+	if (asprintf(&path, "%s/data/%s", nxs->basedir, name) == -1) {
+		return NULL;
+	}
+	if (mkdir(path, 0644) == -1) {
+		free(path);
+		return NULL;
+	}
+	free(path);
+
+	/*
+	 * TODO: Write the index configuration.
+	 */
+
+	return nxs_index_open(nxs, name);
+}
+
+fts_index_t *
 nxs_index_open(nxs_t *nxs, const char *name)
 {
+	const char *filters[] = {
+		// TODO: Implement index parameters
+		"normalizer", "stemmer"
+	};
 	const size_t name_len = strlen(name);
 	fts_index_t *idx;
 	char *path;
@@ -103,6 +144,14 @@ nxs_index_open(nxs_t *nxs, const char *name)
 		return NULL;
 	}
 	if (idxterm_sysinit(idx) == -1) {
+		nxs_index_close(nxs, idx);
+		return NULL;
+	}
+
+	idx->fp = filter_pipeline_create(nxs,
+	    "en" /* XXX */, filters, __arraycount(filters));
+	if (idx->fp == NULL) {
+		nxs_index_close(nxs, idx);
 		return NULL;
 	}
 
@@ -146,59 +195,164 @@ nxs_index_close(nxs_t *nxs, fts_index_t *idx)
 		rhashmap_del(nxs->indexes, idx->name, strlen(idx->name));
 		free(idx->name);
 	}
+	if (idx->fp) {
+		filter_pipeline_destroy(idx->fp);
+	}
+	idx_dtmap_close(idx);
 	idx_terms_close(idx);
 	idxterm_sysfini(idx);
 	free(idx);
 }
 
-#if 0
-
 int
-nxs_index_add(nxs_t *nxs, const char *text, size_t len)
+nxs_index_add(fts_index_t *idx, uint64_t doc_id, char *text, size_t len)
 {
-	/*
-	 * Tokenize.
-	 */
+	tokenset_t *tokens;
+	int ret = -1;
 
 	/*
-	 * Resolve tokens to terms.
+	 * Tokenize and resolve tokens to terms.
 	 */
+	if ((tokens = tokenize(idx->fp, text, len)) == NULL) {
+		return -1;
+	}
+	idxterm_resolve_tokens(idx, tokens, true);
 
 	/*
 	 * Add new terms.
 	 */
+	if (idx_terms_add(idx, tokens) == -1) {
+		goto out;
+	}
+	ASSERT(TAILQ_EMPTY(&tokens->staging));
 
 	/*
 	 * Add document.
 	 */
-
-	return 0;
+	if (idx_dtmap_add(idx, doc_id, tokens) == -1) {
+		goto out;
+	}
+	ret = 0;
+out:
+	tokenset_destroy(tokens);
+	return ret;
 }
 
-int
-nxs_index_search(nxs_t *nxs, const char *query, size_t len)
+static nxs_result_entry_t *
+prepare_doc_entry(nxs_results_t *results, rhashmap_t *doc_map,
+    const idxdoc_t *doc, float score)
 {
-	/*
-	 * Tokenize.
-	 */
+	nxs_result_entry_t *entry;
+
+	entry = rhashmap_get(doc_map, &doc->id, sizeof(doc_id_t));
+	if (entry == NULL) {
+		if ((entry = calloc(1, sizeof(nxs_result_entry_t))) == NULL) {
+			return NULL;
+		}
+		rhashmap_put(doc_map, &doc->id, sizeof(doc_id_t), entry);
+
+		entry->next = results->entries;
+		results->entries = entry;
+		results->count++;
+	}
+
+	entry->score += score;
+	return entry;
+}
+
+nxs_results_t *
+nxs_index_search(fts_index_t *idx, const char *query, size_t len)
+{
+	nxs_results_t *results = NULL;
+	tokenset_t *tokens;
+	rhashmap_t *doc_map;
+	token_t *token;
+	char *text;
+	int err = -1;
 
 	/*
-	 * Resolve tokens to terms.
+	 * Sync the latest updates to the index.
 	 */
+	if (idx_terms_sync(idx) == -1 || idx_dtmap_sync(idx) == -1) {
+		return NULL;
+	}
+
+	/*
+	 * Tokenize and resolve tokens to terms.
+	 */
+	if ((text = strdup(query)) == NULL) {
+		return NULL;
+	}
+	if ((tokens = tokenize(idx->fp, text, len)) == NULL) {
+		free(text);
+		return NULL;
+	}
+	idxterm_resolve_tokens(idx, tokens, false);
+	free(text);
+
+	doc_map = rhashmap_create(0, RHM_NOCOPY | RHM_NONCRYPTO);
+	if (doc_map == NULL) {
+		goto out;
+	}
+	if ((results = calloc(1, sizeof(nxs_results_t))) == NULL) {
+		goto out;
+	}
 
 	/*
 	 * Lookup the documents given the terms.
 	 */
+	TAILQ_FOREACH(token, &tokens->list, entry) {
+		roaring_uint32_iterator_t *bm_iter;
+		idxterm_t *term;
 
-	/*
-	 * Rank the documents.
-	 */
+		if ((term = token->idxterm) == NULL) {
+			/* The term is not in the index: just skip. */
+			continue;
+		}
 
-	/*
-	 * Return the document IDs.
-	 */
+		bm_iter = roaring_create_iterator(term->doc_bitmap);
+		while (bm_iter->has_value) {
+			const doc_id_t doc_id = bm_iter->current_value;
+			idxdoc_t *doc;
+			float score;
 
-	return 0;
+			/*
+			 * Lookup the document and compute its score.
+			 */
+			if ((doc = idxdoc_lookup(idx, doc_id)) == NULL) {
+				goto out;
+			}
+			score = tf_idf(idx, term, doc);
+			if (!prepare_doc_entry(results, doc_map, doc, score)) {
+				goto out;
+			}
+			roaring_advance_uint32_iterator(bm_iter);
+		}
+		roaring_free_uint32_iterator(bm_iter);
+	}
+	err = 0;
+out:
+	if (err && results) {
+		nxs_results_release(results);
+	}
+	if (doc_map) {
+		rhashmap_destroy(doc_map);
+	}
+	tokenset_destroy(tokens);
+	return results;
 }
 
-#endif
+void
+nxs_results_release(nxs_results_t *results)
+{
+	if (results) {
+		nxs_result_entry_t *entry = results->entries;
+
+		while (entry) {
+			nxs_result_entry_t *next = entry->next;
+			free(entry);
+			entry = next;
+		}
+	}
+	free(results);
+}
