@@ -1,0 +1,14 @@
+name: Continous integration
+on: [push]
+
+jobs:
+  build_and_test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: Push
+        shell: bash
+        run: docker build -f compose/nxsearch.Dockerfile .
