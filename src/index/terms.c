@@ -5,6 +5,22 @@
  * Use is subject to license terms, as specified in the LICENSE file.
  */
 
+/*
+ * Terms index.
+ *
+ * This module manages the terms list.  It is generally an append only
+ * structure which follows the general idxmap synchronization logic.
+ * Term IDs are determined by the term's order in the index.  Terms in
+ * the list are NIL-terminated for convenience.  Each term has an total
+ * occurrence count (in the whole index i.e. all documents) which is
+ * accessed directly via the memory-mapped file.
+ *
+ * The count is a 64-bit integer updated atomically, therefore padding
+ * must be added to provide the alignment where needed.
+ *
+ * See the storage.h header for more details on the on-disk layout.
+ */
+
 #include <sys/mman.h>
 #include <sys/queue.h>
 #include <sys/file.h>
@@ -84,22 +100,26 @@ idx_terms_open(fts_index_t *idx, const char *path)
 	if (!created && idx_terms_verify(&idx->terms_memmap) == -1) {
 		goto err;
 	}
-	flock(fd, LOCK_UN);
 
 	/*
 	 * Setup the in-memory structures.
 	 */
 	idx->term_map = rhashmap_create(0, RHM_NOCOPY | RHM_NONCRYPTO);
+	if (idx->term_map == NULL) {
+		goto err;
+	}
 	TAILQ_INIT(&idx->term_list);
 	idx->terms_consumed = 0;
 	idx->terms_last_id = 0;
+	flock(fd, LOCK_UN);
 
 	/*
 	 * Finally, load the terms.
 	 */
 	return idx_terms_sync(idx);
 err:
-	close(fd);
+	flock(fd, LOCK_UN);
+	idx_db_release(&idx->terms_memmap);
 	return -1;
 }
 
@@ -118,16 +138,28 @@ idx_terms_close(fts_index_t *idx)
 	idx_db_release(idxmap);
 }
 
+/*
+ * idx_terms_add: add the given tokens/terms into the term index.
+ *
+ * - Tokens must be resolved using the idxterm_resolve_tokens() i.e. all
+ * tokens which don't have the already existing in-memory term associated
+ * must be in the staging list.
+ *
+ * - Terms are added into the on-disk index and the in-memory list.
+ */
 int
 idx_terms_add(fts_index_t *idx, tokenset_t *tokens)
 {
 	idxmap_t *idxmap = &idx->terms_memmap;
-	size_t max_append_len, data_len, target_len;
-	size_t append_len = 0;
+	size_t max_append_len, data_len, target_len, append_len = 0;
 	idxterms_hdr_t *hdr;
 	token_t *token;
 	void *dataptr;
 	mmrw_t mm;
+	int ret = -1;
+
+	ASSERT(!TAILQ_EMPTY(&tokens->staging));
+	ASSERT(tokens->count > 0);
 
 	/*
 	 * Lock the file and check whether we need to sync.
@@ -155,7 +187,8 @@ again:
 	/*
 	 * Compute the target length and extend if necessary.
 	 */
-	max_append_len = tokens->data_len + (tokens->count * IDXTERMS_META_LEN);
+	max_append_len = tokens->data_len +
+	    (tokens->count * IDXTERMS_META_MAXLEN);
 	target_len = sizeof(idxterms_hdr_t) + data_len + max_append_len;
 	if ((hdr = idx_db_map(idxmap, target_len, true)) == NULL) {
 		flock(idxmap->fd, LOCK_UN);
@@ -168,7 +201,7 @@ again:
 	dataptr = MAP_GET_OFF(hdr, sizeof(idxterms_hdr_t) + data_len);
 	mmrw_init(&mm, dataptr, max_append_len);
 
-	TAILQ_FOREACH(token, &tokens->staging, entry) {
+	while ((token = TAILQ_FIRST(&tokens->staging)) != NULL) {
 		const char *val = token->buffer.value;
 		const size_t len = token->buffer.length;
 		idxterm_t *term;
@@ -177,20 +210,22 @@ again:
 
 		/*
 		 * De-duplicate: if the term is already present (because
-		 * of the above re-sync), then just increment the counter.
+		 * of the above re-sync), then just put it back to the list.
 		 */
 		term = rhashmap_get(idx->term_map, val, len);
 		if (term) {
+			TAILQ_REMOVE(&tokens->staging, token, entry);
+			TAILQ_INSERT_TAIL(&tokens->list, token, entry);
 			token->idxterm = term;
 			continue;
 		}
 
-		// FIXME: roundup2 term len for alignment
-
 		if (mmrw_store16(&mm, len) == -1 ||
-		    mmrw_store(&mm, val, len + 1) == -1) {
+		    mmrw_store(&mm, val, len + 1) == -1 ||
+		    mmrw_advance(&mm, IDXTERMS_PAD_LEN(len)) == -1) {
 			goto err;
 		}
+
 		offset = (uintptr_t)mm.curptr - (uintptr_t)hdr;
 
 		if (mmrw_store64(&mm, token->count) == -1) {
@@ -201,38 +236,42 @@ again:
 		 * Create the term, assign the ID and also associate
 		 * the token with it.
 		 */
-		if ((term = idxterm_create(idx, val, len, offset)) == NULL) {
+		term = idxterm_create(idx, val, len, offset);
+		if (term == NULL) {
 			goto err;
 		}
 		id = ++idx->terms_last_id;
 		idxterm_assign(idx, term, id);
 		token->idxterm = term;
 
-		append_len += len + IDXTERMS_META_LEN;
+		/* Token resolved: put it back to the list and iterate. */
+		TAILQ_REMOVE(&tokens->staging, token, entry);
+		TAILQ_INSERT_TAIL(&tokens->list, token, entry);
+		append_len += IDXTERMS_BLK_LEN(len);
 	}
-
-	/* All tokens are now resolved; put them back to the list. */
-	TAILQ_CONCAT(&tokens->list, &tokens->staging, entry);
-
+	ASSERT(TAILQ_EMPTY(&tokens->staging));
+	ret = 0;
+err:
 	/* Publish the new data length. */
 	idx->terms_consumed = data_len + append_len;
 	atomic_store_release(&hdr->data_len, htobe32(idx->terms_consumed));
 	flock(idxmap->fd, LOCK_UN);
-	return 0;
-err:
-	// FIXME bump terms_consumed?
-	flock(idxmap->fd, LOCK_UN);
-	return -1;
+	return ret;
 }
 
+/*
+ * idx_terms_sync: load any new terms from the on-disk index (by creating
+ * the in-memory structures).
+ */
 int
 idx_terms_sync(fts_index_t *idx)
 {
 	idxmap_t *idxmap = &idx->terms_memmap;
-	size_t seen_data_len, target_len;
+	size_t seen_data_len, target_len, consumed_len = 0;
 	idxterms_hdr_t *hdr;
 	void *dataptr;
 	mmrw_t mm;
+	int ret = -1;
 
 	/*
 	 * Fetch the data length.  Compute the length of data to consume.
@@ -246,6 +285,7 @@ idx_terms_sync(fts_index_t *idx)
 		/*
 		 * No new data: there is nothing to do.
 		 */
+		app_dbgx("nothing to consume", NULL);
 		return 0;
 	}
 
@@ -261,6 +301,7 @@ idx_terms_sync(fts_index_t *idx)
 	}
 	target_len = seen_data_len - idx->terms_consumed;
 	dataptr = MAP_GET_OFF(hdr, sizeof(idxterms_hdr_t) + idx->terms_consumed);
+	app_dbgx("consuming %zu", target_len);
 
 	/*
 	 * Fetch the terms.
@@ -275,16 +316,16 @@ idx_terms_sync(fts_index_t *idx)
 		uint16_t len;
 
 		if (mmrw_fetch16(&mm, &len) == -1 || len == 0) {
-			return -1;
+			goto err;
 		}
 
 		/*
 		 * Save the pointer to the term.  Advance to the
 		 * term counter.  NOTE: There must be a NIL terminator,
-		 * therefore we add 1 to the length.
+		 * therefore we add 1 to the length.  Skip any padding.
 		 */
 		val = (const char *)mm.curptr;
-		if (mmrw_advance(&mm, len + 1) == -1) {
+		if (mmrw_advance(&mm, len + 1 + IDXTERMS_PAD_LEN(len)) == -1) {
 			goto err;
 		}
 		offset = (uintptr_t)mm.curptr - (uintptr_t)hdr;
@@ -292,15 +333,17 @@ idx_terms_sync(fts_index_t *idx)
 		if (mmrw_fetch64(&mm, &count) == -1) {
 			goto err;
 		}
-		if ((term = idxterm_create(idx, val, len, offset)) == NULL) {
+		term = idxterm_create(idx, val, len, offset);
+		if (term == NULL) {
 			goto err;
 		}
 		id = ++idx->terms_last_id;
 		idxterm_assign(idx, term, id);
+		consumed_len += IDXTERMS_BLK_LEN(len);
 	}
-	idx->terms_consumed = seen_data_len;
-	return 0;
+	ret = 0;
 err:
-	// FIXME bump terms_consumed?
-	return -1;
+	idx->terms_consumed = consumed_len;
+	app_dbgx("consumed = %zu", consumed_len);
+	return ret;
 }

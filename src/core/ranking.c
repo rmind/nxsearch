@@ -11,6 +11,7 @@
 #define __NXSLIB_PRIVATE
 #include "nxs_impl.h"
 #include "index.h"
+#include "utils.h"
 
 /*
  * Ranking algorithm.
@@ -55,8 +56,8 @@ tf_idf(const fts_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	 * logarithm to apply on IDF, whether smoothen TF with square root
 	 * or logarithm, etc.  We will use:
 	 *
-	 *	TF <- tf(t, d) = log(term_freq(t, d))
-	 *	IDF <- idf(t, D) = 1 + log(N / doc_freq(t))
+	 *	TF <- tf(t, d) = log(term_freq(t, d) + 1)
+	 *	IDF <- idf(t, D) = log(N / doc_freq(t)) + 1
 	 *
 	 * We sum the scores of multiple terms, e.g. "cats AND dogs",
 	 * if they are in the given document.
@@ -67,11 +68,15 @@ tf_idf(const fts_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	float tf, idf;
 
 	term_freq = idxdoc_get_termcount(idx, doc, term->id);
-	tf = log(term_freq);
+	ASSERT(term_freq > 0);
+	tf = log(term_freq + 1);
 
-	doc_count = idx_dtmap_getcount(idx);
+	doc_count = idxdoc_get_totalcount(idx);
 	doc_freq = roaring_bitmap_get_cardinality(term->doc_bitmap);
-	idf = 1 + log((float)doc_count / doc_freq);
+	idf = log((float)doc_count / doc_freq) + 1;
+
+	app_dbgx("term_freq %d, doc_freq %u, tf %f, idf %f, score %f",
+	    term_freq, doc_freq, tf, idf, tf * idf);
 
 	return tf * idf;
 }

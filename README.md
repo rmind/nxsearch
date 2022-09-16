@@ -1,6 +1,5 @@
 # nxsearch
 
-![TEST](https://github.com/rmind/nxsearch/actions/workflows/test.yaml/badge.svg)
-
+![TESTS](https://github.com/rmind/nxsearch/actions/workflows/tests.yaml/badge.svg)
 
 Work in progress.

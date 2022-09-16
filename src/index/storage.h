@@ -27,9 +27,12 @@
  *
  * A single term block is defined as (with the sizes in bytes):
  *
- *	| len | term .. | NIL | total count |
- *	+-----+---------+-----+-------------+
- *	|  2  |   len   |  1  |      8      |
+ *	| len | term .. | NIL | [pad] | total count |
+ *	+-----+---------+-----+-------+-------------+
+ *	|  2  |   len   |  1  |  ...  |      8      |
+ *
+ * The total count must 64-bit aligned, therefore padding must be added
+ * to enforce the alignment where needed.
  *
  * CAUTION: All values must be converted to big-endian for storage.
  */
@@ -48,12 +51,19 @@ typedef struct {
 	uint32_t	reserved2;
 } __attribute__((packed)) idxterms_hdr_t;
 
+static_assert(sizeof(idxterms_hdr_t) == 16);  // ABI guard
+static_assert(sizeof(idxterms_hdr_t) % 8 == 0);  // alignment guard
+
 #define	IDXTERMS_DATA_LEN(h)	(be32toh((h)->data_len))
 #define	IDXTERMS_FILE_LEN(h)	\
     (sizeof(idxterms_hdr_t) + IDXTERMS_DATA_LEN(h))
 
 /* The sum of above single term block, except the term length itself. */
-#define	IDXTERMS_META_LEN	(2 + 1 + 8)
+#define	IDXTERMS_META_LEN	(2UL + 1 + 8)
+#define	IDXTERMS_META_MAXLEN	(IDXTERMS_META_LEN + 8)
+#define	IDXTERMS_PAD_LEN(len)	(roundup2(2UL + 1 + (len), 8) - (2 + 1 + (len)))
+#define	IDXTERMS_BLK_LEN(len)	\
+    (IDXTERMS_META_LEN + (len) + IDXTERMS_PAD_LEN(len))
 
 #define	IDXTERMS_DATA_PTR(h, off)	\
     ((void *)((uintptr_t)(hdr) + (sizeof(idxterms_hdr_t) + (off))))
@@ -83,10 +93,10 @@ typedef struct {
  * CAUTION: All values must be converted to big-endian for storage.
  */
 
-#define	NXS_M_MARK	"NXS_M"
+#define	NXS_D_MARK	"NXS_D"
 
 typedef struct {
-	uint8_t		mark[5];	// NXS_M_MARK
+	uint8_t		mark[5];	// NXS_D_MARK
 	uint8_t		ver;		// ABI version
 	uint8_t		reserved0[2];
 
@@ -104,6 +114,9 @@ typedef struct {
 	uint32_t	reserved1;
 
 } __attribute__((packed)) idxdt_hdr_t;
+
+static_assert(sizeof(idxdt_hdr_t) == 32);  // ABI guard
+static_assert(sizeof(idxdt_hdr_t) % 8 == 0);  // alignment guard
 
 #define	IDXDT_DATA_LEN(h)	(be64toh((h)->data_len))
 #define	IDXDT_FILE_LEN(h)	(sizeof(idxdt_hdr_t) + IDXDT_DATA_LEN(h))

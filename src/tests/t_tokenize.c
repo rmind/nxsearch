@@ -78,7 +78,6 @@ run_tokenizer_test(void)
 	tokenset_t *tset;
 	token_t *token;
 	nxs_t *nxs;
-	char *text;
 	unsigned i;
 
 	nxs = nxs_create("");
@@ -87,12 +86,8 @@ run_tokenizer_test(void)
 	fp = get_test_filter_pipeline(nxs);
 	assert(fp != NULL);
 
-	text = strdup(test_text);
-	assert(text != NULL);
-
-	tset = tokenize(fp, text, strlen(text));
+	tset = tokenize(fp, test_text, strlen(test_text));
 	assert(tset != NULL);
-	free(text);
 
 	/*
 	 * Verify the tokens.

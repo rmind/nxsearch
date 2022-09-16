@@ -5,6 +5,18 @@
  * Use is subject to license terms, as specified in the LICENSE file.
  */
 
+/*
+ * In-memory term and term-document mapping.
+ *
+ * - Tracks term IDs and provides the mapping to the term values.
+ *
+ * - Resolves (associates) tokens to the term objects which contain
+ * the term IDs and other metadata.
+ *
+ * - Tacks the documents where the term occurs, i.e. provides the
+ * following mapping: term_id => [doc IDs ...].
+ */
+
 #include <sys/queue.h>
 #include <sys/file.h>
 #include <sys/stat.h>
@@ -72,6 +84,7 @@ idxterm_create(fts_index_t *idx, const char *token,
 		return NULL;
 	}
 	TAILQ_INSERT_TAIL(&idx->term_list, term, entry);
+	app_dbgx("term %p [%s]", term, term->value);
 	return term;
 }
 
@@ -97,6 +110,7 @@ idxterm_assign(fts_index_t *idx, idxterm_t *term, term_id_t term_id)
 {
 	term->id = term_id;
 	rhashmap_put(idx->td_map, &term->id, sizeof(term_id_t), term);
+	app_dbgx("term %p [%s] => %u", term, term->value, term->id);
 }
 
 /*
@@ -128,6 +142,10 @@ idxterm_resolve_tokens(fts_index_t *idx, tokenset_t *tokens, bool stage)
 		if (!term && stage) {
 			TAILQ_REMOVE(&tokens->list, token, entry);
 			TAILQ_INSERT_TAIL(&tokens->staging, token, entry);
+			app_dbgx("staging %p [%s]", token, sbuf->value);
+		}
+		if (term) {
+			app_dbgx("[%s] => %u", sbuf->value, term->id);
 		}
 		token->idxterm = term;
 		token = next_token;
@@ -150,6 +168,7 @@ idxterm_incr_total(fts_index_t *idx, const idxterm_t *term, unsigned count)
 	    memory_order_relaxed, memory_order_relaxed));
 #endif
 	atomic_fetch_add_explicit(tc, count, memory_order_relaxed);
+	app_dbgx("term %u count +%u ", term->id, count);
 }
 
 int
@@ -162,5 +181,6 @@ idxterm_add_doc(fts_index_t *idx, term_id_t term_id, doc_id_t doc_id)
 		return -1;
 	}
 	roaring_bitmap_add(term->doc_bitmap, doc_id);
+	app_dbgx("term %u => doc %"PRIu64, term_id, doc_id);
 	return 0;
 }

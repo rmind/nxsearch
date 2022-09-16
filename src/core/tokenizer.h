@@ -56,6 +56,6 @@ void		tokenset_destroy(tokenset_t *);
 token_t *	token_create(const char *, size_t);
 void		token_destroy(token_t *);
 
-tokenset_t *	tokenize(filter_pipeline_t *, char *, size_t);
+tokenset_t *	tokenize(filter_pipeline_t *, const char *, size_t);
 
 #endif

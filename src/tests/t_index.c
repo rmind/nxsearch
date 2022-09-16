@@ -13,7 +13,7 @@
 #include "helpers.h"
 #include "utils.h"
 
-static const struct {
+static const struct test_docs_s {
 	const char *	text;
 	doc_id_t	id;
 } test_docs[] = {
@@ -28,6 +28,18 @@ static const struct {
 };
 
 static void
+print_results(const char *query, nxs_results_t *results)
+{
+	assert(results);
+	printf("QUERY [%s] DOC COUNT %u\n", query, results->count);
+	nxs_result_entry_t *entry = results->entries;
+	while (entry) {
+		printf("DOC %lu, SCORE %f\n", entry->doc_id, entry->score);
+		entry = entry->next;
+	}
+}
+
+static void
 run_general(void)
 {
 	char *basedir = get_tmpdir();
@@ -35,6 +47,8 @@ run_general(void)
 	nxs_results_t *results;
 	fts_index_t *idx;
 	nxs_t *nxs;
+
+	// app_set_loglevel("DEBUG");
 
 	nxs = nxs_create(basedir);
 	assert(nxs);
@@ -44,26 +58,23 @@ run_general(void)
 
 	for (unsigned i = 0; i < __arraycount(test_docs); i++) {
 		const doc_id_t doc_id = test_docs[i].id;
-		char *text = strdup(test_docs[i].text);
+		const char *text = test_docs[i].text;
 		int ret;
 
 		ret = nxs_index_add(idx, doc_id, text, strlen(text));
 		assert(ret == 0);
-		free(text);
 	}
 
 	query = "dog";
 	results = nxs_index_search(idx, query, strlen(query));
-	assert(results);
-#if 0
-	printf("DOC COUNT %u\n", results->count);
-	nxs_result_entry_t *entry = results->entries;
-	while (entry) {
-		printf("DOC %lu, SCORE %f\n", entry->doc_id, entry->score);
-		entry = entry->next;
-	}
-#endif
+	print_results(query, results);
 	nxs_results_release(results);
+
+	query = "fox";
+	results = nxs_index_search(idx, query, strlen(query));
+	print_results(query, results);
+	nxs_results_release(results);
+
 	nxs_index_close(nxs, idx);
 	nxs_destroy(nxs);
 }

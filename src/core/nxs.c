@@ -28,7 +28,7 @@
  *		term_2 => [doc_1, doc_3, doc_5]
  *		term_3 => [doc_2]
  *
- *	See the storage.h and index.h headers for the details on the
+ *	See the index.h and storage.h headers for the details on the
  *	underlying in-memory and on-disk structures.
  */
 
@@ -205,7 +205,7 @@ nxs_index_close(nxs_t *nxs, fts_index_t *idx)
 }
 
 int
-nxs_index_add(fts_index_t *idx, uint64_t doc_id, char *text, size_t len)
+nxs_index_add(fts_index_t *idx, uint64_t doc_id, const char *text, size_t len)
 {
 	tokenset_t *tokens;
 	int ret = -1;
@@ -251,6 +251,7 @@ prepare_doc_entry(nxs_results_t *results, rhashmap_t *doc_map,
 		}
 		rhashmap_put(doc_map, &doc->id, sizeof(doc_id_t), entry);
 
+		entry->doc_id = doc->id;
 		entry->next = results->entries;
 		results->entries = entry;
 		results->count++;

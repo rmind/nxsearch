@@ -34,7 +34,7 @@ typedef struct nxs_results {
 	nxs_result_entry_t *	entries;
 } nxs_results_t;
 
-int		nxs_index_add(struct fts_index *, uint64_t, char *, size_t);
+int		nxs_index_add(struct fts_index *, uint64_t, const char *, size_t);
 nxs_results_t *	nxs_index_search(struct fts_index *, const char *, size_t);
 
 void		nxs_results_release(nxs_results_t *);

@@ -96,6 +96,16 @@ void		idxterm_incr_total(fts_index_t *, const idxterm_t *, unsigned);
 int		idxterm_add_doc(fts_index_t *, term_id_t, doc_id_t);
 
 /*
+ * Document (in-memory) interface.
+ */
+idxdoc_t *	idxdoc_create(fts_index_t *, doc_id_t, uint64_t);
+void		idxdoc_destroy(fts_index_t *, idxdoc_t *);
+idxdoc_t *	idxdoc_lookup(fts_index_t *, doc_id_t);
+int		idxdoc_get_termcount(const fts_index_t *,
+		    const idxdoc_t *, term_id_t);
+unsigned	idxdoc_get_totalcount(const fts_index_t *);
+
+/*
  * Terms index interface.
  */
 int		idx_terms_open(fts_index_t *, const char *);
@@ -104,17 +114,11 @@ int		idx_terms_sync(fts_index_t *);
 void		idx_terms_close(fts_index_t *);
 
 /*
- * On-disk document-terms index interface.
+ * Document-terms index interface.
  */
 int		idx_dtmap_open(fts_index_t *, const char *);
 int		idx_dtmap_add(fts_index_t *, doc_id_t, tokenset_t *);
 int		idx_dtmap_sync(fts_index_t *);
 void		idx_dtmap_close(fts_index_t *);
-
-unsigned	idx_dtmap_getcount(const fts_index_t *);
-
-idxdoc_t *	idxdoc_lookup(fts_index_t *, doc_id_t);
-int		idxdoc_get_termcount(const fts_index_t *,
-		    const idxdoc_t *, term_id_t);
 
 #endif

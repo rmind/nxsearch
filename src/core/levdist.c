@@ -26,7 +26,7 @@
  *	    )
  *
  * The actual implementation is based on the optimized version of the
- * Wagner–Fischer algorithm which, instead of two full matrix, uses only
+ * Wagner–Fischer algorithm which, instead of the full matrix, uses only
  * the relevant row and two variables necessary to compute the final value.
  */
 

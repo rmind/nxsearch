@@ -5,6 +5,10 @@
  * Use is subject to license terms, as specified in the LICENSE file.
  */
 
+/*
+ * Document-term index.
+ */
+
 #include <sys/mman.h>
 #include <sys/queue.h>
 #include <sys/file.h>
@@ -26,9 +30,6 @@
 #include "mmrw.h"
 #include "utils.h"
 
-static idxdoc_t *	idxdoc_create(fts_index_t *, doc_id_t, uint64_t);
-static void		idxdoc_destroy(fts_index_t *, idxdoc_t *);
-
 static int
 idx_dtmap_init(idxmap_t *idxmap)
 {
@@ -39,7 +40,7 @@ idx_dtmap_init(idxmap_t *idxmap)
 	 * it reaches global visibility.
 	 */
 	memset(hdr, 0, sizeof(idxdt_hdr_t));
-	memcpy(hdr->mark, NXS_M_MARK, sizeof(hdr->mark));
+	memcpy(hdr->mark, NXS_D_MARK, sizeof(hdr->mark));
 	hdr->ver = NXS_ABI_VER;
 	atomic_store_release(&hdr->data_len, htobe32(0));
 	return 0;
@@ -51,7 +52,7 @@ idx_dtmap_verify(const idxmap_t *idxmap)
 	const idxdt_hdr_t *hdr = idxmap->baseptr;
 	const size_t flen = idxmap->mapped_len;
 
-	if (memcmp(hdr->mark, NXS_M_MARK, sizeof(hdr->mark)) != 0 ||
+	if (memcmp(hdr->mark, NXS_D_MARK, sizeof(hdr->mark)) != 0 ||
 	    hdr->ver != NXS_ABI_VER || IDXDT_FILE_LEN(hdr) > flen) {
 		return -1;
 	}
@@ -87,21 +88,25 @@ idx_dtmap_open(fts_index_t *idx, const char *path)
 	if (!created && idx_dtmap_verify(&idx->dt_memmap) == -1) {
 		goto err;
 	}
-	flock(fd, LOCK_UN);
 
 	/*
 	 * Setup the in-memory structures.
 	 */
 	idx->dt_map = rhashmap_create(0, RHM_NOCOPY | RHM_NONCRYPTO);
+	if (idx->dt_map == NULL) {
+		goto err;
+	}
 	TAILQ_INIT(&idx->dt_list);
 	idx->dt_consumed = 0;
+	flock(fd, LOCK_UN);
 
 	/*
 	 * Finally, load the map.
 	 */
 	return idx_dtmap_sync(idx);
 err:
-	close(fd);
+	flock(fd, LOCK_UN);
+	idx_db_release(&idx->dt_memmap);
 	return -1;
 }
 
@@ -121,17 +126,20 @@ idx_dtmap_close(fts_index_t *idx)
 }
 
 int
-idx_dtmap_add(fts_index_t *idx, doc_id_t id, tokenset_t *tokens)
+idx_dtmap_add(fts_index_t *idx, doc_id_t doc_id, tokenset_t *tokens)
 {
 	idxmap_t *idxmap = &idx->dt_memmap;
 	size_t append_len, data_len, target_len, offset;
+	idxdoc_t *doc = NULL;
+	token_t *token = NULL;
 	idxdt_hdr_t *hdr;
-	token_t *token;
 	void *dataptr;
 	mmrw_t mm;
 
-	ASSERT(id > 0);
+	ASSERT(doc_id > 0);
 	ASSERT(!TAILQ_EMPTY(&tokens->list));
+	ASSERT(TAILQ_EMPTY(&tokens->staging));
+	ASSERT(tokens->count > 0);
 
 	/*
 	 * Lock the file and remap/extend if necessary.
@@ -157,8 +165,7 @@ again:
 	append_len = IDXDT_META_LEN(tokens->count);
 	target_len = sizeof(idxdt_hdr_t) + data_len + append_len;
 	if ((hdr = idx_db_map(idxmap, target_len, true)) == NULL) {
-		flock(idxmap->fd, LOCK_UN);
-		return -1;
+		goto err;
 	}
 
 	dataptr = MAP_GET_OFF(hdr, sizeof(idxdt_hdr_t) + data_len);
@@ -168,15 +175,14 @@ again:
 	 * Add the document to the in-memory map.
 	 */
 	offset = (uintptr_t)mm.curptr - (uintptr_t)hdr;
-	if (!idxdoc_create(idx, id, offset)) {
-		flock(idxmap->fd, LOCK_UN);
-		return -1;
+	if ((doc = idxdoc_create(idx, doc_id, offset)) == NULL) {
+		goto err;
 	}
 
 	/*
 	 * Fill the document metadata.
 	 */
-	if (mmrw_store64(&mm, id) == -1 ||
+	if (mmrw_store64(&mm, doc_id) == -1 ||
 	    mmrw_store32(&mm, tokens->seen) == -1 ||
 	    mmrw_store32(&mm, tokens->count) == -1) {
 		goto err;
@@ -196,7 +202,10 @@ again:
 		    mmrw_store32(&mm, token->count) == -1) {
 			goto err;
 		}
-		// FIXME: idxterm_incr_total(idx, idxterm, token->count);
+		if (idxterm_add_doc(idx, idxterm->id, doc_id) == -1) {
+			goto err;
+		}
+		idxterm_incr_total(idx, idxterm, token->count);
 	}
 
 	/*
@@ -210,8 +219,14 @@ again:
 	return 0;
 err:
 	flock(idxmap->fd, LOCK_UN);
-	// XXX: decrement the counters?
-	// FIXME: free(doc);
+	if (doc) {
+		idxdoc_destroy(idx, doc);
+	}
+#if 0 // FIXME
+	while ((token = TAILQ_PREV(token, &tokens->list, entry)) != NULL) {
+		idxterm_decr_total(idx, idxterm, token->count);
+	}
+#endif
 	return -1;
 }
 
@@ -235,6 +250,7 @@ idx_dtmap_sync(fts_index_t *idx)
 		/*
 		 * No new data: there is nothing to do.
 		 */
+		app_dbgx("nothing to consume", NULL);
 		return 0;
 	}
 
@@ -250,6 +266,7 @@ idx_dtmap_sync(fts_index_t *idx)
 	}
 	target_len = seen_data_len - idx->dt_consumed;
 	dataptr = MAP_GET_OFF(hdr, sizeof(idxdt_hdr_t) + idx->dt_consumed);
+	app_dbgx("consuming %zu", target_len);
 
 	/*
 	 * Fetch the document mapping.
@@ -288,85 +305,6 @@ idx_dtmap_sync(fts_index_t *idx)
 		}
 	}
 	idx->dt_consumed = seen_data_len;
+	app_dbgx("consumed = %zu", seen_data_len);
 	return 0;
-}
-
-unsigned
-idx_dtmap_getcount(const fts_index_t *idx)
-{
-	const idxmap_t *idxmap = &idx->dt_memmap;
-	const idxdt_hdr_t *hdr = idxmap->baseptr;
-	return be32toh(hdr->doc_count);
-}
-
-static idxdoc_t *
-idxdoc_create(fts_index_t *idx, doc_id_t id, uint64_t offset)
-{
-	idxdoc_t *doc;
-
-	doc = malloc(sizeof(idxdoc_t));
-	if (doc == NULL) {
-		return NULL;
-	}
-	doc->id = id;
-	doc->offset = offset;
-
-	if (rhashmap_put(idx->dt_map, &doc->id, sizeof(doc_id_t), doc) != doc) {
-		free(doc);
-		errno = EINVAL;
-		return NULL;
-	}
-	TAILQ_INSERT_TAIL(&idx->dt_list, doc, entry);
-	return doc;
-}
-
-static void
-idxdoc_destroy(fts_index_t *idx, idxdoc_t *doc)
-{
-	rhashmap_del(idx->dt_map, &doc->id, sizeof(doc_id_t));
-	TAILQ_REMOVE(&idx->dt_list, doc, entry);
-	free(doc);
-}
-
-idxdoc_t *
-idxdoc_lookup(fts_index_t *idx, doc_id_t doc_id)
-{
-	return rhashmap_get(idx->dt_map, &doc_id, sizeof(doc_id_t));
-}
-
-int
-idxdoc_get_termcount(const fts_index_t *idx,
-    const idxdoc_t *doc, term_id_t term_id)
-{
-	const idxmap_t *idxmap = &idx->dt_memmap;
-	const idxdt_hdr_t *hdr = idxmap->baseptr;
-	unsigned n;
-	mmrw_t mm;
-
-	mmrw_init(&mm, MAP_GET_OFF(hdr, doc->offset),
-	    IDXDT_FILE_LEN(hdr) - doc->offset);
-
-	if (mmrw_advance(&mm, 8 + 4) == -1 ||
-	    mmrw_fetch32(&mm, &n) == -1) {
-		return -1;
-	}
-
-	/*
-	 * XXX: O(n) scan; sort by term ID on indexing and use
-	 * binary search here?
-	 */
-	for (unsigned i = 0; i < n; i++) {
-		term_id_t id;
-		uint32_t count;
-
-		if (mmrw_fetch32(&mm, &id) == -1 ||
-		    mmrw_fetch32(&mm, &count) == -1) {
-			return -1;
-		}
-		if (term_id == id) {
-			return count;
-		}
-	}
-
-	return -1;
 }

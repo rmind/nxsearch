@@ -93,12 +93,14 @@ OBJS+=		core/levdist.o
 
 OBJS+=		index/idxmap.o
 OBJS+=		index/idxterm.o
+OBJS+=		index/idxdoc.o
 OBJS+=		index/terms.o
 OBJS+=		index/dtmap.o
 
 OBJS+=		utils/strbuf.o
 OBJS+=		utils/mmrw.o
 OBJS+=		utils/utf8.o
+OBJS+=		utils/log.o
 
 #
 # libs

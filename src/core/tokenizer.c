@@ -116,17 +116,20 @@ tokenset_add(tokenset_t *tset, token_t *token)
  * and pass the token through the filter pipeline.
  */
 tokenset_t *
-tokenize(filter_pipeline_t *fp, char *text, size_t text_len __unused)
+tokenize(filter_pipeline_t *fp, const char *text, size_t text_len __unused)
 {
 	const char *sep = " \t\n";
-	char *val, *brk;
+	char *content, *val, *brk;
 	tokenset_t *tset;
 
 	if ((tset = tokenset_create()) == NULL) {
 		return NULL;
 	}
+	if ((content = strdup(text)) == NULL) {
+		goto err;
+	}
 
-	for (val = strtok_r(text, sep, &brk); val;
+	for (val = strtok_r(content, sep, &brk); val;
 	    val = strtok_r(NULL, sep, &brk)) {
 		const size_t len = strlen(val);  // XXX
 		filter_action_t action;
@@ -147,8 +150,10 @@ tokenize(filter_pipeline_t *fp, char *text, size_t text_len __unused)
 		}
 		tokenset_add(tset, token);
 	}
+	free(content);
 	return tset;
 err:
 	tokenset_destroy(tset);
+	free(content);
 	return NULL;
 }

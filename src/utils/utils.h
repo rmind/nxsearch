@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Mindaugas Rasiukevicius <rmind at noxt eu>
+ * Copyright (c) 2020-2022 Mindaugas Rasiukevicius <rmind at noxt eu>
  * All rights reserved.
  *
  * Use is subject to license terms, as specified in the LICENSE file.
@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <inttypes.h>
+#include <syslog.h>
 #include <limits.h>
 #include <assert.h>
 
@@ -104,7 +105,26 @@
 #endif
 
 /*
- * Misc interfaces.
+ * Log interface.
  */
+
+extern int app_log_level;
+
+int	app_set_loglevel(const char *);
+
+void	_app_log(int, const char *, int, const char *, const char *, ...);
+
+#define	LOG_EMSG	(1U << 31)
+
+/* Optimize-out the debug logging. */
+#ifdef DEBUG
+#define	app_dbgx(m, ...)	if (__predict_false(app_log_level >= LOG_DEBUG)) \
+    _app_log(LOG_DEBUG, __FILE__, __LINE__, __func__, m, __VA_ARGS__)
+#define	app_dbg(m, ...)		if (__predict_false(app_log_level >= LOG_DEBUG)) \
+    _app_log(LOG_DEBUG|LOG_EMSG, __FILE__, __LINE__, __func__, m, __VA_ARGS__)
+#else
+#define	app_dbgx(m, ...)
+#define	app_dbg(m, ...)
+#endif
 
 #endif
