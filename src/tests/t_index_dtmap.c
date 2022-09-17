@@ -41,7 +41,7 @@ static const uint8_t dtmap_db_exp[] = {
 };
 
 static void
-prepare_terms(fts_index_t *idx, tokenset_t *tokens, bool init)
+prepare_terms(nxs_index_t *idx, tokenset_t *tokens, bool init)
 {
 	int ret;
 
@@ -59,7 +59,7 @@ prepare_terms(fts_index_t *idx, tokenset_t *tokens, bool init)
 }
 
 static void
-check_term_counts(fts_index_t *idx, doc_id_t doc1_id, doc_id_t doc2_id)
+check_term_counts(nxs_index_t *idx, nxs_doc_id_t doc1_id, nxs_doc_id_t doc2_id)
 {
 	idxdoc_t *doc;
 	int tc;
@@ -85,9 +85,9 @@ static void
 run_dtmap_test(void)
 {
 	char *testdb_path = get_tmpfile(NULL);
-	const doc_id_t doc1_id = 1001, doc2_id = 1002;
+	const nxs_doc_id_t doc1_id = 1001, doc2_id = 1002;
 	tokenset_t *tokens1, *tokens2;
-	fts_index_t idx;
+	nxs_index_t idx;
 	int ret;
 
 	memset(&idx, 0, sizeof(idx));

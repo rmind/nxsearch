@@ -27,7 +27,7 @@
 #include "utils.h"
 
 idxdoc_t *
-idxdoc_create(fts_index_t *idx, doc_id_t id, uint64_t offset)
+idxdoc_create(nxs_index_t *idx, nxs_doc_id_t id, uint64_t offset)
 {
 	idxdoc_t *doc;
 
@@ -38,7 +38,8 @@ idxdoc_create(fts_index_t *idx, doc_id_t id, uint64_t offset)
 	doc->id = id;
 	doc->offset = offset;
 
-	if (rhashmap_put(idx->dt_map, &doc->id, sizeof(doc_id_t), doc) != doc) {
+	if (rhashmap_put(idx->dt_map, &doc->id,
+	    sizeof(nxs_doc_id_t), doc) != doc) {
 		free(doc);
 		errno = EINVAL;
 		return NULL;
@@ -49,17 +50,17 @@ idxdoc_create(fts_index_t *idx, doc_id_t id, uint64_t offset)
 }
 
 void
-idxdoc_destroy(fts_index_t *idx, idxdoc_t *doc)
+idxdoc_destroy(nxs_index_t *idx, idxdoc_t *doc)
 {
-	rhashmap_del(idx->dt_map, &doc->id, sizeof(doc_id_t));
+	rhashmap_del(idx->dt_map, &doc->id, sizeof(nxs_doc_id_t));
 	TAILQ_REMOVE(&idx->dt_list, doc, entry);
 	free(doc);
 }
 
 idxdoc_t *
-idxdoc_lookup(fts_index_t *idx, doc_id_t doc_id)
+idxdoc_lookup(nxs_index_t *idx, nxs_doc_id_t doc_id)
 {
-	return rhashmap_get(idx->dt_map, &doc_id, sizeof(doc_id_t));
+	return rhashmap_get(idx->dt_map, &doc_id, sizeof(nxs_doc_id_t));
 }
 
 /*
@@ -67,8 +68,8 @@ idxdoc_lookup(fts_index_t *idx, doc_id_t doc_id)
  * in the given document.
  */
 int
-idxdoc_get_termcount(const fts_index_t *idx,
-    const idxdoc_t *doc, term_id_t term_id)
+idxdoc_get_termcount(const nxs_index_t *idx,
+    const idxdoc_t *doc, nxs_term_id_t term_id)
 {
 	const idxmap_t *idxmap = &idx->dt_memmap;
 	const idxdt_hdr_t *hdr = idxmap->baseptr;
@@ -88,7 +89,7 @@ idxdoc_get_termcount(const fts_index_t *idx,
 	 * binary search here?
 	 */
 	for (unsigned i = 0; i < n; i++) {
-		term_id_t id;
+		nxs_term_id_t id;
 		uint32_t count;
 
 		if (mmrw_fetch32(&mm, &id) == -1 ||
@@ -107,7 +108,7 @@ idxdoc_get_termcount(const fts_index_t *idx,
  * idxdoc_get_totalcount: get the total document count in the index.
  */
 unsigned
-idxdoc_get_totalcount(const fts_index_t *idx)
+idxdoc_get_totalcount(const nxs_index_t *idx)
 {
 	const idxmap_t *idxmap = &idx->dt_memmap;
 	const idxdt_hdr_t *hdr = idxmap->baseptr;

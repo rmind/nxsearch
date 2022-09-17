@@ -9,7 +9,13 @@
 #define _NXSLIB_H_
 
 #include <inttypes.h>
-#include "index.h"
+
+/*
+ * General nxsearch library API.
+ */
+
+typedef uint32_t nxs_term_id_t;
+typedef uint64_t nxs_doc_id_t;
 
 struct nxs;
 typedef struct nxs nxs_t;
@@ -17,26 +23,34 @@ typedef struct nxs nxs_t;
 nxs_t *		nxs_create(const char *);
 void		nxs_destroy(nxs_t *);
 
-struct fts_index;
+/*
+ * Index handling API.
+ */
 
-struct fts_index *nxs_index_create(nxs_t *, const char *);
-struct fts_index *nxs_index_open(nxs_t *, const char *);
-void		nxs_index_close(nxs_t *, struct fts_index *);
+struct nxs_index;
+typedef struct nxs_index nxs_index_t;
+
+nxs_index_t *	nxs_index_create(nxs_t *, const char *);
+nxs_index_t *	nxs_index_open(nxs_t *, const char *);
+void		nxs_index_close(nxs_t *, nxs_index_t *);
+int		nxs_index_add(nxs_index_t *, uint64_t, const char *, size_t);
+
+/*
+ * Search API.
+ */
 
 typedef struct nxs_result_entry {
-	doc_id_t	doc_id;
+	nxs_doc_id_t	doc_id;
 	float		score;
 	void *		next;
 } nxs_result_entry_t;
 
 typedef struct nxs_results {
-	unsigned		count;
-	nxs_result_entry_t *	entries;
+	unsigned	count;
+	nxs_result_entry_t *entries;
 } nxs_results_t;
 
-int		nxs_index_add(struct fts_index *, uint64_t, const char *, size_t);
-nxs_results_t *	nxs_index_search(struct fts_index *, const char *, size_t);
-
+nxs_results_t *	nxs_index_search(nxs_index_t *, const char *, size_t);
 void		nxs_results_release(nxs_results_t *);
 
 #endif

@@ -33,7 +33,7 @@
  */
 
 float
-tf_idf(const fts_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
+tf_idf(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 {
 	/*
 	 * TF-IDF intuition:

@@ -35,7 +35,7 @@ static const uint8_t terms_db_exp[] = {
 };
 
 static void
-check_terms(fts_index_t *idx)
+check_terms(nxs_index_t *idx)
 {
 	static const char *expected_tokens[] = {
 		"some-term-1", "another-term-2"
@@ -58,7 +58,7 @@ run_idxterm_test(void)
 	char *testdb_path = get_tmpfile(NULL);
 	const char tval[] = "test-1";
 	idxterm_t *term, *tp;
-	fts_index_t idx;
+	nxs_index_t idx;
 	int ret;
 
 	memset(&idx, 0, sizeof(idx));
@@ -85,7 +85,7 @@ run_terms_test(void)
 {
 	char *testdb_path = get_tmpfile(NULL);
 	tokenset_t *tokens;
-	fts_index_t idx;
+	nxs_index_t idx;
 	int ret;
 
 	memset(&idx, 0, sizeof(idx));

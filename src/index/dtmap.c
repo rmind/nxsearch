@@ -60,7 +60,7 @@ idx_dtmap_verify(const idxmap_t *idxmap)
 }
 
 int
-idx_dtmap_open(fts_index_t *idx, const char *path)
+idx_dtmap_open(nxs_index_t *idx, const char *path)
 {
 	int fd;
 	void *baseptr;
@@ -111,7 +111,7 @@ err:
 }
 
 void
-idx_dtmap_close(fts_index_t *idx)
+idx_dtmap_close(nxs_index_t *idx)
 {
 	idxmap_t *idxmap = &idx->dt_memmap;
 	idxdoc_t *doc;
@@ -126,7 +126,7 @@ idx_dtmap_close(fts_index_t *idx)
 }
 
 int
-idx_dtmap_add(fts_index_t *idx, doc_id_t doc_id, tokenset_t *tokens)
+idx_dtmap_add(nxs_index_t *idx, nxs_doc_id_t doc_id, tokenset_t *tokens)
 {
 	idxmap_t *idxmap = &idx->dt_memmap;
 	size_t append_len, data_len, target_len, offset;
@@ -231,7 +231,7 @@ err:
 }
 
 int
-idx_dtmap_sync(fts_index_t *idx)
+idx_dtmap_sync(nxs_index_t *idx)
 {
 	idxmap_t *idxmap = &idx->dt_memmap;
 	size_t seen_data_len, target_len;
@@ -273,7 +273,7 @@ idx_dtmap_sync(fts_index_t *idx)
 	 */
 	mmrw_init(&mm, dataptr, target_len);
 	while (mm.remaining) {
-		doc_id_t doc_id;
+		nxs_doc_id_t doc_id;
 		uint32_t n, doc_total_len;
 		uint64_t offset;
 
@@ -292,7 +292,7 @@ idx_dtmap_sync(fts_index_t *idx)
 		 * Build the reverse term-document index.
 		 */
 		for (unsigned i = 0; i < n; i++) {
-			term_id_t id;
+			nxs_term_id_t id;
 			uint32_t count;
 
 			if (mmrw_fetch32(&mm, &id) == -1 ||

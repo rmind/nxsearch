@@ -27,6 +27,6 @@ struct nxs {
 
 int	nxs_filter_register(nxs_t *, const char *, const filter_ops_t *);
 
-float	tf_idf(const fts_index_t *, const idxterm_t *, const idxdoc_t *);
+float	tf_idf(const nxs_index_t *, const idxterm_t *, const idxdoc_t *);
 
 #endif

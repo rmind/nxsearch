@@ -15,7 +15,7 @@
 
 static const struct test_docs_s {
 	const char *	text;
-	doc_id_t	id;
+	nxs_doc_id_t	id;
 } test_docs[] = {
 	{
 		"The quick brown fox jumped over the lazy dog",
@@ -45,7 +45,7 @@ run_general(void)
 	char *basedir = get_tmpdir();
 	const char *query;
 	nxs_results_t *results;
-	fts_index_t *idx;
+	nxs_index_t *idx;
 	nxs_t *nxs;
 
 	// app_set_loglevel("DEBUG");
@@ -57,7 +57,7 @@ run_general(void)
 	assert(idx);
 
 	for (unsigned i = 0; i < __arraycount(test_docs); i++) {
-		const doc_id_t doc_id = test_docs[i].id;
+		const nxs_doc_id_t doc_id = test_docs[i].id;
 		const char *text = test_docs[i].text;
 		int ret;
 

@@ -72,7 +72,7 @@ idx_terms_verify(const idxmap_t *idxmap)
 }
 
 int
-idx_terms_open(fts_index_t *idx, const char *path)
+idx_terms_open(nxs_index_t *idx, const char *path)
 {
 	int fd;
 	void *baseptr;
@@ -124,7 +124,7 @@ err:
 }
 
 void
-idx_terms_close(fts_index_t *idx)
+idx_terms_close(nxs_index_t *idx)
 {
 	idxmap_t *idxmap = &idx->terms_memmap;
 	idxterm_t *term;
@@ -148,7 +148,7 @@ idx_terms_close(fts_index_t *idx)
  * - Terms are added into the on-disk index and the in-memory list.
  */
 int
-idx_terms_add(fts_index_t *idx, tokenset_t *tokens)
+idx_terms_add(nxs_index_t *idx, tokenset_t *tokens)
 {
 	idxmap_t *idxmap = &idx->terms_memmap;
 	size_t max_append_len, data_len, target_len, append_len = 0;
@@ -205,7 +205,7 @@ again:
 		const char *val = token->buffer.value;
 		const size_t len = token->buffer.length;
 		idxterm_t *term;
-		term_id_t id;
+		nxs_term_id_t id;
 		size_t offset;
 
 		/*
@@ -264,7 +264,7 @@ err:
  * the in-memory structures).
  */
 int
-idx_terms_sync(fts_index_t *idx)
+idx_terms_sync(nxs_index_t *idx)
 {
 	idxmap_t *idxmap = &idx->terms_memmap;
 	size_t seen_data_len, target_len, consumed_len = 0;
@@ -309,7 +309,7 @@ idx_terms_sync(fts_index_t *idx)
 	mmrw_init(&mm, dataptr, target_len);
 	while (mm.remaining) {
 		idxterm_t *term;
-		term_id_t id;
+		nxs_term_id_t id;
 		const char *val;
 		size_t offset;
 		uint64_t count;

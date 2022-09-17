@@ -98,7 +98,7 @@ nxs_destroy(nxs_t *nxs)
 	free(nxs);
 }
 
-fts_index_t *
+nxs_index_t *
 nxs_index_create(nxs_t *nxs, const char *name)
 {
 	char *path;
@@ -122,7 +122,7 @@ nxs_index_create(nxs_t *nxs, const char *name)
 	return nxs_index_open(nxs, name);
 }
 
-fts_index_t *
+nxs_index_t *
 nxs_index_open(nxs_t *nxs, const char *name)
 {
 	const char *filters[] = {
@@ -130,7 +130,7 @@ nxs_index_open(nxs_t *nxs, const char *name)
 		"normalizer", "stemmer"
 	};
 	const size_t name_len = strlen(name);
-	fts_index_t *idx;
+	nxs_index_t *idx;
 	char *path;
 	int ret;
 
@@ -139,7 +139,7 @@ nxs_index_open(nxs_t *nxs, const char *name)
 		return NULL;
 	}
 
-	idx = calloc(1, sizeof(fts_index_t));
+	idx = calloc(1, sizeof(nxs_index_t));
 	if (idx == NULL) {
 		return NULL;
 	}
@@ -189,7 +189,7 @@ nxs_index_open(nxs_t *nxs, const char *name)
 }
 
 void
-nxs_index_close(nxs_t *nxs, fts_index_t *idx)
+nxs_index_close(nxs_t *nxs, nxs_index_t *idx)
 {
 	if (idx->name) {
 		rhashmap_del(nxs->indexes, idx->name, strlen(idx->name));
@@ -205,7 +205,7 @@ nxs_index_close(nxs_t *nxs, fts_index_t *idx)
 }
 
 int
-nxs_index_add(fts_index_t *idx, uint64_t doc_id, const char *text, size_t len)
+nxs_index_add(nxs_index_t *idx, uint64_t doc_id, const char *text, size_t len)
 {
 	tokenset_t *tokens;
 	int ret = -1;
@@ -244,12 +244,12 @@ prepare_doc_entry(nxs_results_t *results, rhashmap_t *doc_map,
 {
 	nxs_result_entry_t *entry;
 
-	entry = rhashmap_get(doc_map, &doc->id, sizeof(doc_id_t));
+	entry = rhashmap_get(doc_map, &doc->id, sizeof(nxs_doc_id_t));
 	if (entry == NULL) {
 		if ((entry = calloc(1, sizeof(nxs_result_entry_t))) == NULL) {
 			return NULL;
 		}
-		rhashmap_put(doc_map, &doc->id, sizeof(doc_id_t), entry);
+		rhashmap_put(doc_map, &doc->id, sizeof(nxs_doc_id_t), entry);
 
 		entry->doc_id = doc->id;
 		entry->next = results->entries;
@@ -262,7 +262,7 @@ prepare_doc_entry(nxs_results_t *results, rhashmap_t *doc_map,
 }
 
 nxs_results_t *
-nxs_index_search(fts_index_t *idx, const char *query, size_t len)
+nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 {
 	nxs_results_t *results = NULL;
 	tokenset_t *tokens;
@@ -313,7 +313,7 @@ nxs_index_search(fts_index_t *idx, const char *query, size_t len)
 
 		bm_iter = roaring_create_iterator(term->doc_bitmap);
 		while (bm_iter->has_value) {
-			const doc_id_t doc_id = bm_iter->current_value;
+			const nxs_doc_id_t doc_id = bm_iter->current_value;
 			idxdoc_t *doc;
 			float score;
 

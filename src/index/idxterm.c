@@ -37,7 +37,7 @@
 #include "utils.h"
 
 int
-idxterm_sysinit(fts_index_t *idx)
+idxterm_sysinit(nxs_index_t *idx)
 {
 	idx->td_map = rhashmap_create(0, RHM_NOCOPY | RHM_NONCRYPTO);
 	if (idx->td_map == NULL) {
@@ -47,7 +47,7 @@ idxterm_sysinit(fts_index_t *idx)
 }
 
 void
-idxterm_sysfini(fts_index_t *idx)
+idxterm_sysfini(nxs_index_t *idx)
 {
 	if (idx->td_map) {
 		rhashmap_destroy(idx->td_map);
@@ -55,7 +55,7 @@ idxterm_sysfini(fts_index_t *idx)
 }
 
 idxterm_t *
-idxterm_create(fts_index_t *idx, const char *token,
+idxterm_create(nxs_index_t *idx, const char *token,
     const size_t len, const size_t offset)
 {
 	idxterm_t *term;
@@ -89,15 +89,15 @@ idxterm_create(fts_index_t *idx, const char *token,
 }
 
 void
-idxterm_destroy(fts_index_t *idx, idxterm_t *term)
+idxterm_destroy(nxs_index_t *idx, idxterm_t *term)
 {
 	const size_t term_len = strlen(term->value);
 
 	TAILQ_REMOVE(&idx->term_list, term, entry);
 	if (term->id) {
-		(void)rhashmap_del(idx->td_map, &term->id, sizeof(term_id_t));
+		rhashmap_del(idx->td_map, &term->id, sizeof(nxs_term_id_t));
 	}
-	(void)rhashmap_del(idx->term_map, term->value, term_len);
+	rhashmap_del(idx->term_map, term->value, term_len);
 	roaring_bitmap_free(term->doc_bitmap);
 	free(term);
 }
@@ -106,10 +106,10 @@ idxterm_destroy(fts_index_t *idx, idxterm_t *term)
  * idxterm_assign: assign the term ID and map the ID to the term object.
  */
 void
-idxterm_assign(fts_index_t *idx, idxterm_t *term, term_id_t term_id)
+idxterm_assign(nxs_index_t *idx, idxterm_t *term, nxs_term_id_t term_id)
 {
 	term->id = term_id;
-	rhashmap_put(idx->td_map, &term->id, sizeof(term_id_t), term);
+	rhashmap_put(idx->td_map, &term->id, sizeof(nxs_term_id_t), term);
 	app_dbgx("term %p [%s] => %u", term, term->value, term->id);
 }
 
@@ -117,7 +117,7 @@ idxterm_assign(fts_index_t *idx, idxterm_t *term, term_id_t term_id)
  * idxterm_lookup: find the term object given the term/token value.
  */
 idxterm_t *
-idxterm_lookup(fts_index_t *idx, const char *value, size_t len)
+idxterm_lookup(nxs_index_t *idx, const char *value, size_t len)
 {
 	return rhashmap_get(idx->term_map, value, len);
 }
@@ -128,7 +128,7 @@ idxterm_lookup(fts_index_t *idx, const char *value, size_t len)
  * a separate staging list if the 'stage' flag is true.
  */
 void
-idxterm_resolve_tokens(fts_index_t *idx, tokenset_t *tokens, bool stage)
+idxterm_resolve_tokens(nxs_index_t *idx, tokenset_t *tokens, bool stage)
 {
 	token_t *token;
 
@@ -153,7 +153,7 @@ idxterm_resolve_tokens(fts_index_t *idx, tokenset_t *tokens, bool stage)
 }
 
 void
-idxterm_incr_total(fts_index_t *idx, const idxterm_t *term, unsigned count)
+idxterm_incr_total(nxs_index_t *idx, const idxterm_t *term, unsigned count)
 {
 	const idxmap_t *idxmap = &idx->terms_memmap;
 	const idxterms_hdr_t *hdr = idxmap->baseptr;
@@ -172,11 +172,11 @@ idxterm_incr_total(fts_index_t *idx, const idxterm_t *term, unsigned count)
 }
 
 int
-idxterm_add_doc(fts_index_t *idx, term_id_t term_id, doc_id_t doc_id)
+idxterm_add_doc(nxs_index_t *idx, nxs_term_id_t term_id, nxs_doc_id_t doc_id)
 {
 	idxterm_t *term;
 
-	term = rhashmap_get(idx->td_map, &term_id, sizeof(term_id_t));
+	term = rhashmap_get(idx->td_map, &term_id, sizeof(nxs_term_id_t));
 	if (!term) {
 		return -1;
 	}
