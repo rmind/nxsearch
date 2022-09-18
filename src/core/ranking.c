@@ -20,6 +20,8 @@
  * on the score it produces.  The algorithm assigns a score based on its
  * estimation of document *relevance*.
  *
+ * This module implements two algorithms: TF-IDF and BM25.
+ *
  * References:
  *
  *	Hans Peter Luhn, 1957, "A Statistical Approach to Mechanized
@@ -71,7 +73,7 @@ tf_idf(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	ASSERT(term_freq > 0);
 	tf = log(term_freq + 1);
 
-	doc_count = idxdoc_get_totalcount(idx);
+	doc_count = idx_get_doc_count(idx);
 	doc_freq = roaring_bitmap_get_cardinality(term->doc_bitmap);
 	idf = log((float)doc_count / doc_freq) + 1;
 
@@ -79,4 +81,68 @@ tf_idf(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	    term_freq, doc_freq, tf, idf, tf * idf);
 
 	return tf * idf;
+}
+
+float
+bm25(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
+{
+	/*
+	 * BM25 can be seen as an evolution of TF-IDF.
+	 *
+	 * There are several adjustments:
+	 *
+	 * - It bounds TF using the tf / (tf + k) formula.  This addresses
+	 * the term saturation problem (i.e. many occurrences of the same
+	 * term in the document resulting in a greater score) and gives the
+	 * greater weight for documents which match multiple terms rather
+	 * than one term many times.
+	 *
+	 * - The algorithm weights in the document length in TF.  The weight
+	 * is expressed by the ratio of the document length and the average
+	 * document length in the whole document collection: dl / adl.  It
+	 * is used as coefficient to k.  The longer the document, the lower
+	 * weight it will have.  The importance of this weight is regulated
+	 * by a constant b using the 1 – b + b * dl / adl formula, where b
+	 * is between 0 and 1.
+	 *
+	 * - BM2 also uses probabilistic IDF, defined as:
+	 *
+	 *	log((N - doc_freq(t) + .5) / (doc_freq(t) + .5))
+	 *
+	 * This is tuned to speed up the score decline for the terms which
+	 * are used in many documents.  Note: Lucene adds 1 to the expression
+	 * in logarithm to avoid the negative scores.
+	 *
+	 * - Therefore:
+	 *
+	 *	TF <- tf(t, d) = log(term_freq(t, d) + 1)
+	 *	BM25 = TF / (TF + k * (1 - b + b * dl / adl)) *
+	 *	       log((N - doc_freq(t) + .5) / (doc_freq(t) + .5) + 1)
+	 *
+	 * We will use the fine tuned k and b constants from Lucene:
+	 *
+	 *	k = 1.2
+	 *	b = 0.75
+	 */
+
+	static const double k = 1.2f;
+	static const double b = 0.75f;
+
+	int term_freq;
+	double doc_freq, doc_count;
+	double tf, dl, adl, tf_bm25, idf_bm25;
+
+	term_freq = idxdoc_get_termcount(idx, doc, term->id);
+	ASSERT(term_freq > 0);
+
+	tf = log(term_freq + 1);
+	dl = idxdoc_get_doclen(idx, doc);
+	adl = idx_get_token_count(idx) / idx_get_doc_count(idx);
+	tf_bm25 = tf / (tf + k * (1 - b + b * dl / adl));
+
+	doc_count = idx_get_doc_count(idx);
+	doc_freq = roaring_bitmap_get_cardinality(term->doc_bitmap);
+	idf_bm25 = log(((doc_count - doc_freq + 0.5) / (doc_freq + 0.5)) + 1);
+
+	return tf_bm25 * idf_bm25;
 }

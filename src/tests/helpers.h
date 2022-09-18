@@ -19,4 +19,7 @@ tokenset_t *	get_test_tokenset(const char *[], size_t);
 
 void		run_with_index(const char *, const char *, bool, test_func_t);
 
+void		print_search_results(const char *, nxs_results_t *);
+void		check_doc_score(nxs_results_t *, nxs_doc_id_t, float);
+
 #endif

@@ -98,9 +98,10 @@ int		idxterm_add_doc(nxs_index_t *, nxs_term_id_t, nxs_doc_id_t);
 idxdoc_t *	idxdoc_create(nxs_index_t *, nxs_doc_id_t, uint64_t);
 void		idxdoc_destroy(nxs_index_t *, idxdoc_t *);
 idxdoc_t *	idxdoc_lookup(nxs_index_t *, nxs_doc_id_t);
+
+int		idxdoc_get_doclen(const nxs_index_t *, const idxdoc_t *);
 int		idxdoc_get_termcount(const nxs_index_t *,
 		    const idxdoc_t *, nxs_term_id_t);
-unsigned	idxdoc_get_totalcount(const nxs_index_t *);
 
 /*
  * Terms index interface.
@@ -117,5 +118,8 @@ int		idx_dtmap_open(nxs_index_t *, const char *);
 int		idx_dtmap_add(nxs_index_t *, nxs_doc_id_t, tokenset_t *);
 int		idx_dtmap_sync(nxs_index_t *);
 void		idx_dtmap_close(nxs_index_t *);
+
+uint64_t	idx_get_token_count(const nxs_index_t *);
+uint32_t	idx_get_doc_count(const nxs_index_t *);
 
 #endif

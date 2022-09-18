@@ -83,6 +83,9 @@ static_assert(sizeof(idxterms_hdr_t) % 8 == 0);  // alignment guard
  *	+--------+---------+-----+--------+-------+--------+
  *	|   8    |    4    |  4  | 4 + 4  |      ...       |
  *
+ * The document length is counted in tokens (note that this includes
+ * all repetitions/duplicates).
+ *
  * Term is a tuple of 32-bit term ID and the 32-bit count of its
  * occurrences in the document.
  *
@@ -103,9 +106,10 @@ typedef struct {
 	uint64_t	data_len __align64;
 
 	/*
-	 * Total number of tokens in all documents and the document count.
+	 * Total number of seen tokens (including repetitions/duplicates)
+	 * in all documents in the index.  Also, the total document count.
 	 */
-	uint64_t	total_tokens;
+	uint64_t	token_count;
 	uint32_t	doc_count;
 	uint32_t	reserved1;
 
@@ -118,6 +122,12 @@ static_assert(sizeof(idxdt_hdr_t) % 8 == 0);  // alignment guard
     ((void *)((uintptr_t)(hdr) + (sizeof(idxdt_hdr_t) + (off))))
 
 #define	IDXDT_META_LEN(n)	(8UL + 4 + 4 + ((n) * (4 + 4)))
+
+#define	IDXDT_TOKEN_COUNT(h)	\
+    be64toh(atomic_load_relaxed(&(hdr)->token_count))
+
+#define	IDXDT_DOC_COUNT(h)	\
+    be32toh(atomic_load_relaxed(&(hdr)->doc_count))
 
 /*
  * Helpers.

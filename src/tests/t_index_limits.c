@@ -15,6 +15,8 @@
 #include "helpers.h"
 #include "utils.h"
 
+// FIXME: #define	TERM_TARGET	UINT16_MAX
+#define	TERM_TARGET	(UINT16_MAX / 3)
 #define	DOC_ID		1001
 
 static char
@@ -57,7 +59,7 @@ generate_terms_doc(nxs_index_t *idx)
 	tokenset_t *tokens;
 	int ret;
 
-	tokens = generate_tokens(UINT16_MAX);
+	tokens = generate_tokens(TERM_TARGET);
 	tokenset_resolve(tokens, idx, true);
 
 	ret = idx_terms_add(idx, tokens);
@@ -73,11 +75,12 @@ static void
 verify_terms_doc(nxs_index_t *idx)
 {
 	idxdoc_t *doc;
+	int count;
 
 	doc = idxdoc_lookup(idx, DOC_ID);
 	assert(doc);
 
-	for (unsigned i = 0; i < UINT16_MAX; i++) {
+	for (unsigned i = 0; i < TERM_TARGET; i++) {
 		nxs_term_id_t term_id = i + 1;
 		idxterm_t *term;
 		char val[4 + 1];
@@ -99,6 +102,12 @@ verify_terms_doc(nxs_index_t *idx)
 		c = idxdoc_get_termcount(idx, doc, term_id);
 		assert(c == 1);
 	}
+
+	count = idxdoc_get_doclen(idx, doc);
+	assert(count == TERM_TARGET);
+
+	count = idx_get_token_count(idx);
+	assert(count == TERM_TARGET);
 }
 
 static void

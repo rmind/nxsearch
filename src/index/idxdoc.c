@@ -64,6 +64,27 @@ idxdoc_lookup(nxs_index_t *idx, nxs_doc_id_t doc_id)
 }
 
 /*
+ * idxdoc_get_doclen: get the document length in tokens.
+ */
+int
+idxdoc_get_doclen(const nxs_index_t *idx, const idxdoc_t *doc)
+{
+	const idxmap_t *idxmap = &idx->dt_memmap;
+	const idxdt_hdr_t *hdr = idxmap->baseptr;
+	unsigned n;
+	mmrw_t mm;
+
+	mmrw_init(&mm, MAP_GET_OFF(hdr, doc->offset),
+	    (sizeof(idxdt_hdr_t) + idx->dt_consumed) - doc->offset);
+
+	if (mmrw_advance(&mm, 8) == -1 ||
+	    mmrw_fetch32(&mm, &n) == -1) {
+		return -1;
+	}
+	return (int)n;
+}
+
+/*
  * idxdoc_get_termcount: get the term count (given the term ID)
  * in the given document.
  */
@@ -102,15 +123,4 @@ idxdoc_get_termcount(const nxs_index_t *idx,
 	}
 
 	return -1;
-}
-
-/*
- * idxdoc_get_totalcount: get the total document count in the index.
- */
-unsigned
-idxdoc_get_totalcount(const nxs_index_t *idx)
-{
-	const idxmap_t *idxmap = &idx->dt_memmap;
-	const idxdt_hdr_t *hdr = idxmap->baseptr;
-	return be32toh(hdr->doc_count);
 }

@@ -213,8 +213,10 @@ again:
 	 * Increment the document totals and publish the new data length.
 	 */
 	idx->dt_consumed = data_len + append_len;
-	hdr->total_tokens = htobe64(be64toh(hdr->total_tokens) + tokens->seen);
-	hdr->doc_count = htobe32(be32toh(hdr->doc_count) + 1);
+	atomic_store_relaxed(&hdr->token_count,
+	    htobe64(IDXDT_TOKEN_COUNT(hdr) + tokens->seen));
+	atomic_store_relaxed(&hdr->doc_count,
+	    htobe32(IDXDT_DOC_COUNT(hdr) + 1));
 	atomic_store_release(&hdr->data_len, htobe64(idx->dt_consumed));
 
 	if (idxmap->sync) {
@@ -319,4 +321,26 @@ err:
 	idx->dt_consumed = consumed_len;
 	app_dbgx("consumed = %zu", consumed_len);
 	return ret;
+}
+
+/*
+ * idx_get_token_count: get the total token count in the index.
+ */
+uint64_t
+idx_get_token_count(const nxs_index_t *idx)
+{
+	const idxmap_t *idxmap = &idx->dt_memmap;
+	const idxdt_hdr_t *hdr = idxmap->baseptr;
+	return IDXDT_TOKEN_COUNT(hdr);
+}
+
+/*
+ * idx_get_doc_count: get the total document count in the index.
+ */
+uint32_t
+idx_get_doc_count(const nxs_index_t *idx)
+{
+	const idxmap_t *idxmap = &idx->dt_memmap;
+	const idxdt_hdr_t *hdr = idxmap->baseptr;
+	return IDXDT_DOC_COUNT(hdr);
 }

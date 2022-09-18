@@ -29,7 +29,7 @@ static const uint8_t dtmap_db_exp[] = {
 	 */
 	0x4e, 0x58, 0x53, 0x5f, 0x44, 0x01, 0x00, 0x00, // header ..
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x38, // data_len = 56
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, // total_tokens = 4
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, // token_count = 4
 	0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, // doc_count = 2 | r0
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xe9, // doc_id = 1001
 	0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x02, // doc_len = 3 | n = 2
@@ -62,10 +62,16 @@ static void
 check_term_counts(nxs_index_t *idx, nxs_doc_id_t doc1_id, nxs_doc_id_t doc2_id)
 {
 	idxdoc_t *doc;
-	int tc;
+	int tc, dc;
 
+	/*
+	 * Check the document length and term counts.
+	 */
 	doc = idxdoc_lookup(idx, doc1_id);
 	assert(doc != NULL);
+
+	dc = idxdoc_get_doclen(idx, doc);
+	assert(dc == __arraycount(test_tokens1));
 
 	tc = idxdoc_get_termcount(idx, doc, 1);  // some-term-1
 	assert(tc == 1);
@@ -76,6 +82,10 @@ check_term_counts(nxs_index_t *idx, nxs_doc_id_t doc1_id, nxs_doc_id_t doc2_id)
 	if (doc2_id) {
 		doc = idxdoc_lookup(idx, doc2_id);
 		assert(doc != NULL);
+
+		dc = idxdoc_get_doclen(idx, doc);
+		assert(dc == __arraycount(test_tokens2));
+
 		tc = idxdoc_get_termcount(idx, doc, 3); // term-3
 		assert(tc == 1);
 	}
@@ -100,6 +110,7 @@ run_dtmap_test(void)
 	/*
 	 * Add a document 1 with the terms to the index.
 	 */
+
 	tokens1 = get_test_tokenset(test_tokens1, __arraycount(test_tokens1));
 	assert(tokens1 != NULL);
 	prepare_terms(&idx, tokens1, true);
@@ -113,6 +124,7 @@ run_dtmap_test(void)
 	/*
 	 * Add a document 2.
 	 */
+
 	tokens2 = get_test_tokenset(test_tokens2, __arraycount(test_tokens2));
 	assert(tokens2 != NULL);
 	prepare_terms(&idx, tokens2, false);
@@ -142,6 +154,15 @@ run_dtmap_test(void)
 	assert(ret == 0);
 
 	check_term_counts(&idx, doc1_id, doc2_id);
+
+	/*
+	 * Check the totals.
+	 */
+	ret = idx_get_token_count(&idx);
+	assert(ret == __arraycount(test_tokens1) + __arraycount(test_tokens2));
+
+	ret = idx_get_doc_count(&idx);
+	assert(ret == 2);
 
 	// Cleanup
 	idx_dtmap_close(&idx);

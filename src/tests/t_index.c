@@ -13,7 +13,7 @@
 #include "helpers.h"
 #include "utils.h"
 
-static const struct test_docs_s {
+static const struct {
 	const char *	text;
 	nxs_doc_id_t	id;
 } test_docs[] = {
@@ -28,18 +28,6 @@ static const struct test_docs_s {
 };
 
 static void
-print_results(const char *query, nxs_results_t *results)
-{
-	assert(results);
-	printf("QUERY [%s] DOC COUNT %u\n", query, results->count);
-	nxs_result_entry_t *entry = results->entries;
-	while (entry) {
-		printf("DOC %lu, SCORE %f\n", entry->doc_id, entry->score);
-		entry = entry->next;
-	}
-}
-
-static void
 run_general(void)
 {
 	char *basedir = get_tmpdir();
@@ -47,8 +35,6 @@ run_general(void)
 	nxs_results_t *results;
 	nxs_index_t *idx;
 	nxs_t *nxs;
-
-	// app_set_loglevel("DEBUG");
 
 	nxs = nxs_create(basedir);
 	assert(nxs);
@@ -65,14 +51,25 @@ run_general(void)
 		assert(ret == 0);
 	}
 
+	/*
+	 * Basic search.  Check scores as a basic regression test.
+	 */
+
 	query = "dog";
 	results = nxs_index_search(idx, query, strlen(query));
-	print_results(query, results);
+
+	assert(results->count == 1);
+	check_doc_score(results, 1, 1.1736);
+
 	nxs_results_release(results);
 
 	query = "fox";
 	results = nxs_index_search(idx, query, strlen(query));
-	print_results(query, results);
+
+	assert(results->count == 2);
+	check_doc_score(results, 1, 0.693147);
+	check_doc_score(results, 2, 0.693147);
+
 	nxs_results_release(results);
 
 	nxs_index_close(nxs, idx);

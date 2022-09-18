@@ -12,6 +12,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <math.h>
+#include <err.h>
 
 #include "helpers.h"
 #include "utils.h"
@@ -146,4 +148,34 @@ run_with_index(const char *terms_testdb_path, const char *dtmap_testdb_path,
 	idx_dtmap_close(&idx);
 	idx_terms_close(&idx);
 	idxterm_sysfini(&idx);
+}
+
+void
+print_search_results(const char *query, nxs_results_t *results)
+{
+	printf("QUERY [%s] DOC COUNT %u\n", query, results->count);
+	nxs_result_entry_t *entry = results->entries;
+	while (entry) {
+		printf("DOC %lu, SCORE %f\n", entry->doc_id, entry->score);
+		entry = entry->next;
+	}
+}
+
+void
+check_doc_score(nxs_results_t *results, nxs_doc_id_t doc_id, float score)
+{
+	nxs_result_entry_t *entry = results->entries;
+
+	while (entry) {
+		if (entry->doc_id != doc_id) {
+			entry = entry->next;
+			continue;
+		}
+		if (fabsf(entry->score - score) < 0.0001) {
+			return;
+		}
+		err(EXIT_FAILURE, "doc %"PRIu64" score is %f (expected %f)",
+		    doc_id, entry->score, score);
+	}
+	err(EXIT_FAILURE, "no doc %"PRIu64" in the results", doc_id);
 }
