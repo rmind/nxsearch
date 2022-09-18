@@ -216,7 +216,7 @@ nxs_index_add(nxs_index_t *idx, uint64_t doc_id, const char *text, size_t len)
 	if ((tokens = tokenize(idx->fp, text, len)) == NULL) {
 		return -1;
 	}
-	idxterm_resolve_tokens(idx, tokens, true);
+	tokenset_resolve(tokens, idx, true);
 
 	/*
 	 * Add new terms.
@@ -288,7 +288,7 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 		free(text);
 		return NULL;
 	}
-	idxterm_resolve_tokens(idx, tokens, false);
+	tokenset_resolve(tokens, idx, false);
 	free(text);
 
 	doc_map = rhashmap_create(0, RHM_NOCOPY | RHM_NONCRYPTO);

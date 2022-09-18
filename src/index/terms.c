@@ -42,6 +42,10 @@
 #include "mmrw.h"
 #include "utils.h"
 
+static_assert(sizeof(nxs_term_id_t) == sizeof(uint32_t));
+
+#define	MAX_TERM_ID		(UINT32_MAX)
+
 static int
 idx_terms_init(idxmap_t *idxmap)
 {
@@ -62,10 +66,9 @@ static int
 idx_terms_verify(const idxmap_t *idxmap)
 {
 	const idxterms_hdr_t *hdr = idxmap->baseptr;
-	const size_t flen = idxmap->mapped_len;
 
 	if (memcmp(hdr->mark, NXS_T_MARK, sizeof(hdr->mark)) != 0 ||
-	    hdr->ver != NXS_ABI_VER || IDXTERMS_FILE_LEN(hdr) > flen) {
+	    hdr->ver != NXS_ABI_VER) {
 		return -1;
 	}
 	return 0;
@@ -141,9 +144,9 @@ idx_terms_close(nxs_index_t *idx)
 /*
  * idx_terms_add: add the given tokens/terms into the term index.
  *
- * - Tokens must be resolved using the idxterm_resolve_tokens() i.e. all
- * tokens which don't have the already existing in-memory term associated
- * must be in the staging list.
+ * - Tokens must be resolved using the tokenset_resolve() i.e. all tokens
+ * which don't have the already existing in-memory term associated must be
+ * in the staging list.
  *
  * - Terms are added into the on-disk index and the in-memory list.
  */
@@ -159,7 +162,9 @@ idx_terms_add(nxs_index_t *idx, tokenset_t *tokens)
 	int ret = -1;
 
 	ASSERT(!TAILQ_EMPTY(&tokens->staging));
-	ASSERT(tokens->count > 0);
+
+	app_dbgx("processing %u tokens", tokens->staged);
+	ASSERT(tokens->staged > 0);
 
 	/*
 	 * Lock the file and check whether we need to sync.
@@ -188,7 +193,7 @@ again:
 	 * Compute the target length and extend if necessary.
 	 */
 	max_append_len = tokens->data_len +
-	    (tokens->count * IDXTERMS_META_MAXLEN);
+	    (tokens->staged * IDXTERMS_META_MAXLEN);
 	target_len = sizeof(idxterms_hdr_t) + data_len + max_append_len;
 	if ((hdr = idx_db_map(idxmap, target_len, true)) == NULL) {
 		flock(idxmap->fd, LOCK_UN);
@@ -198,7 +203,7 @@ again:
 	/*
 	 * Fill the terms (processed tokens).
 	 */
-	dataptr = MAP_GET_OFF(hdr, sizeof(idxterms_hdr_t) + data_len);
+	dataptr = IDXTERMS_DATA_PTR(hdr, data_len);
 	mmrw_init(&mm, dataptr, max_append_len);
 
 	while ((token = TAILQ_FIRST(&tokens->staging)) != NULL) {
@@ -208,14 +213,22 @@ again:
 		nxs_term_id_t id;
 		size_t offset;
 
+		if (len > UINT16_MAX) {
+			app_dbgx("term too long", NULL);
+			goto err;
+		}
+		if (idx->terms_last_id == MAX_TERM_ID) {
+			app_dbgx("reached the term limit", NULL);
+			goto err;
+		}
+
 		/*
 		 * De-duplicate: if the term is already present (because
 		 * of the above re-sync), then just put it back to the list.
 		 */
 		term = rhashmap_get(idx->term_map, val, len);
 		if (term) {
-			TAILQ_REMOVE(&tokens->staging, token, entry);
-			TAILQ_INSERT_TAIL(&tokens->list, token, entry);
+			tokenset_moveback(tokens, token);
 			token->idxterm = term;
 			continue;
 		}
@@ -245,17 +258,24 @@ again:
 		token->idxterm = term;
 
 		/* Token resolved: put it back to the list and iterate. */
-		TAILQ_REMOVE(&tokens->staging, token, entry);
-		TAILQ_INSERT_TAIL(&tokens->list, token, entry);
+		tokenset_moveback(tokens, token);
 		append_len += IDXTERMS_BLK_LEN(len);
 	}
+
 	ASSERT(TAILQ_EMPTY(&tokens->staging));
+	ASSERT(tokens->staged == 0);
 	ret = 0;
 err:
 	/* Publish the new data length. */
 	idx->terms_consumed = data_len + append_len;
 	atomic_store_release(&hdr->data_len, htobe32(idx->terms_consumed));
+
+	if (idxmap->sync) {
+		msync(hdr, target_len, MS_ASYNC);
+	}
 	flock(idxmap->fd, LOCK_UN);
+	app_dbgx("produced %u bytes", append_len);
+
 	return ret;
 }
 
@@ -300,8 +320,8 @@ idx_terms_sync(nxs_index_t *idx)
 		return -1;
 	}
 	target_len = seen_data_len - idx->terms_consumed;
-	dataptr = MAP_GET_OFF(hdr, sizeof(idxterms_hdr_t) + idx->terms_consumed);
-	app_dbgx("consuming %zu", target_len);
+	dataptr = IDXTERMS_DATA_PTR(hdr, idx->terms_consumed);
+	app_dbgx("current %zu, consuming %zu", idx->terms_consumed, target_len);
 
 	/*
 	 * Fetch the terms.
@@ -341,9 +361,10 @@ idx_terms_sync(nxs_index_t *idx)
 		idxterm_assign(idx, term, id);
 		consumed_len += IDXTERMS_BLK_LEN(len);
 	}
+	ASSERT(consumed_len == target_len);
 	ret = 0;
 err:
 	idx->terms_consumed = consumed_len;
-	app_dbgx("consumed = %zu", consumed_len);
+	app_dbgx("consumed %zu", consumed_len);
 	return ret;
 }

@@ -13,17 +13,11 @@
  * - Constructs a list of processed tokens.
  */
 
-#include <sys/queue.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <inttypes.h>
-#include <limits.h>
 
-#include "strbuf.h"
-#include "filters.h"
 #include "tokenizer.h"
-#include "utf8.h"
+#include "index.h"
 #include "utils.h"
 
 /*
@@ -74,6 +68,7 @@ tokenset_destroy(tokenset_t *tset)
 {
 	token_t *token;
 
+	TAILQ_CONCAT(&tset->list, &tset->staging, entry);
 	while ((token = TAILQ_FIRST(&tset->list)) != NULL) {
 		TAILQ_REMOVE(&tset->list, token, entry);
 		token_destroy(token);
@@ -109,6 +104,49 @@ tokenset_add(tokenset_t *tset, token_t *token)
 	tset->data_len += str->length;
 	tset->count++;
 	tset->seen++;
+}
+
+/*
+ * tokenset_moveback: move the staged token back to the list.
+ */
+void
+tokenset_moveback(tokenset_t *tset, token_t *token)
+{
+	TAILQ_REMOVE(&tset->staging, token, entry);
+	TAILQ_INSERT_TAIL(&tset->list, token, entry);
+	ASSERT(tset->staged > 0);
+	tset->staged--;
+}
+
+/*
+ * tokenset_resolve: lookup the in-memory term object for each token.
+ * If found, associate it with the token; otherwise, move the token to
+ * a separate staging list if the 'stage' flag is true.
+ */
+void
+tokenset_resolve(tokenset_t *tset, nxs_index_t *idx, bool stage)
+{
+	token_t *token;
+
+	token = TAILQ_FIRST(&tset->list);
+	while (token) {
+		token_t *next_token = TAILQ_NEXT(token, entry);
+		const strbuf_t *sbuf = &token->buffer;
+		idxterm_t *term;
+
+		term = idxterm_lookup(idx, sbuf->value, sbuf->length);
+		if (!term && stage) {
+			TAILQ_REMOVE(&tset->list, token, entry);
+			TAILQ_INSERT_TAIL(&tset->staging, token, entry);
+			tset->staged++;
+			app_dbgx("staging %p [%s]", token, sbuf->value);
+		}
+		if (term) {
+			app_dbgx("[%s] => %u", sbuf->value, term->id);
+		}
+		token->idxterm = term;
+		token = next_token;
+	}
 }
 
 /*

@@ -13,14 +13,13 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "tokenizer.h"
 #include "helpers.h"
 #include "utils.h"
 
-static char *		tmpdir_list[8];
+static char *		tmpdir_list[32];
 static unsigned		tmpdir_count = 0;
 
-static char *		tmpfile_list[8];
+static char *		tmpfile_list[32];
 static unsigned		tmpfile_count = 0;
 
 static void
@@ -109,5 +108,42 @@ get_test_tokenset(const char *values[], size_t count)
 
 	/* Stage all tokens, as we will be adding them. */
 	TAILQ_CONCAT(&tokens->staging, &tokens->list, entry);
+	tokens->staged = tokens->count;
+
 	return tokens;
+}
+
+void
+run_with_index(const char *terms_testdb_path, const char *dtmap_testdb_path,
+    bool sync, test_func_t testfunc)
+{
+	nxs_index_t idx;
+	int ret;
+
+	memset(&idx, 0, sizeof(idx));
+	ret = idxterm_sysinit(&idx);
+	assert(ret == 0);
+
+	// Open the terms and dtmap indexes.
+	ret = idx_terms_open(&idx, terms_testdb_path);
+	assert(ret == 0);
+
+	ret = idx_dtmap_open(&idx, dtmap_testdb_path);
+	assert(ret == 0);
+
+	if (sync) {
+		ret = idx_terms_sync(&idx);
+		assert(ret == 0);
+
+		ret = idx_dtmap_sync(&idx);
+		assert(ret == 0);
+	}
+
+	// Run the test function
+	testfunc(&idx);
+
+	// Cleanup
+	idx_dtmap_close(&idx);
+	idx_terms_close(&idx);
+	idxterm_sysfini(&idx);
 }

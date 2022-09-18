@@ -50,10 +50,9 @@ static int
 idx_dtmap_verify(const idxmap_t *idxmap)
 {
 	const idxdt_hdr_t *hdr = idxmap->baseptr;
-	const size_t flen = idxmap->mapped_len;
 
 	if (memcmp(hdr->mark, NXS_D_MARK, sizeof(hdr->mark)) != 0 ||
-	    hdr->ver != NXS_ABI_VER || IDXDT_FILE_LEN(hdr) > flen) {
+	    hdr->ver != NXS_ABI_VER) {
 		return -1;
 	}
 	return 0;
@@ -139,6 +138,8 @@ idx_dtmap_add(nxs_index_t *idx, nxs_doc_id_t doc_id, tokenset_t *tokens)
 	ASSERT(doc_id > 0);
 	ASSERT(!TAILQ_EMPTY(&tokens->list));
 	ASSERT(TAILQ_EMPTY(&tokens->staging));
+
+	app_dbgx("processing %u tokens", tokens->count);
 	ASSERT(tokens->count > 0);
 
 	/*
@@ -168,7 +169,7 @@ again:
 		goto err;
 	}
 
-	dataptr = MAP_GET_OFF(hdr, sizeof(idxdt_hdr_t) + data_len);
+	dataptr = IDXDT_DATA_PTR(hdr, data_len);
 	mmrw_init(&mm, dataptr, append_len);
 
 	/*
@@ -215,7 +216,12 @@ again:
 	hdr->total_tokens = htobe64(be64toh(hdr->total_tokens) + tokens->seen);
 	hdr->doc_count = htobe32(be32toh(hdr->doc_count) + 1);
 	atomic_store_release(&hdr->data_len, htobe64(idx->dt_consumed));
+
+	if (idxmap->sync) {
+		msync(hdr, target_len, MS_ASYNC);
+	}
 	flock(idxmap->fd, LOCK_UN);
+
 	return 0;
 err:
 	flock(idxmap->fd, LOCK_UN);
@@ -234,17 +240,19 @@ int
 idx_dtmap_sync(nxs_index_t *idx)
 {
 	idxmap_t *idxmap = &idx->dt_memmap;
-	size_t seen_data_len, target_len;
+	size_t seen_data_len, target_len, consumed_len = 0;;
 	idxdt_hdr_t *hdr;
 	void *dataptr;
 	mmrw_t mm;
-
-	hdr = idxmap->baseptr;
-	ASSERT(idxmap->fd > 0 && hdr != NULL);
+	int ret = -1;
 
 	/*
 	 * Fetch the data length.  Compute the length of data to consume.
 	 */
+
+	hdr = idxmap->baseptr;
+	ASSERT(idxmap->fd > 0 && hdr != NULL);
+
 	seen_data_len = be64toh(atomic_load_acquire(&hdr->data_len));
 	if (seen_data_len == idx->dt_consumed) {
 		/*
@@ -265,11 +273,11 @@ idx_dtmap_sync(nxs_index_t *idx)
 		return -1;
 	}
 	target_len = seen_data_len - idx->dt_consumed;
-	dataptr = MAP_GET_OFF(hdr, sizeof(idxdt_hdr_t) + idx->dt_consumed);
-	app_dbgx("consuming %zu", target_len);
+	dataptr = IDXDT_DATA_PTR(hdr, idx->dt_consumed);
+	app_dbgx("current %zu, consuming %zu", target_len, idx->dt_consumed);
 
 	/*
-	 * Fetch the document mapping.
+	 * Fetch the document mappings.
 	 */
 	mmrw_init(&mm, dataptr, target_len);
 	while (mm.remaining) {
@@ -282,10 +290,10 @@ idx_dtmap_sync(nxs_index_t *idx)
 		if (mmrw_fetch64(&mm, &doc_id) == -1 ||
 		    mmrw_fetch32(&mm, &doc_total_len) == -1 ||
 		    mmrw_fetch32(&mm, &n) == -1) {
-			return -1;
+			goto err;
 		}
 		if (!idxdoc_create(idx, doc_id, offset)) {
-			return -1;
+			goto err;
 		}
 
 		/*
@@ -297,14 +305,18 @@ idx_dtmap_sync(nxs_index_t *idx)
 
 			if (mmrw_fetch32(&mm, &id) == -1 ||
 			    mmrw_fetch32(&mm, &count) == -1) {
-				return -1;
+				goto err;  // XXX: revert additions
 			}
 			if (idxterm_add_doc(idx, id, doc_id) == -1) {
-				return -1;
+				goto err;  // XXX: revert additions
 			}
 		}
+		consumed_len += IDXDT_META_LEN(n);
 	}
-	idx->dt_consumed = seen_data_len;
-	app_dbgx("consumed = %zu", seen_data_len);
-	return 0;
+	ASSERT(consumed_len == target_len);
+	ret = 0;
+err:
+	idx->dt_consumed = consumed_len;
+	app_dbgx("consumed = %zu", consumed_len);
+	return ret;
 }

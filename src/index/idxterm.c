@@ -122,36 +122,6 @@ idxterm_lookup(nxs_index_t *idx, const char *value, size_t len)
 	return rhashmap_get(idx->term_map, value, len);
 }
 
-/*
- * idxterm_resolve_tokens: lookup the in-memory term object for each token.
- * If found, associate it with the token; otherwise, move the token to
- * a separate staging list if the 'stage' flag is true.
- */
-void
-idxterm_resolve_tokens(nxs_index_t *idx, tokenset_t *tokens, bool stage)
-{
-	token_t *token;
-
-	token = TAILQ_FIRST(&tokens->list);
-	while (token) {
-		token_t *next_token = TAILQ_NEXT(token, entry);
-		const strbuf_t *sbuf = &token->buffer;
-		idxterm_t *term;
-
-		term = idxterm_lookup(idx, sbuf->value, sbuf->length);
-		if (!term && stage) {
-			TAILQ_REMOVE(&tokens->list, token, entry);
-			TAILQ_INSERT_TAIL(&tokens->staging, token, entry);
-			app_dbgx("staging %p [%s]", token, sbuf->value);
-		}
-		if (term) {
-			app_dbgx("[%s] => %u", sbuf->value, term->id);
-		}
-		token->idxterm = term;
-		token = next_token;
-	}
-}
-
 void
 idxterm_incr_total(nxs_index_t *idx, const idxterm_t *term, unsigned count)
 {
@@ -166,8 +136,9 @@ idxterm_incr_total(nxs_index_t *idx, const idxterm_t *term, unsigned count)
 		new_tc = htobe64(old_tc + 1);
 	} while (!atomic_compare_exchange_weak_explicit(&tc, &old_tc, new_tc,
 	    memory_order_relaxed, memory_order_relaxed));
-#endif
+#else
 	atomic_fetch_add_explicit(tc, count, memory_order_relaxed);
+#endif
 	app_dbgx("term %u count +%u ", term->id, count);
 }
 

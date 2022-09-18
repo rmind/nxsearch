@@ -13,7 +13,7 @@
 #define	NXS_ABI_VER		1
 
 /*
- * Term list.
+ * Term index (list).
  *
  *	+------------------+
  *	| header           |
@@ -54,9 +54,8 @@ typedef struct {
 static_assert(sizeof(idxterms_hdr_t) == 16);  // ABI guard
 static_assert(sizeof(idxterms_hdr_t) % 8 == 0);  // alignment guard
 
-#define	IDXTERMS_DATA_LEN(h)	(be32toh((h)->data_len))
-#define	IDXTERMS_FILE_LEN(h)	\
-    (sizeof(idxterms_hdr_t) + IDXTERMS_DATA_LEN(h))
+#define	IDXTERMS_DATA_PTR(h, off)	\
+    ((void *)((uintptr_t)(hdr) + (sizeof(idxterms_hdr_t) + (off))))
 
 /* The sum of above single term block, except the term length itself. */
 #define	IDXTERMS_META_LEN	(2UL + 1 + 8)
@@ -64,9 +63,6 @@ static_assert(sizeof(idxterms_hdr_t) % 8 == 0);  // alignment guard
 #define	IDXTERMS_PAD_LEN(len)	(roundup2(2UL + 1 + (len), 8) - (2 + 1 + (len)))
 #define	IDXTERMS_BLK_LEN(len)	\
     (IDXTERMS_META_LEN + (len) + IDXTERMS_PAD_LEN(len))
-
-#define	IDXTERMS_DATA_PTR(h, off)	\
-    ((void *)((uintptr_t)(hdr) + (sizeof(idxterms_hdr_t) + (off))))
 
 /*
  * Document-term map.
@@ -118,12 +114,10 @@ typedef struct {
 static_assert(sizeof(idxdt_hdr_t) == 32);  // ABI guard
 static_assert(sizeof(idxdt_hdr_t) % 8 == 0);  // alignment guard
 
-#define	IDXDT_DATA_LEN(h)	(be64toh((h)->data_len))
-#define	IDXDT_FILE_LEN(h)	(sizeof(idxdt_hdr_t) + IDXDT_DATA_LEN(h))
-#define	IDXDT_META_LEN(n)	(8UL + 4 + 4 + ((n) * (4 + 4)))
-
 #define	IDXDT_DATA_PTR(h, off)	\
     ((void *)((uintptr_t)(hdr) + (sizeof(idxdt_hdr_t) + (off))))
+
+#define	IDXDT_META_LEN(n)	(8UL + 4 + 4 + ((n) * (4 + 4)))
 
 /*
  * Helpers.

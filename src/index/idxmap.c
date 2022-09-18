@@ -144,6 +144,8 @@ idx_db_map(idxmap_t *idxmap, size_t target_len, bool extend)
 			errno = EINVAL;
 			return NULL;
 		}
+		app_dbgx("extending from %zu to %zu",
+		    (size_t)st.st_size, file_len);
 
 		/*
 		 * Extending.  WARNING: Must be called with the
@@ -155,6 +157,7 @@ idx_db_map(idxmap_t *idxmap, size_t target_len, bool extend)
 		flock(idxmap->fd, LOCK_UN);
 	}
 
+	app_dbgx("fd %u length %zu", idxmap->fd, file_len);
 	addr = mmap(NULL, file_len, PROT_READ | PROT_WRITE,
 	    MAP_SHARED | MAP_FILE, idxmap->fd, 0);
 	if (addr == MAP_FAILED) {

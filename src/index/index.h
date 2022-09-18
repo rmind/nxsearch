@@ -38,6 +38,7 @@ typedef struct idxmap {
 	int			fd;
 	void *			baseptr;
 	size_t			mapped_len;
+	bool			sync;
 } idxmap_t;
 
 struct nxs_index {
@@ -86,7 +87,6 @@ idxterm_t *	idxterm_create(nxs_index_t *, const char *,
 		    const size_t, const size_t);
 void		idxterm_destroy(nxs_index_t *, idxterm_t *);
 
-void		idxterm_resolve_tokens(nxs_index_t *, tokenset_t *, bool);
 void		idxterm_assign(nxs_index_t *, idxterm_t *, nxs_term_id_t);
 idxterm_t *	idxterm_lookup(nxs_index_t *, const char *, size_t);
 void		idxterm_incr_total(nxs_index_t *, const idxterm_t *, unsigned);

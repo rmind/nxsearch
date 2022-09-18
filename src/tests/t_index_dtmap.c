@@ -54,7 +54,7 @@ prepare_terms(nxs_index_t *idx, tokenset_t *tokens, bool init)
 	ret = idx_terms_add(idx, tokens);
 	assert(ret == 0);
 
-	idxterm_resolve_tokens(idx, tokens, true);
+	tokenset_resolve(tokens, idx, true);
 	assert(TAILQ_EMPTY(&tokens->staging));
 }
 
@@ -92,6 +92,7 @@ run_dtmap_test(void)
 
 	memset(&idx, 0, sizeof(idx));
 	ret = idxterm_sysinit(&idx);
+	assert(ret == 0);
 
 	ret = idx_dtmap_open(&idx, testdb_path);
 	assert(ret == 0);

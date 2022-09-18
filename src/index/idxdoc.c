@@ -77,7 +77,7 @@ idxdoc_get_termcount(const nxs_index_t *idx,
 	mmrw_t mm;
 
 	mmrw_init(&mm, MAP_GET_OFF(hdr, doc->offset),
-	    IDXDT_FILE_LEN(hdr) - doc->offset);
+	    (sizeof(idxdt_hdr_t) + idx->dt_consumed) - doc->offset);
 
 	if (mmrw_advance(&mm, 8 + 4) == -1 ||
 	    mmrw_fetch32(&mm, &n) == -1) {

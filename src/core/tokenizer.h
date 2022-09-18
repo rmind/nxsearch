@@ -10,12 +10,12 @@
 
 #include <sys/queue.h>
 #include <inttypes.h>
+#include <stdbool.h>
 
+#include "nxs.h"
 #include "strbuf.h"
 #include "rhashmap.h"
 #include "filters.h"
-
-struct idxmap;
 
 typedef struct token {
 	/*
@@ -46,11 +46,14 @@ typedef struct {
 	 */
 	size_t			data_len;
 	unsigned		count;
+	unsigned		staged;
 	unsigned		seen;
 } tokenset_t;
 
 tokenset_t *	tokenset_create(void);
 void		tokenset_add(tokenset_t *, token_t *);
+void		tokenset_moveback(tokenset_t *, token_t *);
+void		tokenset_resolve(tokenset_t *, nxs_index_t *, bool);
 void		tokenset_destroy(tokenset_t *);
 
 token_t *	token_create(const char *, size_t);
