@@ -92,9 +92,10 @@ run_norm_test(void)
 		// General normalization
 		{ "Henry Ⅷ", "henry viii" },
 		{ "AirForce ①", "airforce 1" },
-		{"５０３４４４０", "5034440"}
+		{ "５０３４４４０", "5034440" },
 #if 0
 		// Removal of diacritics
+		{ "カ", "ｶ" },
 		{ "ĄŽUOLĖLIS", "azuolelis" },
 		{ "Fuglafjørður", "fuglafjordur" },
 		{ "Árbæ", "arbae" },

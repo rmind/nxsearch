@@ -8,4 +8,4 @@ services:
     image: nxsearch
     volumes:
       - ./data:/data
-      - ./src:/build
+      - ./src:/src
