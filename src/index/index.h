@@ -20,6 +20,11 @@
 
 #define	IDX_SIZE_STEP		(32UL * 1024)	// 32 KB
 
+typedef enum {
+	TF_IDF		= 0,
+	BM25		= 1,
+} ranking_algo_t;
+
 typedef struct idxterm {
 	nxs_term_id_t		id;
 	uint32_t		offset;
@@ -65,9 +70,11 @@ struct nxs_index {
 	 */
 	rhashmap_t *		td_map;
 	filter_pipeline_t *	fp;
+	ranking_algo_t		algo;
 
-	/* Index name. */
+	/* Index name and list entry */
 	char *			name;
+	TAILQ_ENTRY(nxs_index)	entry;
 };
 
 /*

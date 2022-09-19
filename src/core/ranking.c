@@ -70,11 +70,19 @@ tf_idf(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	float tf, idf;
 
 	term_freq = idxdoc_get_termcount(idx, doc, term->id);
-	ASSERT(term_freq > 0);
-	tf = log(term_freq + 1);
-
 	doc_count = idx_get_doc_count(idx);
 	doc_freq = roaring_bitmap_get_cardinality(term->doc_bitmap);
+
+	/*
+	 * Verify: the index may be changed by concurrent requests.
+	 * This would not affect results in real-world situations,
+	 * but we must handle the document removal case.
+	 */
+	if (__predict_false(term_freq <= 0)) {
+		return nanf("");
+	}
+
+	tf = log(term_freq + 1);
 	idf = log((float)doc_count / doc_freq) + 1;
 
 	app_dbgx("term_freq %d, doc_freq %u, tf %f, idf %f, score %f",
@@ -133,15 +141,19 @@ bm25(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	double tf, dl, adl, tf_bm25, idf_bm25;
 
 	term_freq = idxdoc_get_termcount(idx, doc, term->id);
-	ASSERT(term_freq > 0);
+	doc_count = idx_get_doc_count(idx);
+	doc_freq = roaring_bitmap_get_cardinality(term->doc_bitmap);
+	adl = idx_get_token_count(idx) / idx_get_doc_count(idx);
+
+	/* Verify in case of concurrent document removals. */
+	if (__predict_false(term_freq <= 0 || adl == 0)) {
+		return nanf("");
+	}
 
 	tf = log(term_freq + 1);
 	dl = idxdoc_get_doclen(idx, doc);
-	adl = idx_get_token_count(idx) / idx_get_doc_count(idx);
 	tf_bm25 = tf / (tf + k * (1 - b + b * dl / adl));
 
-	doc_count = idx_get_doc_count(idx);
-	doc_freq = roaring_bitmap_get_cardinality(term->doc_bitmap);
 	idf_bm25 = log(((doc_count - doc_freq + 0.5) / (doc_freq + 0.5)) + 1);
 
 	return tf_bm25 * idf_bm25;

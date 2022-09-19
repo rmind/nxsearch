@@ -161,8 +161,11 @@ idx_terms_add(nxs_index_t *idx, tokenset_t *tokens)
 	mmrw_t mm;
 	int ret = -1;
 
-	ASSERT(!TAILQ_EMPTY(&tokens->staging));
-
+	if (TAILQ_EMPTY(&tokens->staging)) {
+		ASSERT(tokens->staged == 0);
+		app_dbgx("no terms to add", NULL);
+		return 0;
+	}
 	app_dbgx("processing %u tokens", tokens->staged);
 	ASSERT(tokens->staged > 0);
 

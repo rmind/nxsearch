@@ -16,11 +16,11 @@
  *	indexed terms.  The term ID is determined by the term order in
  *	the index starting from 1.
  *
- *	- Document-term mapping (nxsdtmap.db) which contains the mappings
- *	of document IDs to the set of terms from the aforementioned list,
+ *	- Document-term mapping (nxsdtmap.db) contains the mappings of
+ *	document IDs to the set of terms from the aforementioned list,
  *	referenced by their IDs.  The term IDs, associated with a document,
- *	are accompanied by count which represents the term occurrences in
- *	the document.
+ *	are accompanied by a count which represents the term occurrences
+ *	in the document.
  *
  *	Using the above two, an in-memory *reverse* index is built:
  *
@@ -45,7 +45,7 @@
 #include "storage.h"
 #include "index.h"
 
-nxs_t *
+__dso_public nxs_t *
 nxs_create(const char *basedir)
 {
 	nxs_t *nxs;
@@ -56,6 +56,7 @@ nxs_create(const char *basedir)
 	if (nxs == NULL) {
 		return NULL;
 	}
+	TAILQ_INIT(&nxs->index_list);
 
 	s = basedir ? basedir : getenv("NXS_BASEDIR");
 	if (s && (nxs->basedir = strdup(s)) == NULL) {
@@ -72,9 +73,6 @@ nxs_create(const char *basedir)
 	if (filters_sysinit(nxs) == -1) {
 		goto err;
 	}
-	if (filters_builtin_sysinit(nxs) == -1) {
-		goto err;
-	}
 
 	nxs->indexes = rhashmap_create(0, RHM_NONCRYPTO);
 	if (nxs->indexes == NULL) {
@@ -87,9 +85,14 @@ err:
 	return NULL;
 }
 
-void
+__dso_public void
 nxs_destroy(nxs_t *nxs)
 {
+	nxs_index_t *idx;
+
+	while ((idx = TAILQ_FIRST(&nxs->index_list)) != NULL) {
+		nxs_index_close(nxs, idx);
+	}
 	if (nxs->indexes) {
 		rhashmap_destroy(nxs->indexes);
 	}
@@ -98,7 +101,7 @@ nxs_destroy(nxs_t *nxs)
 	free(nxs);
 }
 
-nxs_index_t *
+__dso_public nxs_index_t *
 nxs_index_create(nxs_t *nxs, const char *name)
 {
 	char *path;
@@ -122,7 +125,7 @@ nxs_index_create(nxs_t *nxs, const char *name)
 	return nxs_index_open(nxs, name);
 }
 
-nxs_index_t *
+__dso_public nxs_index_t *
 nxs_index_open(nxs_t *nxs, const char *name)
 {
 	const char *filters[] = {
@@ -185,13 +188,15 @@ nxs_index_open(nxs_t *nxs, const char *name)
 
 	idx->name = strdup(name);
 	rhashmap_put(nxs->indexes, name, name_len, idx);
+	TAILQ_INSERT_TAIL(&nxs->index_list, idx, entry);
 	return idx;
 }
 
-void
+__dso_public void
 nxs_index_close(nxs_t *nxs, nxs_index_t *idx)
 {
 	if (idx->name) {
+		TAILQ_REMOVE(&nxs->index_list, idx, entry);
 		rhashmap_del(nxs->indexes, idx->name, strlen(idx->name));
 		free(idx->name);
 	}
@@ -204,11 +209,18 @@ nxs_index_close(nxs_t *nxs, nxs_index_t *idx)
 	free(idx);
 }
 
-int
+__dso_public int
 nxs_index_add(nxs_index_t *idx, uint64_t doc_id, const char *text, size_t len)
 {
 	tokenset_t *tokens;
 	int ret = -1;
+
+	/* Check whether the document already exists.
+	*/
+	if (idxdoc_lookup(idx, doc_id)) {
+		errno = EEXIST;
+		return -1;
+	}
 
 	/*
 	 * Tokenize and resolve tokens to terms.
@@ -261,10 +273,11 @@ prepare_doc_entry(nxs_results_t *results, rhashmap_t *doc_map,
 	return entry;
 }
 
-nxs_results_t *
+__dso_public nxs_results_t *
 nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 {
 	nxs_results_t *results = NULL;
+	ranking_func_t rank;
 	tokenset_t *tokens;
 	rhashmap_t *doc_map;
 	token_t *token;
@@ -276,6 +289,18 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 	 */
 	if (idx_terms_sync(idx) == -1 || idx_dtmap_sync(idx) == -1) {
 		return NULL;
+	}
+
+	/* Determine the ranking algorithm. */
+	switch (idx->algo) {
+	case TF_IDF:
+		rank = tf_idf;
+		break;
+	case BM25:
+		rank = bm25;
+		break;
+	default:
+		abort();
 	}
 
 	/*
@@ -323,7 +348,7 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 			if ((doc = idxdoc_lookup(idx, doc_id)) == NULL) {
 				goto out;
 			}
-			score = tf_idf(idx, term, doc);
+			score = rank(idx, term, doc);
 			if (!prepare_doc_entry(results, doc_map, doc, score)) {
 				goto out;
 			}
@@ -343,7 +368,7 @@ out:
 	return results;
 }
 
-void
+__dso_public void
 nxs_results_release(nxs_results_t *results)
 {
 	if (results) {

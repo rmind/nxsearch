@@ -8,6 +8,7 @@
 #ifndef	_UTILS_H_
 #define	_UTILS_H_
 
+#include <sys/cdefs.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <inttypes.h>
@@ -108,6 +109,27 @@
 #define	htobe64(x)	OSSwapHostToBigInt64(x)
 #else
 #include <sys/endian.h>
+#endif
+
+/*
+ * DSO visibility.
+ */
+
+#ifndef __GNUC_PREREQ__
+#ifdef __GNUC__
+#define	__GNUC_PREREQ__(x, y)						\
+    ((__GNUC__ == (x) && __GNUC_MINOR__ >= (y)) || (__GNUC__ > (x)))
+#else
+#define	__GNUC_PREREQ__(x, y)	0
+#endif
+#endif
+
+#if !defined(__dso_public)
+#if __GNUC_PREREQ__(4, 0)
+#define	__dso_public	__attribute__((__visibility__("default")))
+#else
+#define	__dso_public
+#endif
 #endif
 
 /*

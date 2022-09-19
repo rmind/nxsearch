@@ -44,12 +44,20 @@ int
 filters_sysinit(nxs_t *nxs)
 {
 	nxs->filters = calloc(FILTER_MAX_ENTRIES, sizeof(filter_entry_t));
-	return nxs->filters ? 0 : -1;
+	if (nxs->filters == NULL) {
+		return -1;
+	}
+	if (filters_builtin_sysinit(nxs) == -1) {
+		free(nxs->filters);
+		return -1;
+	}
+	return 0;
 }
 
 void
 filters_sysfini(nxs_t *nxs)
 {
+	filters_builtin_sysfini(nxs);
 	free(nxs->filters);
 }
 
@@ -69,7 +77,7 @@ filter_lookup(nxs_t *nxs, const char *name)
 	return ops;
 }
 
-int
+__dso_public int
 nxs_filter_register(nxs_t *nxs, const char *name, const filter_ops_t *ops)
 {
 	unsigned count = nxs->filters_count;
@@ -123,7 +131,7 @@ filter_pipeline_create(nxs_t *nxs, const char *lang,
 		if (filt->ops->create == NULL) {
 			continue;
 		}
-		filt->context = filt->ops->create(fp->lang);
+		filt->context = filt->ops->create(nxs, lang);
 		if (filt->context == NULL) {
 			goto err;
 		}

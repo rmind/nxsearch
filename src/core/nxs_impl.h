@@ -22,10 +22,17 @@ struct nxs {
 	char *			basedir;
 	unsigned		filters_count;
 	filter_entry_t *	filters;
+
 	rhashmap_t *		indexes;
+	TAILQ_HEAD(, nxs_index)	index_list;
+
+	rhashmap_t *		swdicts;
 };
 
 int	nxs_filter_register(nxs_t *, const char *, const filter_ops_t *);
+
+typedef float (*ranking_func_t)(const nxs_index_t *,
+    const idxterm_t *, const idxdoc_t *);
 
 float	tf_idf(const nxs_index_t *, const idxterm_t *, const idxdoc_t *);
 float	bm25(const nxs_index_t *, const idxterm_t *, const idxdoc_t *);

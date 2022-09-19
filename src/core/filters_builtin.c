@@ -35,8 +35,9 @@
  */
 
 static void *
-normalizer_create(const char *lang)
+normalizer_create(nxs_t *nxs, const char *lang)
 {
+	(void)nxs;
 	return utf8_ctx_create(lang);
 }
 
@@ -76,8 +77,6 @@ static const filter_ops_t normalizer_ops = {
  * Stopwords.
  */
 
-static rhashmap_t *	swdicts = NULL;
-
 static int
 stopwords_sysinit(nxs_t *nxs)
 {
@@ -86,34 +85,46 @@ stopwords_sysinit(nxs_t *nxs)
 	ssize_t len;
 	FILE *fp;
 
-	swdicts = rhashmap_create(0, RHM_NOCOPY | RHM_NONCRYPTO);  // XXX
 	if (asprintf(&dbpath, "%s/filters/stopwords/%s",
-	    nxs->basedir, "en") == -1) {
+	    nxs->basedir, "en") == -1) {  // XXX en
 		return -1;
 	}
 	fp = fopen(dbpath, "r");
 	free(dbpath);
-
 	if (fp == NULL) {
 		/* No stop words. */
 		return 0;
+	}
+
+	if ((nxs->swdicts = rhashmap_create(0, RHM_NONCRYPTO)) == NULL) {
+		fclose(fp);
+		return -1;
 	}
 	while ((len = getline(&line, &lcap, fp)) > 0) {
 		if (len == 0) {
 			continue;
 		}
 		line[len - 1] = '\0';
-		rhashmap_put(swdicts, line, len, (void *)(uintptr_t)0x1);
+		rhashmap_put(nxs->swdicts, line, len, (void *)(uintptr_t)0x1);
 	}
 	free(line);
 	fclose(fp);
 	return 0;
 }
 
-static void *
-stopwords_create(const char *lang)
+static void
+stopwords_sysfini(nxs_t *nxs)
 {
-	return rhashmap_get(swdicts, lang, strlen(lang));
+	if (nxs->swdicts) {
+		rhashmap_destroy(nxs->swdicts);
+		nxs->swdicts = NULL;
+	}
+}
+
+static void *
+stopwords_create(nxs_t *nxs, const char *lang)
+{
+	return rhashmap_get(nxs->swdicts, lang, strlen(lang));
 }
 
 static filter_action_t
@@ -138,8 +149,9 @@ static const filter_ops_t stopwords_ops = {
  */
 
 static void *
-stemmer_create(const char *lang)
+stemmer_create(nxs_t *nxs, const char *lang)
 {
+	(void)nxs;
 	return sb_stemmer_new(lang, NULL /* UTF-8 */);
 }
 
@@ -191,4 +203,10 @@ filters_builtin_sysinit(nxs_t *nxs)
 	nxs_filter_register(nxs, "stopwords", &stopwords_ops);
 	nxs_filter_register(nxs, "stemmer", &stemmer_ops);
 	return 0;
+}
+
+void
+filters_builtin_sysfini(nxs_t *nxs)
+{
+	stopwords_sysfini(nxs);
 }

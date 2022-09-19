@@ -159,6 +159,11 @@ again:
 		}
 		goto again;
 	}
+	if (idxdoc_lookup(idx, doc_id)) {
+		app_dbgx("document %"PRIu64" is already indexed", doc_id);
+		flock(idxmap->fd, LOCK_UN);
+		return -1;
+	}
 
 	/*
 	 * Compute the target length and extend if necessary.

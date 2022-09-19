@@ -57,6 +57,7 @@ CFLAGS+=	-fsanitize=address -fsanitize=undefined
 LDFLAGS+=	-fsanitize=address -fsanitize=undefined
 else
 CFLAGS+=	-DNDEBUG
+CFLAGS+=	-fvisibility=hidden
 endif
 
 #
@@ -79,6 +80,14 @@ LDFLAGS+=	$(shell pkg-config --libs --cflags icu-uc icu-io)
 
 # Snowball stemmer
 LDFLAGS+=	-lstemmer
+
+#
+# Lua module
+#
+LUA_CFLAGS?=	$(shell pkg-config --cflags lua)
+LUA_LDFLAGS?=	$(shell pkg-config --cflags --libs lua)
+LUA_CFLAGS+=	$(LUA_CFLAGS) -fPIC
+LUA_LDFLAGS+=	-L.libs -lnxsearch
 
 #
 # objs
@@ -124,13 +133,13 @@ EXT_OBJS+=	libs/rhashmap/src/siphash.o
 EXT_OBJS+=	libs/rhashmap/src/murmurhash.o
 CFLAGS+=	-I libs/rhashmap/src/
 
-EXT_OBJS+=	libs/CRoaring/build/src/libroaring.a
+EXT_AOBJ+=	libs/CRoaring/build/src/libroaring.a
 CFLAGS+=	-I libs/CRoaring/include/
 
 #
 # object files for the tests
 #
-TEST_OBJS:=	$(shell echo $(OBJS) $(EXT_OBJS))
+TEST_OBJS:=	$(shell echo $(OBJS) $(EXT_OBJS) $(EXT_AOBJ))
 TEST_OBJS+=	tests/helpers.o
 TESTS:=		$(patsubst tests/%.c,%,$(wildcard tests/t_*.c))
 
@@ -143,7 +152,7 @@ install/%.la:	ILIBDIR=	$(DESTDIR)/$(LIBDIR)
 install:	IBINDIR=	$(DESTDIR)/$(BINDIR)
 install:	IMAN1DIR=	$(DESTDIR)/$(MANDIR)/man1/
 
-all: $(OBJS) $(EXT_OBJS) core/cli.o
+all: $(OBJS) $(EXT_OBJS) $(EXT_AOBJ) core/cli.o
 	$(CC) $(CFLAGS) $^ -o $(BIN) $(LDFLAGS)
 
 lib: $(LIB).la
@@ -152,11 +161,12 @@ lib: $(LIB).la
 	libtool --mode=compile --tag CC $(CC) $(CFLAGS) -c $<
 
 $(LIB).la: $(shell echo $(OBJS) $(EXT_OBJS) | sed 's/\.o/\.lo/g')
-	libtool --mode=link --tag CC $(CC) $(LDFLAGS) -o $@ $(notdir $^)
+	libtool --mode=link --tag CC $(CC) $(LDFLAGS) -o $@ $(notdir $^) $(EXT_AOBJ)
 
 libs/CRoaring/build/src/libroaring.a:
 	@ echo Building libroaring
-	cd libs/CRoaring && mkdir -p build && cd build && cmake .. && cmake --build .
+	cd libs/CRoaring && mkdir -p build && cd build && \
+	    cmake -DENABLE_ROARING_TESTS=OFF .. && cmake --build .
 
 install/%.la: %.la
 	mkdir -p $(ILIBDIR)

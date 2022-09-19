@@ -8,7 +8,10 @@
 #ifndef _NXSLIB_H_
 #define _NXSLIB_H_
 
+#include <sys/cdefs.h>
 #include <inttypes.h>
+
+__BEGIN_DECLS
 
 /*
  * General nxsearch library API.
@@ -52,5 +55,7 @@ typedef struct nxs_results {
 
 nxs_results_t *	nxs_index_search(nxs_index_t *, const char *, size_t);
 void		nxs_results_release(nxs_results_t *);
+
+__END_DECLS
 
 #endif
