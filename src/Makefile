@@ -4,6 +4,7 @@
 
 BIN=		nxsearch
 LIB=		libnxsearch
+LUALIB=		$(BIN)
 
 SYSNAME:=	$(shell uname -s)
 
@@ -66,7 +67,7 @@ endif
 
 ifeq ($(SYSNAME),Linux)
 CFLAGS+=	-D_GNU_SOURCE -D_DEFAULT_SOURCE
-LDFLAGS+=	-ljemalloc
+#LDFLAGS+=	-ljemalloc
 endif
 
 #
@@ -84,10 +85,10 @@ LDFLAGS+=	-lstemmer
 #
 # Lua module
 #
-LUA_CFLAGS?=	$(shell pkg-config --cflags lua)
-LUA_LDFLAGS?=	$(shell pkg-config --cflags --libs lua)
-LUA_CFLAGS+=	$(LUA_CFLAGS) -fPIC
-LUA_LDFLAGS+=	-L.libs -lnxsearch
+LUA_CFLAGS?=	-fPIC $(shell pkg-config --cflags lua)
+LUA_LDFLAGS?=	-fPIC $(shell pkg-config --cflags --libs lua)
+
+LUA_OBJS+=	core/lua.o
 
 #
 # objs
@@ -148,20 +149,27 @@ TESTS:=		$(patsubst tests/%.c,%,$(wildcard tests/t_*.c))
 #
 
 $(LIB).la:	LDFLAGS+=	-rpath $(LIBDIR)
+$(LUALIB).so:	CFLAGS+=	$(LUA_CFLAGS)
+
 install/%.la:	ILIBDIR=	$(DESTDIR)/$(LIBDIR)
 install:	IBINDIR=	$(DESTDIR)/$(BINDIR)
-install:	IMAN1DIR=	$(DESTDIR)/$(MANDIR)/man1/
+install:	LUA_ILIBDIR=	$(DESTDIR)/$(LUA_LIBDIR)/
 
 all: $(OBJS) $(EXT_OBJS) $(EXT_AOBJ) core/cli.o
 	$(CC) $(CFLAGS) $^ -o $(BIN) $(LDFLAGS)
 
 lib: $(LIB).la
 
+lua-lib: $(LUALIB).so
+
 %.lo: %.c
 	libtool --mode=compile --tag CC $(CC) $(CFLAGS) -c $<
 
-$(LIB).la: $(shell echo $(OBJS) $(EXT_OBJS) | sed 's/\.o/\.lo/g')
+%.la: $(shell echo $(OBJS) $(EXT_OBJS) | sed 's/\.o/\.lo/g')
 	libtool --mode=link --tag CC $(CC) $(LDFLAGS) -o $@ $(notdir $^) $(EXT_AOBJ)
+
+%.so: $(OBJS) $(LUA_OBJS) $(EXT_OBJS) $(EXT_AOBJ)
+	$(CC) -fPIC -shared -o $@ $^ $(LDFLAGS) $(LUA_LDFLAGS)
 
 libs/CRoaring/build/src/libroaring.a:
 	@ echo Building libroaring
@@ -181,7 +189,7 @@ install-bin:
 
 clean:
 	libtool --mode=clean rm
-	rm -rf .libs *.o *.lo *.la
+	rm -rf .libs *.o *.so *.lo *.la
 	rm -f $(BIN) $(OBJS) $(TESTS)
 
 distclean: clean
