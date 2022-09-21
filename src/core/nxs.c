@@ -8,6 +8,28 @@
 /*
  * nxsearch: a full-text search engine.
  *
+ * Overview
+ *
+ *	The main operations are: *adding* to the index (i.e. indexing
+ *	a document), *searching* the index (running a particular query)
+ *	and *deleting* the document from the index.
+ *
+ * Index a document
+ *
+ *	Basic document indexing involves the following steps:
+ *
+ *	- Tokenizing the given text and running the filters which may
+ *	transform each token, typically using various linguistic methods,
+ *	in order to accommodate the searching logic.
+ *
+ *	- Resolving the tokens to get the terms (i.e. the objects tracking
+ *	the processed tokens already present in the index).  If the term
+ *	is not in the index, then it gets added to the "staging" list which
+ *	and then added to the term list (index) by idx_terms_add().
+ *
+ *	- Adding the document record with the set of term IDs (and their
+ *	frequency in the document) to the document-term index ("dtmap").
+ *
  * Indexes
  *
  *	There are two data files which form the index:
@@ -30,6 +52,15 @@
  *
  *	See the index.h and storage.h headers for the details on the
  *	underlying in-memory and on-disk structures.
+ *
+ * Searching
+ *
+ *	The document search also involves tokenization of the query string
+ *	with the filters applied.  The tokens are resolved to terms using
+ *	the term index.  Then the reverse (term-document map) index is used
+ *	to obtain the list of document IDs where the term is present.  The
+ *	relevant counters are provided to the ranking algorithm to produce
+ *	the relevance score for each document.
  */
 
 #include <sys/stat.h>
@@ -78,6 +109,7 @@ nxs_create(const char *basedir)
 	if (nxs->indexes == NULL) {
 		goto err;
 	}
+
 	return nxs;
 err:
 	nxs_destroy(nxs);
@@ -250,36 +282,12 @@ out:
 	return ret;
 }
 
-static nxs_result_entry_t *
-prepare_doc_entry(nxs_results_t *results, rhashmap_t *doc_map,
-    const idxdoc_t *doc, float score)
-{
-	nxs_result_entry_t *entry;
-
-	entry = rhashmap_get(doc_map, &doc->id, sizeof(nxs_doc_id_t));
-	if (entry == NULL) {
-		if ((entry = calloc(1, sizeof(nxs_result_entry_t))) == NULL) {
-			return NULL;
-		}
-		rhashmap_put(doc_map, &doc->id, sizeof(nxs_doc_id_t), entry);
-
-		entry->doc_id = doc->id;
-		entry->next = results->entries;
-		results->entries = entry;
-		results->count++;
-	}
-
-	entry->score += score;
-	return entry;
-}
-
-__dso_public nxs_results_t *
+__dso_public nxs_resp_t *
 nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 {
-	nxs_results_t *results = NULL;
+	nxs_resp_t *resp = NULL;
 	ranking_func_t rank;
 	tokenset_t *tokens;
-	rhashmap_t *doc_map;
 	token_t *token;
 	char *text;
 	int err = -1;
@@ -316,17 +324,12 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 	tokenset_resolve(tokens, idx, false);
 	free(text);
 
-	doc_map = rhashmap_create(0, RHM_NOCOPY | RHM_NONCRYPTO);
-	if (doc_map == NULL) {
-		goto out;
-	}
-	if ((results = calloc(1, sizeof(nxs_results_t))) == NULL) {
-		goto out;
-	}
-
 	/*
 	 * Lookup the documents given the terms.
 	 */
+	if ((resp = nxs_resp_create()) == NULL) {
+		goto out;
+	}
 	TAILQ_FOREACH(token, &tokens->list, entry) {
 		roaring_uint32_iterator_t *bm_iter;
 		idxterm_t *term;
@@ -349,36 +352,20 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 				goto out;
 			}
 			score = rank(idx, term, doc);
-			if (!prepare_doc_entry(results, doc_map, doc, score)) {
+			if (nxs_resp_addresult(resp, doc, score) == -1) {
 				goto out;
 			}
 			roaring_advance_uint32_iterator(bm_iter);
 		}
 		roaring_free_uint32_iterator(bm_iter);
 	}
+	nxs_resp_build(resp);
 	err = 0;
 out:
-	if (err && results) {
-		nxs_results_release(results);
-	}
-	if (doc_map) {
-		rhashmap_destroy(doc_map);
+	if (err && resp) {
+		nxs_resp_release(resp);
+		resp = NULL;
 	}
 	tokenset_destroy(tokens);
-	return results;
-}
-
-__dso_public void
-nxs_results_release(nxs_results_t *results)
-{
-	if (results) {
-		nxs_result_entry_t *entry = results->entries;
-
-		while (entry) {
-			nxs_result_entry_t *next = entry->next;
-			free(entry);
-			entry = next;
-		}
-	}
-	free(results);
+	return resp;
 }

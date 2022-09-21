@@ -35,7 +35,6 @@
 #include <string.h>
 #include <inttypes.h>
 #include <err.h>
-#include <assert.h>
 
 #include "levdist.h"
 #include "utils.h"

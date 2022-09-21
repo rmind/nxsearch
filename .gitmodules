@@ -6,3 +6,7 @@
 	path = src/libs/CRoaring
 	url = https://github.com/RoaringBitmap/CRoaring.git
 	shallow = true
+[submodule "src/libs/yyjson"]
+	path = src/libs/yyjson
+	url = https://github.com/ibireme/yyjson
+	shallow = true

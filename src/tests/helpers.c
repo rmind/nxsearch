@@ -156,39 +156,41 @@ run_with_index(const char *terms_testdb_path, const char *dtmap_testdb_path,
 
 static void
 print_search_results(const char *query,
-    const nxs_index_t *idx, const nxs_results_t *results)
+    const nxs_index_t *idx, nxs_resp_t *resp)
 {
+	nxs_doc_id_t doc_id;
+	float score;
+
 	printf("ALGO %u QUERY [%s] DOC COUNT %u\n",
-	    idx->algo, query, results->count);
-	nxs_result_entry_t *entry = results->entries;
-	while (entry) {
-		printf("DOC %lu, SCORE %f\n", entry->doc_id, entry->score);
-		entry = entry->next;
+	    idx->algo, query, nxs_resp_resultcount(resp));
+
+	nxs_resp_iter_reset(resp);
+	while (nxs_resp_iter_result(resp, &doc_id, &score)) {
+		printf("DOC %lu, SCORE %f\n", doc_id, score);
 	}
 }
 
 static void
 check_doc_score(const char *query, const nxs_index_t *idx,
-    const nxs_results_t *results, const nxs_doc_id_t doc_id,
-    const float score)
+    nxs_resp_t *resp, nxs_doc_id_t target_doc_id,
+    float expected_score)
 {
-	nxs_result_entry_t *entry = results->entries;
+	nxs_doc_id_t doc_id;
+	float score;
 
-	while (entry) {
-		if (entry->doc_id != doc_id) {
-			entry = entry->next;
+	nxs_resp_iter_reset(resp);
+	while (nxs_resp_iter_result(resp, &doc_id, &score)) {
+		if (doc_id != target_doc_id) {
 			continue;
 		}
-		if (fabsf(entry->score - score) < 0.0001) {
+		if (fabsf(score - expected_score) < 0.0001) {
 			return;
 		}
-		break;
-	}
-	print_search_results(query, idx, results);
-	if (entry) {
+		print_search_results(query, idx, resp);
 		errx(EXIT_FAILURE, "doc %"PRIu64" score is %f (expected %f)",
-		    doc_id, entry->score, score);
+		    doc_id, score, expected_score);
 	}
+	print_search_results(query, idx, resp);
 	errx(EXIT_FAILURE, "no doc %"PRIu64" in the results", doc_id);
 }
 
@@ -197,8 +199,8 @@ test_index_search(const test_score_case_t *test_case)
 {
 	char *basedir = get_tmpdir();
 	const char *q = test_case->query;
-	nxs_results_t *results;
 	nxs_index_t *idx;
+	nxs_resp_t *resp;
 	nxs_t *nxs;
 	unsigned i;
 
@@ -219,18 +221,19 @@ test_index_search(const test_score_case_t *test_case)
 
 	for (ranking_algo_t algo = TF_IDF; algo <= BM25; algo++) {
 		idx->algo = algo;
-		results = nxs_index_search(idx, q, strlen(q));
+		resp = nxs_index_search(idx, q, strlen(q));
+		assert(resp);
 
 		for (i = 0; ; i++) {
 			const test_score_t *score = &test_case->scores[i];
 			if (score->id == 0) {
 				break;
 			}
-			check_doc_score(q, idx, results, score->id,
+			check_doc_score(q, idx, resp, score->id,
 			    score->value[idx->algo]);
 		}
-		assert(results->count == i);
-		nxs_results_release(results);
+		assert(nxs_resp_resultcount(resp)  == i);
+		nxs_resp_release(resp);
 	}
 
 	nxs_index_close(nxs, idx);

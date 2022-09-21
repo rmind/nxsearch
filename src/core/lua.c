@@ -130,28 +130,31 @@ static int
 lua_nxs_index_search(lua_State *L)
 {
 	nxs_lua_t *lctx = lua_nxs_getctx(L);
-	nxs_results_t *results;
-	nxs_result_entry_t *entry;
+	nxs_resp_t *resp;
 	const char *text;
-	size_t len;
+	size_t len, count;
 
 	text = lua_tolstring(L, 2, &len);
 	luaL_argcheck(L, text && len, 2, "non-empty `string' expected");
 
-	results = nxs_index_search(lctx->index, text, len);
-	if (results == NULL) {
+	resp = nxs_index_search(lctx->index, text, len);
+	if (resp == NULL) {
 		return luaL_error(L, "nxsearch internal error");
 	}
 
-	lua_createtable(L, 0, results->count);
-	entry = results->entries;
-	while (entry) {
-		lua_pushinteger(L, entry->doc_id);
-		lua_pushnumber(L, entry->score);
-		lua_settable(L, -3);
-		entry = entry->next;
+	count = nxs_resp_resultcount(resp);
+	lua_createtable(L, 0, count);
+	if (count) {
+		nxs_doc_id_t doc_id;
+		float score;
+
+		while (nxs_resp_iter_result(resp, &doc_id, &score)) {
+			lua_pushinteger(L, doc_id);
+			lua_pushnumber(L, score);
+			lua_settable(L, -3);
+		}
 	}
-	nxs_results_release(results);
+	nxs_resp_release(resp);
 	return 1;
 }
 

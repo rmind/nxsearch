@@ -100,6 +100,7 @@ OBJS+=		core/filters.o
 OBJS+=		core/filters_builtin.o
 OBJS+=		core/ranking.o
 OBJS+=		core/levdist.o
+OBJS+=		core/results.o
 
 OBJS+=		index/idxmap.o
 OBJS+=		index/idxterm.o
@@ -136,6 +137,9 @@ CFLAGS+=	-I libs/rhashmap/src/
 
 EXT_AOBJ+=	libs/CRoaring/build/src/libroaring.a
 CFLAGS+=	-I libs/CRoaring/include/
+
+EXT_AOBJ+=	libs/yyjson/build/libyyjson.a
+CFLAGS+=	-I libs/yyjson/src/
 
 #
 # object files for the tests
@@ -175,6 +179,11 @@ libs/CRoaring/build/src/libroaring.a:
 	@ echo Building libroaring
 	cd libs/CRoaring && mkdir -p build && cd build && \
 	    cmake -DENABLE_ROARING_TESTS=OFF .. && cmake --build .
+
+libs/yyjson/build/libyyjson.a:
+	@ echo Building yyjson
+	cd libs/yyjson && mkdir -p build && cd build && \
+	    cmake -DYYJSON_BUILD_TESTS=OFF .. && cmake --build .
 
 install/%.la: %.la
 	mkdir -p $(ILIBDIR)
