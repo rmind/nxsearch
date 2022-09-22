@@ -282,6 +282,11 @@ out:
 	return ret;
 }
 
+/*
+ * nxs_index_search: perform  a search query on the given index.
+ *
+ * => Returns the response object (which must be released by the caller).
+ */
 __dso_public nxs_resp_t *
 nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 {

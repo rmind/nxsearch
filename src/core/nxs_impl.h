@@ -42,11 +42,12 @@ float	tf_idf(const nxs_index_t *, const idxterm_t *, const idxdoc_t *);
 float	bm25(const nxs_index_t *, const idxterm_t *, const idxdoc_t *);
 
 /*
- * Internal response API.
+ * Internal params and response API.
  */
 
-nxs_resp_t *	nxs_resp_create(void);
+char *		nxs_params_tojson(nxs_params_t *, size_t *);
 
+nxs_resp_t *	nxs_resp_create(void);
 int		nxs_resp_addresult(nxs_resp_t *, const idxdoc_t *, float);
 void		nxs_resp_adderror(nxs_resp_t *, const char *);
 void		nxs_resp_build(nxs_resp_t *);

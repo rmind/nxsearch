@@ -174,10 +174,6 @@ nxs_resp_build(nxs_resp_t *resp)
 	/* Set the count and initialize the iterator. */
 	yyjson_mut_obj_add_uint(resp->doc, resp->root, "count", resp->count);
 	yyjson_mut_arr_iter_init(resp->results_arr, &resp->results_iter);
-
-	char *s = nxs_resp_tojson(resp, NULL);
-	app_dbgx("JSON resp: %s", s);
-	free(s);
 }
 
 __dso_public void

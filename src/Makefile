@@ -107,6 +107,7 @@ OBJS+=		index/idxterm.o
 OBJS+=		index/idxdoc.o
 OBJS+=		index/terms.o
 OBJS+=		index/dtmap.o
+OBJS+=		index/params.o
 
 OBJS+=		utils/strbuf.o
 OBJS+=		utils/mmrw.o

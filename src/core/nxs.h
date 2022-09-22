@@ -28,6 +28,18 @@ nxs_t *		nxs_create(const char *);
 void		nxs_destroy(nxs_t *);
 
 /*
+ * Parameters API.
+ */
+
+struct nxs_params;
+typedef struct nxs_params nxs_params_t;
+
+nxs_params_t *	nxs_params_create(void);
+int		nxs_params_set_str(nxs_params_t *, const char *, const char *);
+int		nxs_params_set_uint(nxs_params_t *, const char *, uint64_t);
+void		nxs_params_release(nxs_params_t *);
+
+/*
  * Index handling API.
  */
 
