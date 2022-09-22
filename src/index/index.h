@@ -72,7 +72,10 @@ struct nxs_index {
 	filter_pipeline_t *	fp;
 	ranking_algo_t		algo;
 
-	/* Index name and list entry */
+	/* Error message. */
+	char *			error;
+
+	/* Index name, list entry and error message. */
 	char *			name;
 	TAILQ_ENTRY(nxs_index)	entry;
 };
@@ -128,5 +131,20 @@ void		idx_dtmap_close(nxs_index_t *);
 
 uint64_t	idx_get_token_count(const nxs_index_t *);
 uint32_t	idx_get_doc_count(const nxs_index_t *);
+
+/*
+ * Error messaging.
+ */
+
+void		_nxs_declare_error(nxs_index_t *, int, const char *, int,
+		    const char *, const char *, ...);
+
+#define	nxs_declare_errorx(idx, msg, ...) \
+    _nxs_declare_error((idx), LOG_ERR, \
+    __FILE__, __LINE__, __func__, (msg), __VA_ARGS__)
+
+#define	nxs_declare_error(idx, msg, ...) \
+    _nxs_declare_error((idx), LOG_ERR|LOG_EMSG, \
+    __FILE__, __LINE__, __func__, (msg), __VA_ARGS__)
 
 #endif

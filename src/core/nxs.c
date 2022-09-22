@@ -67,6 +67,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <stdarg.h>
 #include <errno.h>
 
 #define __NXSLIB_PRIVATE
@@ -131,6 +132,52 @@ nxs_destroy(nxs_t *nxs)
 	filters_sysfini(nxs);
 	free(nxs->basedir);
 	free(nxs);
+}
+
+static void
+nxs_clear_error(nxs_index_t *idx)
+{
+	free(idx->error);
+	idx->error = NULL;
+}
+
+/*
+ * _nxs_declare_error: set the index-level error message and log it.
+ * If LOG_EMSG flag is set, then append the system-level error message.
+ */
+void
+_nxs_declare_error(nxs_index_t *idx, int level, const char *file, int line,
+    const char *func, const char *fmt, ...)
+{
+	const int error = errno;
+	char *s = NULL, *msg = NULL;
+	va_list ap;
+
+	va_start(ap, fmt);
+	(void)vasprintf(&s, fmt, ap);
+	va_end(ap);
+
+	if (level & LOG_EMSG) {
+		(void)asprintf(&msg, "%s: %s", s, strerror(error));
+		free(s);
+	} else {
+		msg = s;
+	}
+
+	free(idx->error);
+	idx->error = msg;
+#if 0
+	va_copy or add another primitive?
+	_app_log(level, file, line, func, fmt, ap);
+#else
+	(void)file; (void)line; (void)func;
+#endif
+}
+
+__dso_public const char *
+nxs_index_get_error(const nxs_index_t *idx)
+{
+	return idx->error;
 }
 
 __dso_public nxs_index_t *
@@ -238,6 +285,7 @@ nxs_index_close(nxs_t *nxs, nxs_index_t *idx)
 	idx_dtmap_close(idx);
 	idx_terms_close(idx);
 	idxterm_sysfini(idx);
+	free(idx->error);
 	free(idx);
 }
 
@@ -247,9 +295,14 @@ nxs_index_add(nxs_index_t *idx, uint64_t doc_id, const char *text, size_t len)
 	tokenset_t *tokens;
 	int ret = -1;
 
-	/* Check whether the document already exists.
-	*/
+	nxs_clear_error(idx);
+
+	/*
+	 * Check whether the document already exists.
+	 */
 	if (idxdoc_lookup(idx, doc_id)) {
+		nxs_declare_errorx(idx,
+		    "document %"PRIu64" is already indexed", doc_id);
 		errno = EEXIST;
 		return -1;
 	}
@@ -258,12 +311,13 @@ nxs_index_add(nxs_index_t *idx, uint64_t doc_id, const char *text, size_t len)
 	 * Tokenize and resolve tokens to terms.
 	 */
 	if ((tokens = tokenize(idx->fp, text, len)) == NULL) {
+		nxs_declare_errorx(idx, "tokenizer failed", NULL);
 		return -1;
 	}
 	tokenset_resolve(tokens, idx, true);
 
 	/*
-	 * Add new terms.
+	 * Add new terms (if any).
 	 */
 	if (idx_terms_add(idx, tokens) == -1) {
 		goto out;
@@ -297,6 +351,8 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 	char *text;
 	int err = -1;
 
+	nxs_clear_error(idx);
+
 	/*
 	 * Sync the latest updates to the index.
 	 */
@@ -323,6 +379,7 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 		return NULL;
 	}
 	if ((tokens = tokenize(idx->fp, text, len)) == NULL) {
+		nxs_declare_errorx(idx, "tokenizer failed", NULL);
 		free(text);
 		return NULL;
 	}
@@ -367,9 +424,8 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 	nxs_resp_build(resp);
 	err = 0;
 out:
-	if (err && resp) {
-		nxs_resp_release(resp);
-		resp = NULL;
+	if (err && resp && idx->error) {
+		nxs_resp_adderror(resp, idx->error);
 	}
 	tokenset_destroy(tokens);
 	return resp;

@@ -104,6 +104,12 @@ nxs_resp_tojson(nxs_resp_t *resp, size_t *len)
 	return yyjson_mut_write(resp->doc, 0, len);
 }
 
+__dso_public const char *
+nxs_resp_geterror(const nxs_resp_t *resp)
+{
+	return resp->errmsg;
+}
+
 /*
  * nxs_resp_addresult: insert the new result entry (document ID and score)
  * or update the existing entry by adding the score.

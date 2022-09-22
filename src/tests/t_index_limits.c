@@ -133,6 +133,7 @@ add_large_term(nxs_index_t *idx)
 	tokenset_t *tokens;
 	token_t *token;
 	idxterm_t *term;
+	const char *errmsg;
 	char *val;
 	int ret;
 
@@ -160,6 +161,13 @@ add_large_term(nxs_index_t *idx)
 
 	ret = idx_terms_add(idx, tokens);
 	assert(ret == -1);
+
+	/* Check the error message. */
+	errmsg = nxs_index_get_error(idx);
+	assert(strcmp(errmsg, "term too long (65536)") == 0);
+
+	free(idx->error);
+	idx->error = NULL;
 
 	tokenset_destroy(tokens);
 	free(val);

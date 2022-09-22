@@ -100,6 +100,7 @@ OBJS+=		core/filters.o
 OBJS+=		core/filters_builtin.o
 OBJS+=		core/ranking.o
 OBJS+=		core/levdist.o
+OBJS+=		core/params.o
 OBJS+=		core/results.o
 
 OBJS+=		index/idxmap.o
@@ -107,7 +108,6 @@ OBJS+=		index/idxterm.o
 OBJS+=		index/idxdoc.o
 OBJS+=		index/terms.o
 OBJS+=		index/dtmap.o
-OBJS+=		index/params.o
 
 OBJS+=		utils/strbuf.o
 OBJS+=		utils/mmrw.o

@@ -48,7 +48,7 @@ _app_log(int level, const char *file, int line,
 	va_list ap;
 
 	if (level & LOG_EMSG) {
-	        err = errno;
+		err = errno;
 	}
 	snprintf(fileline, sizeof(fileline), "%s:%d", file, line);
 	ret = snprintf(p, size, "%-25s :: %s: ", fileline, func);

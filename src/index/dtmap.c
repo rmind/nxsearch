@@ -71,6 +71,7 @@ idx_dtmap_open(nxs_index_t *idx, const char *path)
 	 * => Returns the descriptor with the lock held.
 	 */
 	if ((fd = idx_db_open(&idx->dt_memmap, path, &created)) == -1) {
+		nxs_declare_error(idx, "could not open dtmap index", NULL);
 		return -1;
 	}
 
@@ -79,12 +80,14 @@ idx_dtmap_open(nxs_index_t *idx, const char *path)
 	 */
 	baseptr = idx_db_map(&idx->dt_memmap, IDX_SIZE_STEP, false);
 	if (baseptr == NULL) {
+		nxs_declare_error(idx, "tmap mapping failed", NULL);
 		goto err;
 	}
 	if (created && idx_dtmap_init(&idx->dt_memmap) == -1) {
 		goto err;
 	}
 	if (!created && idx_dtmap_verify(&idx->dt_memmap) == -1) {
+		nxs_declare_error(idx, "corrupted dtmap index header", NULL);
 		goto err;
 	}
 
@@ -160,8 +163,9 @@ again:
 		goto again;
 	}
 	if (idxdoc_lookup(idx, doc_id)) {
-		app_dbgx("document %"PRIu64" is already indexed", doc_id);
 		flock(idxmap->fd, LOCK_UN);
+		nxs_declare_errorx(idx,
+		    "document %"PRIu64" is already indexed", doc_id);
 		return -1;
 	}
 
@@ -171,6 +175,7 @@ again:
 	append_len = IDXDT_META_LEN(tokens->count);
 	target_len = sizeof(idxdt_hdr_t) + data_len + append_len;
 	if ((hdr = idx_db_map(idxmap, target_len, true)) == NULL) {
+		nxs_declare_error(idx, "dtmap mapping failed", NULL);
 		goto err;
 	}
 
@@ -182,6 +187,7 @@ again:
 	 */
 	offset = (uintptr_t)mm.curptr - (uintptr_t)hdr;
 	if ((doc = idxdoc_create(idx, doc_id, offset)) == NULL) {
+		nxs_declare_error(idx, "idxdoc_create failed", NULL);
 		goto err;
 	}
 
@@ -191,6 +197,7 @@ again:
 	if (mmrw_store64(&mm, doc_id) == -1 ||
 	    mmrw_store32(&mm, tokens->seen) == -1 ||
 	    mmrw_store32(&mm, tokens->count) == -1) {
+		nxs_declare_errorx(idx, "dtmap I/O error", NULL);
 		goto err;
 	}
 
@@ -206,9 +213,11 @@ again:
 
 		if (mmrw_store32(&mm, idxterm->id) == -1 ||
 		    mmrw_store32(&mm, token->count) == -1) {
+			nxs_declare_errorx(idx, "dtmap I/O error", NULL);
 			goto err;
 		}
 		if (idxterm_add_doc(idx, idxterm->id, doc_id) == -1) {
+			nxs_declare_error(idx, "idxterm_add_doc failed", NULL);
 			goto err;
 		}
 		idxterm_incr_total(idx, idxterm, token->count);
@@ -277,6 +286,7 @@ idx_dtmap_sync(nxs_index_t *idx)
 	 */
 	hdr = idx_db_map(idxmap, sizeof(idxdt_hdr_t) + seen_data_len, false);
 	if (hdr == NULL) {
+		nxs_declare_error(idx, "dtmap mapping failed", NULL);
 		return -1;
 	}
 	target_len = seen_data_len - idx->dt_consumed;
@@ -297,9 +307,12 @@ idx_dtmap_sync(nxs_index_t *idx)
 		if (mmrw_fetch64(&mm, &doc_id) == -1 ||
 		    mmrw_fetch32(&mm, &doc_total_len) == -1 ||
 		    mmrw_fetch32(&mm, &n) == -1) {
+			nxs_declare_errorx(idx, "corrupted dtmap index", NULL);
 			goto err;
 		}
 		if (!idxdoc_create(idx, doc_id, offset)) {
+			nxs_declare_error(idx,
+			    "idxdoc_create failed", NULL);
 			goto err;
 		}
 
@@ -312,9 +325,13 @@ idx_dtmap_sync(nxs_index_t *idx)
 
 			if (mmrw_fetch32(&mm, &id) == -1 ||
 			    mmrw_fetch32(&mm, &count) == -1) {
+				nxs_declare_errorx(idx,
+				    "corrupted dtmap index", NULL);
 				goto err;  // XXX: revert additions
 			}
 			if (idxterm_add_doc(idx, id, doc_id) == -1) {
+				nxs_declare_error(idx,
+				    "idxterm_add_doc failed", NULL);
 				goto err;  // XXX: revert additions
 			}
 		}
