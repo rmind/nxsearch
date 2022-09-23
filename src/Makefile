@@ -113,6 +113,7 @@ OBJS+=		utils/strbuf.o
 OBJS+=		utils/mmrw.o
 OBJS+=		utils/utf8.o
 OBJS+=		utils/log.o
+OBJS+=		utils/utils.o
 
 #
 # libs
@@ -205,6 +206,7 @@ clean:
 
 distclean: clean
 	rm -f $(EXT_OBJS) $(ALL_OBJS)
+	rm -rf libs/CRoaring/build libs/yyjson/build
 
 #
 # Tests

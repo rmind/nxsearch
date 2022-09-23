@@ -19,17 +19,28 @@
 #include "rhashmap.h"
 
 struct nxs {
+	/* Base directory and the error message. */
 	char *			basedir;
-	unsigned		filters_count;
-	filter_entry_t *	filters;
+	char *			error;
 
+	/* Opened index map and list. */
 	rhashmap_t *		indexes;
 	TAILQ_HEAD(, nxs_index)	index_list;
 
+
+	/* Filter list. */
+	unsigned		filters_count;
+	filter_entry_t *	filters;
+
+	/*
+	 * Internals of some built-in filters.
+	 */
 	rhashmap_t *		swdicts;
 };
 
 int	nxs_filter_register(nxs_t *, const char *, const filter_ops_t *);
+
+void	nxs_clear_error(nxs_t *);
 
 /*
  * Ranking algorithms.
@@ -45,8 +56,8 @@ float	bm25(const nxs_index_t *, const idxterm_t *, const idxdoc_t *);
  * Internal params and response API.
  */
 
-int		nxs_params_serialize(const nxs_params_t *, const char *);
-nxs_params_t *	nxs_params_unserialize(const char *);
+int		nxs_params_serialize(nxs_t *, const nxs_params_t *, const char *);
+nxs_params_t *	nxs_params_unserialize(nxs_t *, const char *);
 const char **	nxs_params_get_strset(nxs_params_t *, const char *, size_t *);
 const char *	nxs_params_get_str(nxs_params_t *, const char *);
 int		nxs_params_get_uint(nxs_params_t *, const char *, uint64_t *);
@@ -55,5 +66,20 @@ nxs_resp_t *	nxs_resp_create(void);
 int		nxs_resp_addresult(nxs_resp_t *, const idxdoc_t *, float);
 void		nxs_resp_adderror(nxs_resp_t *, const char *);
 void		nxs_resp_build(nxs_resp_t *);
+
+/*
+ * Error messaging.
+ */
+
+void		_nxs_decl_err(nxs_t *, int, const char *, int,
+		    const char *, const char *, ...);
+
+#define	nxs_decl_errx(nxs, msg, ...) \
+    _nxs_decl_err((nxs), LOG_ERR, \
+    __FILE__, __LINE__, __func__, (msg), __VA_ARGS__)
+
+#define	nxs_decl_err(nxs, msg, ...) \
+    _nxs_decl_err((nxs), LOG_ERR|LOG_EMSG, \
+    __FILE__, __LINE__, __func__, (msg), __VA_ARGS__)
 
 #endif

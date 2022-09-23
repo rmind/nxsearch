@@ -128,27 +128,26 @@ nxs_params_get_uint(nxs_params_t *params, const char *key, uint64_t *val)
 //////////////////////////////////////////////////////////////////////////
 
 int
-nxs_params_serialize(const nxs_params_t *params, const char *path)
+nxs_params_serialize(nxs_t *nxs, const nxs_params_t *params, const char *path)
 {
 	yyjson_write_err err;
 
 	if (!yyjson_mut_write_file(path, params->doc,
 	    YYJSON_WRITE_PRETTY, NULL, &err)) {
-		// nxs_declare_errorx(idx, "params serialize failed: %s", err.msg);
+		nxs_decl_errx(nxs, "params serialize failed: %s", err.msg);
 		return -1;
 	}
 	return 0;
 }
 
 static nxs_params_t *
-nxs_params_load(yyjson_doc *doc, yyjson_read_err *err)
+nxs_params_load(nxs_t *nxs, yyjson_doc *doc, yyjson_read_err *err)
 {
 	nxs_params_t *params;
 
 	if (!doc) {
-		//nxs_declare_errorx(idx, "params parsing failed: %s at %u",
-		//    err->msg, err->pos);
-		(void)err;
+		nxs_decl_errx(nxs, "params parsing failed: %s at %u",
+		    err->msg, err->pos);
 		return NULL;
 	}
 	if ((params = calloc(1, sizeof(nxs_params_t))) == NULL) {
@@ -161,18 +160,18 @@ nxs_params_load(yyjson_doc *doc, yyjson_read_err *err)
 }
 
 nxs_params_t *
-nxs_params_unserialize(const char *path)
+nxs_params_unserialize(nxs_t *nxs, const char *path)
 {
 	yyjson_read_err err;
 	yyjson_doc *doc = yyjson_read_file(path, 0, NULL, &err);
-	return nxs_params_load(doc, &err);
+	return nxs_params_load(nxs, doc, &err);
 }
 
 __dso_public nxs_params_t *
-nxs_params_fromjson(const char *json, size_t len)
+nxs_params_fromjson(nxs_t *nxs, const char *json, size_t len)
 {
 	yyjson_read_err err;
 	yyjson_doc *doc = yyjson_read_opts(
 	    (char *)(uintptr_t)json, len, 0, NULL, &err);
-	return nxs_params_load(doc, &err);
+	return nxs_params_load(nxs, doc, &err);
 }

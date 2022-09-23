@@ -67,7 +67,7 @@ again:
 		 * lock to prevent the readers from loading the, initially,
 		 * inconsistent state.
 		 */
-		fd = open(path, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC);
+		fd = open(path, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
 		if (fd == -1 && errno == EEXIST) {
 			/* Concurrent creation: try again. */
 			goto again;

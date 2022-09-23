@@ -130,29 +130,30 @@ nxs_destroy(nxs_t *nxs)
 	nxs_index_t *idx;
 
 	while ((idx = TAILQ_FIRST(&nxs->index_list)) != NULL) {
-		nxs_index_close(nxs, idx);
+		nxs_index_close(idx);
 	}
 	if (nxs->indexes) {
 		rhashmap_destroy(nxs->indexes);
 	}
 	filters_sysfini(nxs);
 	free(nxs->basedir);
+	free(nxs->error);
 	free(nxs);
 }
 
-static void
-nxs_clear_error(nxs_index_t *idx)
+void
+nxs_clear_error(nxs_t *nxs)
 {
-	free(idx->error);
-	idx->error = NULL;
+	free(nxs->error);
+	nxs->error = NULL;
 }
 
 /*
- * _nxs_declare_error: set the index-level error message and log it.
+ * _nxs_decl_error: set the index-level error message and log it.
  * If LOG_EMSG flag is set, then append the system-level error message.
  */
 void
-_nxs_declare_error(nxs_index_t *idx, int level, const char *file, int line,
+_nxs_decl_err(nxs_t *nxs, int level, const char *file, int line,
     const char *func, const char *fmt, ...)
 {
 	const int error = errno;
@@ -170,8 +171,8 @@ _nxs_declare_error(nxs_index_t *idx, int level, const char *file, int line,
 		msg = s;
 	}
 
-	free(idx->error);
-	idx->error = msg;
+	free(nxs->error);
+	nxs->error = msg;
 #if 0
 	va_copy or add another primitive?
 	_app_log(level, file, line, func, fmt, ap);
@@ -181,9 +182,9 @@ _nxs_declare_error(nxs_index_t *idx, int level, const char *file, int line,
 }
 
 __dso_public const char *
-nxs_index_get_error(const nxs_index_t *idx)
+nxs_get_error(const nxs_t *nxs)
 {
-	return idx->error;
+	return nxs->error;
 }
 
 __dso_public nxs_index_t *
@@ -196,13 +197,25 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 	uint64_t uval;
 	char *path;
 
+	nxs_clear_error(nxs);
+
 	/*
 	 * Create the index directory.
 	 */
+	if (!str_isalnumdu(name)) {
+		nxs_decl_errx(nxs, "invalid characters in index name", NULL);
+		errno = EINVAL;
+		return NULL;
+	}
 	if (asprintf(&path, "%s/data/%s", nxs->basedir, name) == -1) {
 		return NULL;
 	}
 	if (mkdir(path, 0644) == -1) {
+		if (errno == EEXIST) {
+			nxs_decl_err(nxs, "index %s already exists", name);
+			goto out;
+		}
+		nxs_decl_err(nxs, "could not create directory at %s", path);
 		goto out;
 	}
 	free(path);
@@ -211,7 +224,7 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 	/*
 	 * Set the defaults.
 	 */
-	if (!def_params) {
+	if (!params) {
 		if ((def_params = nxs_params_create()) == NULL) {
 			goto out;
 		}
@@ -234,10 +247,11 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 	/*
 	 * Write the index configuration.
 	 */
-	if (asprintf(&path, "%s/data/params.db", nxs->basedir) == -1) {
+	if (asprintf(&path, "%s/data/%s/params.db",
+	    nxs->basedir, name) == -1) {
 		goto out;
 	}
-	if (nxs_params_serialize(params, path) == -1) {
+	if (nxs_params_serialize(nxs, params, path) == -1) {
 		goto out;
 	}
 	idx = nxs_index_open(nxs, name);
@@ -262,7 +276,15 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	char *path;
 	int ret;
 
+	nxs_clear_error(nxs);
+
+	if (!str_isalnumdu(name)) {
+		nxs_decl_errx(nxs, "invalid characters in index name", NULL);
+		errno = EINVAL;
+		return NULL;
+	}
 	if (rhashmap_get(nxs->indexes, name, name_len)) {
+		nxs_decl_errx(nxs, "index is already open", NULL);
 		errno = EEXIST;
 		return NULL;
 	}
@@ -276,19 +298,21 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	/*
 	 * Load the index parameters.
 	 */
-	if (asprintf(&path, "%s/data/params.db", nxs->basedir) == -1) {
-		nxs_index_close(nxs, idx);
+	if (asprintf(&path, "%s/data/%s/params.db",
+	    nxs->basedir, name) == -1) {
+		nxs_index_close(idx);
 		return NULL;
 	}
-	if ((params = nxs_params_unserialize(path)) == NULL) {
-		nxs_index_close(nxs, idx);
+	if ((params = nxs_params_unserialize(nxs, path)) == NULL) {
+		nxs_index_close(idx);
 		return NULL;
 	}
 	free(path);
 
 	if (nxs_params_get_uint(params, "algo", &uval) == -1) {
+		nxs_decl_errx(nxs, "corrupted index params", NULL);
 		nxs_params_release(params);
-		nxs_index_close(nxs, idx);
+		nxs_index_close(idx);
 		return NULL;
 	}
 	idx->algo = uval;
@@ -296,8 +320,10 @@ nxs_index_open(nxs_t *nxs, const char *name)
 
 	filters = nxs_params_get_strset(params, "filters", &filter_count);
 	if (filters == NULL) {
+		nxs_decl_errx(nxs, "corrupted index params", NULL);
 		nxs_params_release(params);
-		nxs_index_close(nxs, idx);
+		nxs_index_close(idx);
+		return NULL;
 	}
 
 	idx->fp = filter_pipeline_create(nxs, lang, filters, filter_count);
@@ -305,7 +331,7 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	free(filters);
 
 	if (idx->fp == NULL) {
-		nxs_index_close(nxs, idx);
+		nxs_index_close(idx);
 		return NULL;
 	}
 
@@ -313,7 +339,7 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	 * Open the terms index.
 	 */
 	if (idxterm_sysinit(idx) == -1) {
-		nxs_index_close(nxs, idx);
+		nxs_index_close(idx);
 		return NULL;
 	}
 	if (asprintf(&path, "%s/data/%s/%s",
@@ -323,7 +349,7 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	ret = idx_terms_open(idx, path);
 	free(path);
 	if (ret == -1) {
-		nxs_index_close(nxs, idx);
+		nxs_index_close(idx);
 		return NULL;
 	}
 
@@ -337,7 +363,7 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	ret = idx_dtmap_open(idx, path);
 	free(path);
 	if (ret == -1) {
-		nxs_index_close(nxs, idx);
+		nxs_index_close(idx);
 		return NULL;
 	}
 
@@ -348,8 +374,10 @@ nxs_index_open(nxs_t *nxs, const char *name)
 }
 
 __dso_public void
-nxs_index_close(nxs_t *nxs, nxs_index_t *idx)
+nxs_index_close(nxs_index_t *idx)
 {
+	nxs_t *nxs = idx->nxs;
+
 	if (idx->name) {
 		TAILQ_REMOVE(&nxs->index_list, idx, entry);
 		rhashmap_del(nxs->indexes, idx->name, strlen(idx->name));
@@ -361,7 +389,6 @@ nxs_index_close(nxs_t *nxs, nxs_index_t *idx)
 	idx_dtmap_close(idx);
 	idx_terms_close(idx);
 	idxterm_sysfini(idx);
-	free(idx->error);
 	free(idx);
 }
 
@@ -371,13 +398,13 @@ nxs_index_add(nxs_index_t *idx, uint64_t doc_id, const char *text, size_t len)
 	tokenset_t *tokens;
 	int ret = -1;
 
-	nxs_clear_error(idx);
+	nxs_clear_error(idx->nxs);
 
 	/*
 	 * Check whether the document already exists.
 	 */
 	if (idxdoc_lookup(idx, doc_id)) {
-		nxs_declare_errorx(idx,
+		nxs_decl_errx(idx->nxs,
 		    "document %"PRIu64" is already indexed", doc_id);
 		errno = EEXIST;
 		return -1;
@@ -387,7 +414,7 @@ nxs_index_add(nxs_index_t *idx, uint64_t doc_id, const char *text, size_t len)
 	 * Tokenize and resolve tokens to terms.
 	 */
 	if ((tokens = tokenize(idx->fp, text, len)) == NULL) {
-		nxs_declare_errorx(idx, "tokenizer failed", NULL);
+		nxs_decl_errx(idx->nxs, "tokenizer failed", NULL);
 		return -1;
 	}
 	tokenset_resolve(tokens, idx, true);
@@ -427,7 +454,7 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 	char *text;
 	int err = -1;
 
-	nxs_clear_error(idx);
+	nxs_clear_error(idx->nxs);
 
 	/*
 	 * Sync the latest updates to the index.
@@ -455,7 +482,7 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 		return NULL;
 	}
 	if ((tokens = tokenize(idx->fp, text, len)) == NULL) {
-		nxs_declare_errorx(idx, "tokenizer failed", NULL);
+		nxs_decl_errx(idx->nxs, "tokenizer failed", NULL);
 		free(text);
 		return NULL;
 	}
@@ -500,8 +527,9 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 	nxs_resp_build(resp);
 	err = 0;
 out:
-	if (err && resp && idx->error) {
-		nxs_resp_adderror(resp, idx->error);
+	if (err && resp) {
+		const char *errmsg = nxs_get_error(idx->nxs);
+		nxs_resp_adderror(resp, errmsg);
 	}
 	tokenset_destroy(tokens);
 	return resp;

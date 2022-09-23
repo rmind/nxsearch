@@ -155,4 +155,9 @@ void	_app_log(int, const char *, int, const char *, const char *, ...);
 #define	app_dbg(m, ...)
 #endif
 
+/*
+ * Misc.
+ */
+int	str_isalnumdu(const char *);
+
 #endif

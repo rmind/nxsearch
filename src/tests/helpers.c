@@ -15,6 +15,8 @@
 #include <math.h>
 #include <err.h>
 
+#define __NXSLIB_PRIVATE
+#include "nxs_impl.h"
 #include "helpers.h"
 #include "utils.h"
 
@@ -124,9 +126,13 @@ run_with_index(const char *terms_testdb_path, const char *dtmap_testdb_path,
     bool sync, test_func_t testfunc)
 {
 	nxs_index_t idx;
+	nxs_t nxs;
 	int ret;
 
+	memset(&nxs, 0, sizeof(nxs));
 	memset(&idx, 0, sizeof(idx));
+	idx.nxs = &nxs;
+
 	ret = idxterm_sysinit(&idx);
 	assert(ret == 0);
 
@@ -149,6 +155,7 @@ run_with_index(const char *terms_testdb_path, const char *dtmap_testdb_path,
 	testfunc(&idx);
 
 	// Cleanup
+	nxs_clear_error(&nxs);
 	idx_dtmap_close(&idx);
 	idx_terms_close(&idx);
 	idxterm_sysfini(&idx);
@@ -236,6 +243,6 @@ test_index_search(const test_score_case_t *test_case)
 		nxs_resp_release(resp);
 	}
 
-	nxs_index_close(nxs, idx);
+	nxs_index_close(idx);
 	nxs_destroy(nxs);
 }

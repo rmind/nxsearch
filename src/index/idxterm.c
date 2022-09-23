@@ -133,8 +133,8 @@ idxterm_incr_total(nxs_index_t *idx, const idxterm_t *term, unsigned count)
 
 	do {
 		old_tc = be64toh(*tc);
-		new_tc = htobe64(old_tc + 1);
-	} while (!atomic_compare_exchange_weak_explicit(&tc, &old_tc, new_tc,
+		new_tc = htobe64(old_tc + count);
+	} while (!atomic_compare_exchange_weak_explicit(tc, &old_tc, new_tc,
 	    memory_order_relaxed, memory_order_relaxed));
 #else
 	atomic_fetch_add_explicit(tc, count, memory_order_relaxed);

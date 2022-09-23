@@ -26,6 +26,7 @@ typedef struct nxs nxs_t;
 
 nxs_t *		nxs_create(const char *);
 void		nxs_destroy(nxs_t *);
+const char *	nxs_get_error(const nxs_t *);
 
 /*
  * Parameters API.
@@ -35,7 +36,7 @@ struct nxs_params;
 typedef struct nxs_params nxs_params_t;
 
 nxs_params_t *	nxs_params_create(void);
-nxs_params_t *	nxs_params_fromjson(const char *, size_t);
+nxs_params_t *	nxs_params_fromjson(nxs_t *, const char *, size_t);
 
 int		nxs_params_set_strset(nxs_params_t *, const char *,
 		    const char **, size_t);
@@ -52,8 +53,7 @@ typedef struct nxs_index nxs_index_t;
 
 nxs_index_t *	nxs_index_create(nxs_t *, const char *, nxs_params_t *);
 nxs_index_t *	nxs_index_open(nxs_t *, const char *);
-void		nxs_index_close(nxs_t *, nxs_index_t *);
-const char *	nxs_index_get_error(const nxs_index_t *);
+void		nxs_index_close(nxs_index_t *);
 int		nxs_index_add(nxs_index_t *, uint64_t, const char *, size_t);
 
 /*
