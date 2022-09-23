@@ -145,13 +145,14 @@ CFLAGS+=	-I libs/yyjson/src/
 #
 # object files for the tests
 #
-TEST_OBJS:=	$(shell echo $(OBJS) $(EXT_OBJS) $(EXT_AOBJ))
 TEST_OBJS+=	tests/helpers.o
 TESTS:=		$(patsubst tests/%.c,%,$(wildcard tests/t_*.c))
 
 #
 # Targets
 #
+
+ALL_OBJS:=	$(shell echo $(OBJS) $(EXT_OBJS) $(EXT_AOBJ))
 
 $(LIB).la:	LDFLAGS+=	-rpath $(LIBDIR)
 $(LUALIB).so:	CFLAGS+=	$(LUA_CFLAGS)
@@ -173,7 +174,7 @@ lua-lib: $(LUALIB).so
 %.la: $(shell echo $(OBJS) $(EXT_OBJS) | sed 's/\.o/\.lo/g')
 	libtool --mode=link --tag CC $(CC) $(LDFLAGS) -o $@ $(notdir $^) $(EXT_AOBJ)
 
-%.so: $(OBJS) $(LUA_OBJS) $(EXT_OBJS) $(EXT_AOBJ)
+%.so: $(ALL_OBJS) $(LUA_OBJS)
 	$(CC) -fPIC -shared -o $@ $^ $(LDFLAGS) $(LUA_LDFLAGS)
 
 libs/CRoaring/build/src/libroaring.a:
@@ -200,16 +201,16 @@ install-bin:
 clean:
 	libtool --mode=clean rm
 	rm -rf .libs *.o *.so *.lo *.la
-	rm -f $(BIN) $(OBJS) $(TESTS)
+	rm -f $(BIN) $(OBJS) $(TEST_OBJS) $(TESTS)
 
 distclean: clean
-	rm -f $(EXT_OBJS)
+	rm -f $(EXT_OBJS) $(ALL_OBJS)
 
 #
 # Tests
 #
 
-t_%: $(TEST_OBJS)
+t_%: $(ALL_OBJS) $(TEST_OBJS)
 	$(CC) $(CFLAGS) $^ tests/$@.c -o $@ $(LDFLAGS)
 
 tests: $(TESTS)

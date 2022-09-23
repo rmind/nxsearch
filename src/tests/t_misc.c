@@ -12,28 +12,61 @@
 #include "nxs_impl.h"
 #include "index.h"
 #include "utils.h"
+#include "helpers.h"
 
 static void
 run_params_tests(void)
 {
+	char *testdb_path = get_tmpfile(NULL);
+	static const char *test_filters[] = {"a", "b", "c"};
 	nxs_params_t *params;
-	char *s;
+	const char *s, **arr;
+	uint64_t val;
+	size_t count;
 	int ret;
 
 	params = nxs_params_create();
 	assert(params);
 
+	/*
+	 * Basic types.
+	 */
+
 	ret = nxs_params_set_str(params, "lang", "en");
 	assert(ret == 0);
 
-	ret = nxs_params_set_uint(params, "n", 1);
+	ret = nxs_params_set_uint(params, "n", 0xdeadbeef);
 	assert(ret == 0);
 
-	s = nxs_params_tojson(params, NULL);
+	ret = nxs_params_set_strset(params, "filters",
+	    test_filters, __arraycount(test_filters));
+	assert(ret == 0);
+
+	/*
+	 * Serialize-unserialize test.
+	 */
+
+	ret = nxs_params_serialize(params, testdb_path);
+	assert(ret == 0);
 	nxs_params_release(params);
 
-	assert(strcmp(s, "{\"lang\":\"en\",\"n\":1}") == 0);
-	free(s);
+	params = nxs_params_unserialize(testdb_path);
+	assert(params);
+
+	s = nxs_params_get_str(params, "lang");
+	assert(strcmp(s, "en") == 0);
+
+	ret = nxs_params_get_uint(params, "n", &val);
+	assert(ret == 0 && val == 0xdeadbeef);
+
+	arr = nxs_params_get_strset(params, "filters", &count);
+	assert(arr && count == 3);
+	assert(strcmp(arr[0], "a") == 0);
+	assert(strcmp(arr[1], "b") == 0);
+	assert(strcmp(arr[2], "c") == 0);
+	free(arr);
+
+	nxs_params_release(params);
 }
 
 static void
@@ -63,5 +96,6 @@ main(void)
 {
 	run_params_tests();
 	run_resp_tests();
+	puts("OK");
 	return 0;
 }

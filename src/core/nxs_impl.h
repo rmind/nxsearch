@@ -45,7 +45,11 @@ float	bm25(const nxs_index_t *, const idxterm_t *, const idxdoc_t *);
  * Internal params and response API.
  */
 
-char *		nxs_params_tojson(nxs_params_t *, size_t *);
+int		nxs_params_serialize(const nxs_params_t *, const char *);
+nxs_params_t *	nxs_params_unserialize(const char *);
+const char **	nxs_params_get_strset(nxs_params_t *, const char *, size_t *);
+const char *	nxs_params_get_str(nxs_params_t *, const char *);
+int		nxs_params_get_uint(nxs_params_t *, const char *, uint64_t *);
 
 nxs_resp_t *	nxs_resp_create(void);
 int		nxs_resp_addresult(nxs_resp_t *, const idxdoc_t *, float);

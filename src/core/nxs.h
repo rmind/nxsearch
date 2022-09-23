@@ -35,6 +35,10 @@ struct nxs_params;
 typedef struct nxs_params nxs_params_t;
 
 nxs_params_t *	nxs_params_create(void);
+nxs_params_t *	nxs_params_fromjson(const char *, size_t);
+
+int		nxs_params_set_strset(nxs_params_t *, const char *,
+		    const char **, size_t);
 int		nxs_params_set_str(nxs_params_t *, const char *, const char *);
 int		nxs_params_set_uint(nxs_params_t *, const char *, uint64_t);
 void		nxs_params_release(nxs_params_t *);
@@ -46,7 +50,7 @@ void		nxs_params_release(nxs_params_t *);
 struct nxs_index;
 typedef struct nxs_index nxs_index_t;
 
-nxs_index_t *	nxs_index_create(nxs_t *, const char *);
+nxs_index_t *	nxs_index_create(nxs_t *, const char *, nxs_params_t *);
 nxs_index_t *	nxs_index_open(nxs_t *, const char *);
 void		nxs_index_close(nxs_t *, nxs_index_t *);
 const char *	nxs_index_get_error(const nxs_index_t *);

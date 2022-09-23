@@ -148,7 +148,7 @@ filter_pipeline_destroy(filter_pipeline_t *fp)
 	for (unsigned i = 0; i < fp->count; i++) {
 		filter_t *filt = &fp->filters[i];
 
-		if (filt->ops->destroy) {
+		if (filt->ops && filt->ops->destroy) {
 			filt->ops->destroy(filt->context);
 		}
 	}

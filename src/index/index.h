@@ -75,7 +75,8 @@ struct nxs_index {
 	/* Error message. */
 	char *			error;
 
-	/* Index name, list entry and error message. */
+	/* Instance backpointer, index name, list entry. */
+	nxs_t *			nxs;
 	char *			name;
 	TAILQ_ENTRY(nxs_index)	entry;
 };

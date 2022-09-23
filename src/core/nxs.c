@@ -77,6 +77,12 @@
 #include "storage.h"
 #include "index.h"
 
+#define	DEFAULT_RANKING_ALGO		BM25
+
+static const char *default_filters[] = {
+	"normalizer", "stopwords", "stemmer"
+};
+
 __dso_public nxs_t *
 nxs_create(const char *basedir)
 {
@@ -181,8 +187,13 @@ nxs_index_get_error(const nxs_index_t *idx)
 }
 
 __dso_public nxs_index_t *
-nxs_index_create(nxs_t *nxs, const char *name)
+nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 {
+	nxs_params_t *def_params = NULL;
+	const char **filters = NULL;
+	nxs_index_t *idx = NULL;
+	size_t filter_count;
+	uint64_t uval;
 	char *path;
 
 	/*
@@ -192,27 +203,62 @@ nxs_index_create(nxs_t *nxs, const char *name)
 		return NULL;
 	}
 	if (mkdir(path, 0644) == -1) {
-		free(path);
-		return NULL;
+		goto out;
 	}
 	free(path);
+	path = NULL;
 
 	/*
-	 * TODO: Write the index configuration.
+	 * Set the defaults.
 	 */
+	if (!def_params) {
+		if ((def_params = nxs_params_create()) == NULL) {
+			goto out;
+		}
+		params = def_params;
+	}
+	filters = nxs_params_get_strset(params, "filters", &filter_count);
+	if (filters == NULL && nxs_params_set_strset(params, "filters",
+	    default_filters, __arraycount(default_filters)) == -1) {
+		goto out;
+	}
+	if (nxs_params_get_uint(params, "algo", &uval) == -1 &&
+	    nxs_params_set_uint(params, "algo", DEFAULT_RANKING_ALGO) == -1) {
+		goto out;
+	}
+	if (nxs_params_get_str(params, "lang") == NULL &&
+	    nxs_params_set_str(params, "lang", "en") == -1) {
+		goto out;
+	}
 
-	return nxs_index_open(nxs, name);
+	/*
+	 * Write the index configuration.
+	 */
+	if (asprintf(&path, "%s/data/params.db", nxs->basedir) == -1) {
+		goto out;
+	}
+	if (nxs_params_serialize(params, path) == -1) {
+		goto out;
+	}
+	idx = nxs_index_open(nxs, name);
+out:
+	if (def_params) {
+		nxs_params_release(def_params);
+	}
+	free(filters);
+	free(path);
+	return idx;
 }
 
 __dso_public nxs_index_t *
 nxs_index_open(nxs_t *nxs, const char *name)
 {
-	const char *filters[] = {
-		// TODO: Implement index parameters
-		"normalizer", "stemmer"
-	};
 	const size_t name_len = strlen(name);
+	const char *lang, **filters;
+	size_t filter_count;
+	nxs_params_t *params;
 	nxs_index_t *idx;
+	uint64_t uval;
 	char *path;
 	int ret;
 
@@ -225,13 +271,39 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	if (idx == NULL) {
 		return NULL;
 	}
-	if (idxterm_sysinit(idx) == -1) {
+	idx->nxs = nxs;
+
+	/*
+	 * Load the index parameters.
+	 */
+	if (asprintf(&path, "%s/data/params.db", nxs->basedir) == -1) {
 		nxs_index_close(nxs, idx);
 		return NULL;
 	}
+	if ((params = nxs_params_unserialize(path)) == NULL) {
+		nxs_index_close(nxs, idx);
+		return NULL;
+	}
+	free(path);
 
-	idx->fp = filter_pipeline_create(nxs,
-	    "en" /* XXX */, filters, __arraycount(filters));
+	if (nxs_params_get_uint(params, "algo", &uval) == -1) {
+		nxs_params_release(params);
+		nxs_index_close(nxs, idx);
+		return NULL;
+	}
+	idx->algo = uval;
+	lang = nxs_params_get_str(params, "lang");
+
+	filters = nxs_params_get_strset(params, "filters", &filter_count);
+	if (filters == NULL) {
+		nxs_params_release(params);
+		nxs_index_close(nxs, idx);
+	}
+
+	idx->fp = filter_pipeline_create(nxs, lang, filters, filter_count);
+	nxs_params_release(params);
+	free(filters);
+
 	if (idx->fp == NULL) {
 		nxs_index_close(nxs, idx);
 		return NULL;
@@ -240,6 +312,10 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	/*
 	 * Open the terms index.
 	 */
+	if (idxterm_sysinit(idx) == -1) {
+		nxs_index_close(nxs, idx);
+		return NULL;
+	}
 	if (asprintf(&path, "%s/data/%s/%s",
 	    nxs->basedir, name, "nxsterms") == -1) {
 		return NULL;

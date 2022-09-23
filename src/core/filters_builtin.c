@@ -30,6 +30,8 @@
 #include "rhashmap.h"
 #include "utf8.h"
 
+#define	DUMMY_PTR	((void *)(uintptr_t)0x1)
+
 /*
  * Basic token normalizer.
  */
@@ -124,7 +126,10 @@ stopwords_sysfini(nxs_t *nxs)
 static void *
 stopwords_create(nxs_t *nxs, const char *lang)
 {
-	return rhashmap_get(nxs->swdicts, lang, strlen(lang));
+	if (nxs->swdicts) {
+		return rhashmap_get(nxs->swdicts, lang, strlen(lang));
+	}
+	return DUMMY_PTR;  // not an error
 }
 
 static filter_action_t
@@ -132,7 +137,8 @@ stopwords_filter(void *arg, strbuf_t *buf)
 {
 	rhashmap_t *swmap = arg;
 
-	if (swmap && rhashmap_get(swmap, buf->value, buf->length)) {
+	if (swmap && swmap != DUMMY_PTR &&
+	    rhashmap_get(swmap, buf->value, buf->length)) {
 		return FILT_DROP;
 	}
 	return FILT_MUTATION;  // pass-through

@@ -16,15 +16,9 @@
 #include "nxs_impl.h"
 #include "utils.h"
 
-typedef struct {
-	void *		next;
-	void *		ptr;
-} param_memref_t;
-
 struct nxs_params {
 	yyjson_mut_doc *	doc;
 	yyjson_mut_val *	root;
-	param_memref_t *	memrefs;
 };
 
 __dso_public nxs_params_t *
@@ -41,31 +35,27 @@ nxs_params_create(void)
 	return params;
 }
 
-static char *
-memref_strdup(nxs_params_t *params, const char *s)
+__dso_public int
+nxs_params_set_strset(nxs_params_t *params, const char *key,
+    const char **vals, size_t count)
 {
-	param_memref_t *mr;
+	yyjson_mut_val *ckey = yyjson_mut_strcpy(params->doc, key);
+	yyjson_mut_val *arr;
 
-	if ((mr = calloc(1, sizeof(param_memref_t))) == NULL) {
-		return NULL;
+	arr = yyjson_mut_arr_with_strcpy(params->doc, vals, count);
+	if (!yyjson_mut_obj_add(params->root, ckey, arr)) {
+		return -1;
 	}
-	if ((mr->ptr = strdup(s)) == NULL) {
-		free(mr);
-		return NULL;
-	}
-	mr->next = params->memrefs;
-	params->memrefs = mr;
-	return mr->ptr;
+	return 0;
 }
 
 __dso_public int
 nxs_params_set_str(nxs_params_t *params, const char *key, const char *val)
 {
-	const char *ckey = memref_strdup(params, key);
-	const char *cval = memref_strdup(params, val);
+	yyjson_mut_val *ckey = yyjson_mut_strcpy(params->doc, key);
+	yyjson_mut_val *cval = yyjson_mut_strcpy(params->doc, val);
 
-	if (ckey == NULL || cval == NULL || !yyjson_mut_obj_add_str(
-	    params->doc, params->root, ckey, cval)) {
+	if (!yyjson_mut_obj_add(params->root, ckey, cval)) {
 		return -1;
 	}
 	return 0;
@@ -74,39 +64,115 @@ nxs_params_set_str(nxs_params_t *params, const char *key, const char *val)
 __dso_public int
 nxs_params_set_uint(nxs_params_t *params, const char *key, uint64_t val)
 {
-	const char *ckey = memref_strdup(params, key);
+	yyjson_mut_val *ckey = yyjson_mut_strcpy(params->doc, key);
+	yyjson_mut_val *cval = yyjson_mut_uint(params->doc, val);
 
-	if (ckey == NULL || !yyjson_mut_obj_add_uint(
-	    params->doc, params->root, ckey, val)) {
+	if (!yyjson_mut_obj_add(params->root, ckey, cval)) {
 		return -1;
 	}
 	return 0;
 }
 
-/*
- * nxs_params_tojson: return the parameters as a JSON string.
- *
- * => The string must be released with free(3) by the caller.
- */
-char *
-nxs_params_tojson(nxs_params_t *params, size_t *len)
-{
-	return yyjson_mut_write(params->doc, 0, len);
-}
-
 __dso_public void
 nxs_params_release(nxs_params_t *params)
 {
-	param_memref_t *mr = params->memrefs;
-
-	while (mr) {
-		param_memref_t *next = mr->next;
-		free(mr->ptr);
-		free(mr);
-		mr = next;
-	}
 	if (params->doc) {
 		yyjson_mut_doc_free(params->doc);
 	}
 	free(params);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+const char **
+nxs_params_get_strset(nxs_params_t *params, const char *key, size_t *count)
+{
+	yyjson_mut_val *arr = yyjson_mut_obj_get(params->root, key);
+	size_t i = 0, c, idx, max;
+	yyjson_mut_val *val;
+	const char **strings;
+
+	if (!arr || (c = yyjson_mut_arr_size(arr)) == 0) {
+		return NULL;
+	}
+	if ((strings = calloc(c, sizeof(const char *))) == NULL) {
+		return NULL;
+	}
+	yyjson_mut_arr_foreach(arr, idx, max, val) {
+		if (yyjson_mut_is_str(val)) {
+			strings[i++] = yyjson_mut_get_str(val);
+		}
+	}
+	*count = i;
+	return strings;
+}
+
+const char *
+nxs_params_get_str(nxs_params_t *params, const char *key)
+{
+	yyjson_mut_val *jval = yyjson_mut_obj_get(params->root, key);
+	return yyjson_mut_is_str(jval) ? yyjson_mut_get_str(jval) : NULL;
+}
+
+int
+nxs_params_get_uint(nxs_params_t *params, const char *key, uint64_t *val)
+{
+	yyjson_mut_val *jval = yyjson_mut_obj_get(params->root, key);
+	if (!yyjson_mut_is_uint(jval)) {
+		return -1;
+	}
+	*val = yyjson_mut_get_uint(jval);
+	return 0;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+int
+nxs_params_serialize(const nxs_params_t *params, const char *path)
+{
+	yyjson_write_err err;
+
+	if (!yyjson_mut_write_file(path, params->doc,
+	    YYJSON_WRITE_PRETTY, NULL, &err)) {
+		// nxs_declare_errorx(idx, "params serialize failed: %s", err.msg);
+		return -1;
+	}
+	return 0;
+}
+
+static nxs_params_t *
+nxs_params_load(yyjson_doc *doc, yyjson_read_err *err)
+{
+	nxs_params_t *params;
+
+	if (!doc) {
+		//nxs_declare_errorx(idx, "params parsing failed: %s at %u",
+		//    err->msg, err->pos);
+		(void)err;
+		return NULL;
+	}
+	if ((params = calloc(1, sizeof(nxs_params_t))) == NULL) {
+		return NULL;
+	}
+	params->doc = yyjson_doc_mut_copy(doc, NULL);
+	params->root = yyjson_mut_doc_get_root(params->doc);
+	yyjson_doc_free(doc);
+	return params;
+}
+
+nxs_params_t *
+nxs_params_unserialize(const char *path)
+{
+	yyjson_read_err err;
+	yyjson_doc *doc = yyjson_read_file(path, 0, NULL, &err);
+	return nxs_params_load(doc, &err);
+}
+
+__dso_public nxs_params_t *
+nxs_params_fromjson(const char *json, size_t len)
+{
+	yyjson_read_err err;
+	yyjson_doc *doc = yyjson_read_opts(
+	    (char *)(uintptr_t)json, len, 0, NULL, &err);
+	return nxs_params_load(doc, &err);
 }
