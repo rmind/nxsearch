@@ -16,14 +16,12 @@ local resp, err = index:search("fox")
 assert(resp)
 
 local results_json = resp:tojson()
-assert(result_json ==
+assert(results_json ==
   '{"results":[{"doc_id":2,"score":0.06675427407026291},' ..
   '{"doc_id":1,"score":0.06675427407026291}],"count":2}')
 
 results_table = resp:repr()
-assert(#result_table == 2)
-
-assert(result_table[1] == 0.066754274070263)
-assert(result_table[2] == 0.066754274070263)
-
+assert(#results_table == 2)
+assert(tostring(results_table[1]) == "0.066754274070263")
+assert(tostring(results_table[2]) == "0.066754274070263")
 print("OK")

@@ -110,7 +110,7 @@ lua_nxs_index_open(lua_State *L)
 		return luaL_error(L, "OOM");
 	}
 	lua_pushnil(L);
-	return ret + 1;
+	return 2;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -137,7 +137,7 @@ lua_nxs_index_create(lua_State *L)
 		return luaL_error(L, "OOM");
 	}
 	lua_pushnil(L);
-	return ret + 1;
+	return 2;
 }
 
 static int
@@ -261,7 +261,7 @@ lua_nxs_index_search(lua_State *L)
 		return luaL_error(L, "OOM");
 	}
 	lua_pushnil(L);
-	return ret + 1;
+	return 2;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
