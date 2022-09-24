@@ -23,8 +23,10 @@ run_params_tests(void)
 	const char *s, **arr;
 	uint64_t val;
 	size_t count;
+	nxs_t nxs;
 	int ret;
 
+	memset(&nxs, 0, sizeof(nxs));
 	params = nxs_params_create();
 	assert(params);
 
@@ -46,11 +48,11 @@ run_params_tests(void)
 	 * Serialize-unserialize test.
 	 */
 
-	ret = nxs_params_serialize(params, testdb_path);
+	ret = nxs_params_serialize(&nxs, params, testdb_path);
 	assert(ret == 0);
 	nxs_params_release(params);
 
-	params = nxs_params_unserialize(testdb_path);
+	params = nxs_params_unserialize(&nxs, testdb_path);
 	assert(params);
 
 	s = nxs_params_get_str(params, "lang");

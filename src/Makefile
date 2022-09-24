@@ -132,9 +132,9 @@ endef
 $(error $(ERRMSG))
 endif
 
-EXT_OBJS+=	libs/rhashmap/src/rhashmap.o
-EXT_OBJS+=	libs/rhashmap/src/siphash.o
-EXT_OBJS+=	libs/rhashmap/src/murmurhash.o
+OBJS+=		libs/rhashmap/src/rhashmap.o
+OBJS+=		libs/rhashmap/src/siphash.o
+OBJS+=		libs/rhashmap/src/murmurhash.o
 CFLAGS+=	-I libs/rhashmap/src/
 
 EXT_AOBJ+=	libs/CRoaring/build/src/libroaring.a
@@ -153,7 +153,7 @@ TESTS:=		$(patsubst tests/%.c,%,$(wildcard tests/t_*.c))
 # Targets
 #
 
-ALL_OBJS:=	$(shell echo $(OBJS) $(EXT_OBJS) $(EXT_AOBJ))
+ALL_OBJS:=	$(shell echo $(OBJS) $(EXT_AOBJ))
 
 $(LIB).la:	LDFLAGS+=	-rpath $(LIBDIR)
 $(LUALIB).so:	CFLAGS+=	$(LUA_CFLAGS)
@@ -162,7 +162,7 @@ install/%.la:	ILIBDIR=	$(DESTDIR)/$(LIBDIR)
 install:	IBINDIR=	$(DESTDIR)/$(BINDIR)
 install:	LUA_ILIBDIR=	$(DESTDIR)/$(LUA_LIBDIR)/
 
-all: $(OBJS) $(EXT_OBJS) $(EXT_AOBJ) core/cli.o
+all: $(ALL_OBJS) core/cli.o
 	$(CC) $(CFLAGS) $^ -o $(BIN) $(LDFLAGS)
 
 lib: $(LIB).la
@@ -172,7 +172,7 @@ lua-lib: $(LUALIB).so
 %.lo: %.c
 	libtool --mode=compile --tag CC $(CC) $(CFLAGS) -c $<
 
-%.la: $(shell echo $(OBJS) $(EXT_OBJS) | sed 's/\.o/\.lo/g')
+%.la: $(shell echo $(OBJS) | sed 's/\.o/\.lo/g')
 	libtool --mode=link --tag CC $(CC) $(LDFLAGS) -o $@ $(notdir $^) $(EXT_AOBJ)
 
 %.so: $(ALL_OBJS) $(LUA_OBJS)
@@ -205,8 +205,7 @@ clean:
 	rm -f $(BIN) $(OBJS) $(TEST_OBJS) $(TESTS)
 
 distclean: clean
-	rm -f $(EXT_OBJS) $(ALL_OBJS)
-	rm -rf libs/CRoaring/build libs/yyjson/build
+	rm -rf libs/CRoaring/build libs/yyjson/build $(ALL_OBJS)
 
 #
 # Tests

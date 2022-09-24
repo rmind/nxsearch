@@ -48,7 +48,6 @@ static nxs_params_t *
 lua_nxs_params_getctx(lua_State *L, int idx)
 {
 	void *ud = luaL_checkudata(L, idx, NXS_PARAMS_METATABLE);
-	luaL_argcheck(L, ud != NULL, idx, "`" NXS_PARAMS_METATABLE "' expected");
 	return *(nxs_params_t **)ud;
 }
 
@@ -80,7 +79,6 @@ static nxs_index_t *
 lua_nxs_index_getctx(lua_State *L)
 {
 	void *ud = luaL_checkudata(L, 1, NXS_IDX_METATABLE);
-	luaL_argcheck(L, ud != NULL, 1, "`" NXS_IDX_METATABLE "' expected");
 	return *(nxs_index_t **)ud;
 }
 
@@ -197,7 +195,6 @@ static nxs_resp_t *
 lua_nxs_resp_getctx(lua_State *L, int idx)
 {
 	void *ud = luaL_checkudata(L, idx, NXS_RESP_METATABLE);
-	luaL_argcheck(L, ud != NULL, idx, "`" NXS_RESP_METATABLE "' expected");
 	return *(nxs_resp_t **)ud;
 }
 
