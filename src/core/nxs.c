@@ -103,7 +103,7 @@ nxs_create(const char *basedir)
 	if (asprintf(&path, "%s/data", nxs->basedir) == -1) {
 		goto err;
 	}
-	if (mkdir(path, 0644) == -1 && errno != EEXIST) {
+	if (mkdir(path, 0755) == -1 && errno != EEXIST) {
 		goto err;
 	}
 	free(path);
@@ -210,7 +210,7 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 	if (asprintf(&path, "%s/data/%s", nxs->basedir, name) == -1) {
 		return NULL;
 	}
-	if (mkdir(path, 0644) == -1) {
+	if (mkdir(path, 0755) == -1) {
 		if (errno == EEXIST) {
 			nxs_decl_err(nxs, "index %s already exists", name);
 			goto out;

@@ -47,7 +47,7 @@ typedef struct {
 	 * Data length, excluding the header.
 	 * Updated atomically after the data gets appended.
 	 */
-	uint32_t	data_len __align32;
+	uint32_t	data_len;
 	uint32_t	reserved2;
 } __attribute__((packed)) idxterms_hdr_t;
 
@@ -103,7 +103,7 @@ typedef struct {
 	 * Data length, excluding the header.
 	 * Updated atomically after the data gets appended.
 	 */
-	uint64_t	data_len __align64;
+	uint64_t	data_len;
 
 	/*
 	 * Total number of seen tokens (including repetitions/duplicates)

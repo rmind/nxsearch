@@ -83,16 +83,16 @@
  */
 
 #define	atomic_load_relaxed(p)		\
-    atomic_load_explicit((p), memory_order_relaxed)
+    __atomic_load_n((p), __ATOMIC_RELAXED)
 
 #define	atomic_store_relaxed(p, v)	\
-    atomic_store_explicit((p), (v), memory_order_relaxed)
+    __atomic_store_n((p), (v), __ATOMIC_RELAXED)
 
 #define	atomic_load_acquire(p)		\
-    atomic_load_explicit((p), memory_order_acquire)
+    __atomic_load_n((p), __ATOMIC_ACQUIRE)
 
 #define	atomic_store_release(p, v)	\
-    atomic_store_explicit((p), (v), memory_order_release)
+    __atomic_store_n((p), (v), __ATOMIC_RELEASE)
 
 /*
  * Byte-order conversions.

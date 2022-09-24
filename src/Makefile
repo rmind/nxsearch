@@ -186,7 +186,8 @@ libs/CRoaring/build/src/libroaring.a:
 libs/yyjson/build/libyyjson.a:
 	@ echo Building yyjson
 	cd libs/yyjson && mkdir -p build && cd build && \
-	    cmake -DYYJSON_BUILD_TESTS=OFF .. && cmake --build .
+	    cmake -DCMAKE_C_FLAGS="-fPIC" -DYYJSON_BUILD_TESTS=OFF .. && \
+	    VERBOSE=1 cmake --build .
 
 install/%.la: %.la
 	mkdir -p $(ILIBDIR)
