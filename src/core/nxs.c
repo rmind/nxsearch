@@ -212,7 +212,7 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 	}
 	if (mkdir(path, 0755) == -1) {
 		if (errno == EEXIST) {
-			nxs_decl_err(nxs, "index %s already exists", name);
+			nxs_decl_err(nxs, "index `%s' already exists", name);
 			goto out;
 		}
 		nxs_decl_err(nxs, "could not create directory at %s", path);
@@ -272,6 +272,7 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	size_t filter_count;
 	nxs_params_t *params;
 	nxs_index_t *idx;
+	struct stat sb;
 	uint64_t uval;
 	char *path;
 	int ret;
@@ -284,7 +285,7 @@ nxs_index_open(nxs_t *nxs, const char *name)
 		return NULL;
 	}
 	if (rhashmap_get(nxs->indexes, name, name_len)) {
-		nxs_decl_errx(nxs, "index is already open", NULL);
+		nxs_decl_errx(nxs, "index `%s' is already open", name);
 		errno = EEXIST;
 		return NULL;
 	}
@@ -303,8 +304,15 @@ nxs_index_open(nxs_t *nxs, const char *name)
 		nxs_index_close(idx);
 		return NULL;
 	}
+	if (stat(path, &sb) == -1 && errno == ENOENT) {
+		nxs_decl_errx(nxs, "index `%s' does not exist", name);
+		nxs_index_close(idx);
+		free(path);
+		return NULL;
+	}
 	if ((params = nxs_params_unserialize(nxs, path)) == NULL) {
 		nxs_index_close(idx);
+		free(path);
 		return NULL;
 	}
 	free(path);

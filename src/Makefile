@@ -85,8 +85,8 @@ LDFLAGS+=	-lstemmer
 #
 # Lua module
 #
-LUA_CFLAGS?=	-fPIC $(shell pkg-config --cflags lua)
-LUA_LDFLAGS?=	-fPIC $(shell pkg-config --cflags --libs lua)
+LUA_CFLAGS?=	-fPIC $(shell pkg-config --cflags luajit)
+LUA_LDFLAGS?=	-fPIC $(shell pkg-config --cflags --libs luajit)
 
 LUA_OBJS+=	core/lua.o
 

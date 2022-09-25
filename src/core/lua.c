@@ -332,12 +332,14 @@ luaopen_nxsearch(lua_State *L)
 		 * with a custom argument.  Push it into the registry so it
 		 * gets invoked on Lua state destruction.
 		 */
+		lua_pushlightuserdata(L, &lua_regkey_dtor);
 		lua_newuserdata(L, 0);
 		lua_newtable(L);
+		lua_pushliteral(L, "__gc");
 		lua_pushcclosure(L, luaclose_nxsearch, 0);
-		lua_setfield(L, -2, "__gc");
+		lua_rawset(L, -3);
 		lua_setmetatable(L, -2);
-		lua_rawsetp(L, LUA_REGISTRYINDEX, &lua_regkey_dtor);
+		lua_settable(L, LUA_REGISTRYINDEX);
 	}
 
 #if LUA_VERSION_NUM >= 502
