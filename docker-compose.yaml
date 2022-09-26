@@ -22,6 +22,8 @@ services:
       context: .
       dockerfile: compose/nxsearch.Dockerfile
     image: nxsearch
+    cap_add:
+      - SYS_PTRACE
     volumes:
       - ./data:/data
       - ./src:/src

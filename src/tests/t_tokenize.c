@@ -11,6 +11,7 @@
 
 #include "nxs.h"
 #include "tokenizer.h"
+#include "helpers.h"
 #include "utils.h"
 
 static const char *test_tokens[] = {
@@ -74,13 +75,14 @@ get_test_filter_pipeline(nxs_t *nxs)
 static void
 run_tokenizer_test(void)
 {
+	char *basedir = get_tmpdir();
 	filter_pipeline_t *fp;
 	tokenset_t *tset;
 	token_t *token;
 	nxs_t *nxs;
 	unsigned i;
 
-	nxs = nxs_create("");
+	nxs = nxs_create(basedir);
 	assert(nxs != NULL);
 
 	fp = get_test_filter_pipeline(nxs);

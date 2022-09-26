@@ -42,7 +42,7 @@
 #include "mmrw.h"
 #include "utils.h"
 
-static_assert(sizeof(nxs_term_id_t) == sizeof(uint32_t));
+static_assert(sizeof(nxs_term_id_t) == sizeof(uint32_t), "ABI guard");
 
 #define	MAX_TERM_ID		(UINT32_MAX)
 

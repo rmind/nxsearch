@@ -29,8 +29,8 @@ static const test_doc_t docs_1[] = {
  * In other words, rarer terms are better.
  */
 
-static_assert(DOG_TFIDF_SCORE > FOX_TFIDF_SCORE);
-static_assert(DOG_BM25_SCORE > FOX_BM25_SCORE);
+static_assert(DOG_TFIDF_SCORE > FOX_TFIDF_SCORE, "logic guard");
+static_assert(DOG_BM25_SCORE > FOX_BM25_SCORE, "logic guard");
 
 static const test_score_case_t test_case_1 = {
 	/*

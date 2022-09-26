@@ -51,8 +51,8 @@ typedef struct {
 	uint32_t	reserved2;
 } __attribute__((packed)) idxterms_hdr_t;
 
-static_assert(sizeof(idxterms_hdr_t) == 16);  // ABI guard
-static_assert(sizeof(idxterms_hdr_t) % 8 == 0);  // alignment guard
+static_assert(sizeof(idxterms_hdr_t) == 16, "ABI guard");
+static_assert(sizeof(idxterms_hdr_t) % 8 == 0, "alignment guard");
 
 #define	IDXTERMS_DATA_PTR(h, off)	\
     ((void *)((uintptr_t)(hdr) + (sizeof(idxterms_hdr_t) + (off))))
@@ -115,8 +115,8 @@ typedef struct {
 
 } __attribute__((packed)) idxdt_hdr_t;
 
-static_assert(sizeof(idxdt_hdr_t) == 32);  // ABI guard
-static_assert(sizeof(idxdt_hdr_t) % 8 == 0);  // alignment guard
+static_assert(sizeof(idxdt_hdr_t) == 32, "ABI guard");
+static_assert(sizeof(idxdt_hdr_t) % 8 == 0, "alignment guard");
 
 #define	IDXDT_DATA_PTR(h, off)	\
     ((void *)((uintptr_t)(hdr) + (sizeof(idxdt_hdr_t) + (off))))

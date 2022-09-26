@@ -26,7 +26,7 @@ strbuf_prealloc(strbuf_t *sb, size_t len)
 {
 	void *buffer;
 
-	if (len < sb->bufsize) {
+	if (len <= sb->bufsize) {
 		ASSERT(sb->value == sb->buffer);
 		return len;
 	}
@@ -46,7 +46,9 @@ strbuf_prealloc(strbuf_t *sb, size_t len)
 /*
  * strbuf_acquire: acquire the string by copying it over to the buffer.
  *
- * => Returns the buffer size or -1 on failure.
+ * => Returns the buffer size (as opposed to string length) or -1 on failure.
+ * => The caller must eventually free the buffer with strbuf_release().
+ * => Consecutive strbuf_acquire() calls are allowed.
  */
 ssize_t
 strbuf_acquire(strbuf_t *sb, const char *value, size_t len)
