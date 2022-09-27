@@ -29,6 +29,7 @@
 #include "tokenizer.h"
 #include "rhashmap.h"
 #include "utf8.h"
+#include "utils.h"
 
 #define	DUMMY_PTR	((void *)(uintptr_t)0x1)
 
@@ -59,6 +60,7 @@ normalizer_filter(void *arg, strbuf_t *buf)
 	 * Lowercase and Unicode NFKC normalization.
 	 */
 	if (utf8_normalize(ctx, buf) == -1) {
+		app_dbgx("normalization of [%s] failed", buf->value);
 		return FILT_ERROR;
 	}
 

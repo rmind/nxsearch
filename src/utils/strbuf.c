@@ -26,9 +26,11 @@ strbuf_prealloc(strbuf_t *sb, size_t len)
 {
 	void *buffer;
 
+	ASSERT(sb->length < sb->bufsize);
+	ASSERT(sb->bufsize == STRBUF_DEF_SIZE || sb->value != sb->buffer);
+
 	if (len <= sb->bufsize) {
-		ASSERT(sb->value == sb->buffer);
-		return len;
+		return sb->bufsize;
 	}
 	if ((buffer = malloc(len)) == NULL) {
 		return -1;
@@ -53,6 +55,9 @@ strbuf_prealloc(strbuf_t *sb, size_t len)
 ssize_t
 strbuf_acquire(strbuf_t *sb, const char *value, size_t len)
 {
+	ASSERT(sb->length < sb->bufsize);
+	ASSERT(sb->bufsize == STRBUF_DEF_SIZE || sb->value != sb->buffer);
+
 	if (__predict_false(len >= sb->bufsize)) {
 		/*
 		 * Double the size, plus NIL terminator.

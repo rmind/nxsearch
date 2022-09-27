@@ -7,14 +7,6 @@
 
 /*
  * UTF-8 string handling providing wrappers around the ICU library.
- *
- * u_isalpha() vs u_isUAlphabetic()
- *
- * u_charsToUChars() and u_UCharsToChars()
- *   vs
- * u_strFromUTF8() and u_strToUTF8()
- *
- * u_strtok_r
  */
 
 #include <stdio.h>
@@ -34,7 +26,6 @@ struct utf8_ctx {
 	char *			locale;
 	UCaseMap *		csm;
 	const UNormalizer2 *	normalizer;
-	strbuf_t		sbuf;
 };
 
 /*
@@ -53,7 +44,6 @@ utf8_ctx_create(const char *locale)
 		return NULL;
 	}
 	ctx->locale = locale ? strdup(locale) : NULL;
-	strbuf_init(&ctx->sbuf);
 
 	ec = U_ZERO_ERROR;
 	ctx->csm = ucasemap_open(locale, U_FOLD_CASE_DEFAULT, &ec);
@@ -88,7 +78,7 @@ utf8_ctx_destroy(utf8_ctx_t *ctx)
  *
  * => The destination array size is in units (16-bit integers).
  * => The destination string will always be NUL-terminated.
- * => Returns the result length in *units* rather than bytes.
+ * => Returns the result length in *units* rather than bytes (excl NUL-term).
  */
 ssize_t
 utf8_to_utf16(utf8_ctx_t *ctx __unused, const char *u8,
@@ -98,7 +88,7 @@ utf8_to_utf16(utf8_ctx_t *ctx __unused, const char *u8,
 	int32_t nunits = 0;
 
 	u_strFromUTF8(buf, count, &nunits, u8, -1 /* NUL-terminated */, &ec);
-	if (__predict_false(U_FAILURE(ec) || (size_t)nunits == count)) {
+	if (__predict_false(U_FAILURE(ec) || (size_t)nunits >= count)) {
 		return -1;
 	}
 	return nunits;
@@ -108,7 +98,7 @@ utf8_to_utf16(utf8_ctx_t *ctx __unused, const char *u8,
  * utf8_from_utf16: convert UTF-16 array to an UTF-8 string.
  *
  * => The destination string will always be NUL-terminated.
- * => Returns the result length in bytes.
+ * => Returns the result length in bytes (excl NUL-term).
  */
 ssize_t
 utf8_from_utf16(utf8_ctx_t *ctx __unused, const uint16_t *u16,
@@ -118,7 +108,7 @@ utf8_from_utf16(utf8_ctx_t *ctx __unused, const uint16_t *u16,
 	int32_t nbytes = 0;
 
 	u_strToUTF8(buf, buflen, &nbytes, u16, -1 /* NUL-terminated */, &ec);
-	if (__predict_false(U_FAILURE(ec) || (size_t)nbytes == buflen)) {
+	if (__predict_false(U_FAILURE(ec) || (size_t)nbytes >= buflen)) {
 		return -1;
 	}
 	return nbytes;
@@ -132,7 +122,7 @@ utf8_tolower(utf8_ctx_t *ctx, const char *s, char *buf, size_t buflen)
 
 	len = ucasemap_utf8ToLower(ctx->csm, buf, buflen,
 	   s, -1 /* NUL-terminated */, &ec);
-	if (__predict_false(U_FAILURE(ec) || (size_t)len == buflen)) {
+	if (__predict_false(U_FAILURE(ec) || (size_t)len >= buflen)) {
 		return -1;
 	}
 	return len;
@@ -146,7 +136,7 @@ utf8_toupper(utf8_ctx_t *ctx, const char *s, char *buf, size_t buflen)
 
 	len = ucasemap_utf8ToUpper(ctx->csm, buf, buflen,
 	   s, -1 /* NUL-terminated */, &ec);
-	if (__predict_false(U_FAILURE(ec) || (size_t)len == buflen)) {
+	if (__predict_false(U_FAILURE(ec) || (size_t)len >= buflen)) {
 		return -1;
 	}
 	return len;
@@ -162,19 +152,57 @@ ssize_t
 utf8_normalize(utf8_ctx_t *ctx, strbuf_t *buf)
 {
 	UErrorCode ec = U_ZERO_ERROR;
-	uint16_t buf1[128], buf2[128]; // FIXME
-	ssize_t len;
+	uint16_t *src_ubuf = NULL, *norm_ubuf = NULL;
+	size_t src_ulen, norm_ulen, max_len;
+	ssize_t c, len = -1;
 
-	if (utf8_to_utf16(ctx, buf->value, buf1, __arraycount(buf1)) == -1) {
-		return -1;
+	/*
+	 * Convert from UTF-8 to UTF-16: the buffer should be twice as
+	 * large, keeping in mind an extra unit for the NUL terminator.
+	 */
+	src_ulen = (buf->length + 1) * 2;
+	if ((src_ubuf = malloc(src_ulen)) == NULL) {
+		goto out;
 	}
-	len = unorm2_normalize(ctx->normalizer,
-	    buf1, -1 /* NUL-terminated */, buf2, __arraycount(buf2), &ec);
-	if (__predict_false(U_FAILURE(ec) || (size_t)len == __arraycount(buf2))) {
-		return -1;
+	if ((c = utf8_to_utf16(ctx, buf->value, src_ubuf, src_ulen)) == -1) {
+		goto out;
 	}
-	if (strbuf_prealloc(buf, len + 1) == -1) {
-		return -1;
+
+	/*
+	 * Normalization may produce more characters, therefore give
+	 * a large buffer size (XXX: 3x is an arbitrary choice).
+	 */
+	norm_ulen = roundup2((c + 1) * 3, 64);
+	if ((norm_ubuf = malloc(norm_ulen * 2)) == NULL) {
+		goto out;
 	}
-	return utf8_from_utf16(ctx, buf2, buf->value, buf->bufsize);
+	c = unorm2_normalize(ctx->normalizer, src_ubuf, -1,
+	    norm_ubuf, norm_ulen, &ec);
+	if (__predict_false(U_FAILURE(ec) || (size_t)c >= norm_ulen)) {
+		const char *errmsg = u_errorName(ec);
+		app_dbgx("unorm2_normalize() failed: %s", errmsg);
+		goto out;
+	}
+
+	/*
+	 * Convert back from UTF-16 to UTF-8.  Ensure the sufficient
+	 * buffer size and set the new string length.  Note that the
+	 * UTF-8 might produce more bytes than UTF-16 units, therfore
+	 * again give some extra space.
+	 */
+	max_len = (c + 1) * 2;  // XXX: x2 is arbitary
+	if (strbuf_prealloc(buf, max_len) == -1) {
+		goto out;
+	}
+	len = utf8_from_utf16(ctx, norm_ubuf, buf->value, buf->bufsize);
+	if (len == -1) {
+		goto out;
+	}
+	buf->length = len;
+out:
+	/* Always ensure the string is NUL terminated. */
+	buf->value[buf->length] = '\0';
+	free(src_ubuf);
+	free(norm_ubuf);
+	return len;
 }

@@ -47,7 +47,12 @@ run_basic_tests(void)
 	strbuf_release(&sb);
 	free(ls);
 
+	// Pre-alloc on the existing buffer using the same length.
 	ret = strbuf_prealloc(&sb, STRBUF_DEF_SIZE);
+	assert(ret == STRBUF_DEF_SIZE);
+
+	// Using the smaller buffer (no change expected).
+	ret = strbuf_prealloc(&sb, 1);
 	assert(ret == STRBUF_DEF_SIZE);
 
 	/*

@@ -170,6 +170,11 @@ filter_pipeline_run(filter_pipeline_t *fp, strbuf_t *buf)
 		filter_action_t action;
 
 		action = ops->filter(filt->context, buf);
+		if (__predict_false(buf->length == 0)) {
+			return FILT_DROP;
+		}
+		ASSERT(buf->value[buf->length] == '\0');
+		app_dbgx("[%s] filter %u action %d", buf->value, i, action);
 
 		if (__predict_false(action != FILT_MUTATION)) {
 			return action;

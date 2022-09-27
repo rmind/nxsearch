@@ -90,6 +90,9 @@ nxs_create(const char *basedir)
 	const char *s;
 	char *path = NULL;
 
+	if ((s = getenv("NXS_LOG_LEVEL")) != NULL) {
+		app_set_loglevel(s);
+	}
 	nxs = calloc(1, sizeof(nxs_t));
 	if (nxs == NULL) {
 		return NULL;
