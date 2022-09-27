@@ -179,7 +179,7 @@ utf8_normalize(utf8_ctx_t *ctx, strbuf_t *buf)
 	c = unorm2_normalize(ctx->normalizer, src_ubuf, -1,
 	    norm_ubuf, norm_ulen, &ec);
 	if (__predict_false(U_FAILURE(ec) || (size_t)c >= norm_ulen)) {
-		const char *errmsg = u_errorName(ec);
+		const char *errmsg __unused = u_errorName(ec);
 		app_dbgx("unorm2_normalize() failed: %s", errmsg);
 		goto out;
 	}

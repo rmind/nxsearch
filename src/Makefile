@@ -202,7 +202,7 @@ install-bin:
 
 clean:
 	libtool --mode=clean rm
-	rm -rf .libs *.o *.so *.lo *.la
+	rm -rf .libs *.o *.so *.lo *.la core/cli.o
 	rm -f $(BIN) $(OBJS) $(TEST_OBJS) $(TESTS)
 
 distclean: clean
