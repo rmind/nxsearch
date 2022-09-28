@@ -205,7 +205,7 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 	/*
 	 * Create the index directory.
 	 */
-	if (!str_isalnumdu(name)) {
+	if (str_isalnumdu(name) == -1) {
 		nxs_decl_errx(nxs, "invalid characters in index name", NULL);
 		errno = EINVAL;
 		return NULL;
@@ -282,7 +282,7 @@ nxs_index_open(nxs_t *nxs, const char *name)
 
 	nxs_clear_error(nxs);
 
-	if (!str_isalnumdu(name)) {
+	if (str_isalnumdu(name) == -1) {
 		nxs_decl_errx(nxs, "invalid characters in index name", NULL);
 		errno = EINVAL;
 		return NULL;

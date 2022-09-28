@@ -2,9 +2,8 @@
 # This file is in the Public Domain.
 #
 
-BIN=		nxsearch
 LIB=		libnxsearch
-LUALIB=		$(BIN)
+LUALIB=		nxsearch
 
 SYSNAME:=	$(shell uname -s)
 
@@ -153,6 +152,7 @@ TESTS:=		$(patsubst tests/%.c,%,$(wildcard tests/t_*.c))
 # Targets
 #
 
+BENCHMARK_BIN=	nxsearch_test
 ALL_OBJS:=	$(shell echo $(OBJS) $(EXT_AOBJ))
 
 $(LIB).la:	LDFLAGS+=	-rpath $(LIBDIR)
@@ -162,8 +162,8 @@ install/%.la:	ILIBDIR=	$(DESTDIR)/$(LIBDIR)
 install:	IBINDIR=	$(DESTDIR)/$(BINDIR)
 install:	LUA_ILIBDIR=	$(DESTDIR)/$(LUA_LIBDIR)/
 
-all: $(ALL_OBJS) core/cli.o
-	$(CC) $(CFLAGS) $^ -o $(BIN) $(LDFLAGS)
+all: $(ALL_OBJS) utils/benchmark.o
+	$(CC) $(CFLAGS) $^ -o $(BENCHMARK_BIN) $(LDFLAGS)
 
 lib: $(LIB).la
 
@@ -197,13 +197,10 @@ install: $(addprefix install/,$(LIB).la)
 	libtool --mode=finish $(LIBDIR)
 	mkdir -p $(IINCDIR) && install -c $(INCS) $(IINCDIR)
 
-install-bin:
-	mkdir -p $(IBINDIR) && install -c $(BIN) $(IBINDIR)
-
 clean:
 	libtool --mode=clean rm
-	rm -rf .libs *.o *.so *.lo *.la core/cli.o
-	rm -f $(BIN) $(OBJS) $(TEST_OBJS) $(TESTS)
+	rm -rf .libs *.o *.so *.lo *.la utils/benchmark.o
+	rm -f $(BENCHMARK_BIN) $(OBJS) $(TEST_OBJS) $(TESTS)
 
 distclean: clean
 	rm -rf libs/CRoaring/build libs/yyjson/build $(ALL_OBJS)

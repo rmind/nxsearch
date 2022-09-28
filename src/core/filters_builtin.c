@@ -84,16 +84,19 @@ static const filter_ops_t normalizer_ops = {
  * Stopwords.
  */
 
+static const char *stopword_langs[] = { "en" };
+
 static int
-stopwords_sysinit(nxs_t *nxs)
+stopwords_load(nxs_t *nxs, const char *lang)
 {
+	rhashmap_t *lmap;
 	char *dbpath, *line = NULL;
 	size_t lcap = 0;
 	ssize_t len;
 	FILE *fp;
 
 	if (asprintf(&dbpath, "%s/filters/stopwords/%s",
-	    nxs->basedir, "en") == -1) {  // XXX en
+	    nxs->basedir, lang) == -1) {
 		return -1;
 	}
 	fp = fopen(dbpath, "r");
@@ -103,19 +106,35 @@ stopwords_sysinit(nxs_t *nxs)
 		return 0;
 	}
 
-	if ((nxs->swdicts = rhashmap_create(0, RHM_NONCRYPTO)) == NULL) {
-		fclose(fp);
+	if ((lmap = rhashmap_create(0, RHM_NONCRYPTO)) == NULL) {
 		return -1;
 	}
 	while ((len = getline(&line, &lcap, fp)) > 0) {
-		if (len == 0) {
+		if (len == 1) {
 			continue;
 		}
-		line[len - 1] = '\0';
-		rhashmap_put(nxs->swdicts, line, len, (void *)(uintptr_t)0x1);
+		line[--len] = '\0';
+		rhashmap_put(lmap, line, len, (void *)(uintptr_t)0x1);
 	}
 	free(line);
 	fclose(fp);
+
+	rhashmap_put(nxs->swdicts, lang, strlen(lang), lmap);
+	return 0;
+}
+
+static int
+stopwords_sysinit(nxs_t *nxs)
+{
+	if ((nxs->swdicts = rhashmap_create(0, RHM_NONCRYPTO)) == NULL) {
+		return -1;
+	}
+	for (unsigned i = 0; i < __arraycount(stopword_langs); i++) {
+		const char *lang = stopword_langs[i];
+		if (stopwords_load(nxs, lang) == -1) {
+			return -1;
+		}
+	}
 	return 0;
 }
 
@@ -123,6 +142,15 @@ static void
 stopwords_sysfini(nxs_t *nxs)
 {
 	if (nxs->swdicts) {
+		for (unsigned i = 0; i < __arraycount(stopword_langs); i++) {
+			const char *lang = stopword_langs[i];
+			rhashmap_t *lmap;
+
+			lmap = rhashmap_get(nxs->swdicts, lang, strlen(lang));
+			if (lmap) {
+				rhashmap_destroy(lmap);
+			}
+		}
 		rhashmap_destroy(nxs->swdicts);
 		nxs->swdicts = NULL;
 	}
@@ -131,9 +159,14 @@ stopwords_sysfini(nxs_t *nxs)
 static void *
 stopwords_create(nxs_t *nxs, const char *lang)
 {
-	if (nxs->swdicts) {
-		return rhashmap_get(nxs->swdicts, lang, strlen(lang));
+	rhashmap_t *lang_map;
+
+	if (nxs->swdicts && (lang_map = rhashmap_get(nxs->swdicts,
+	    lang, strlen(lang))) != NULL) {
+		return lang_map;
 	}
+
+	app_dbgx("no stopwords for '%s' language", lang);
 	return DUMMY_PTR;  // not an error
 }
 

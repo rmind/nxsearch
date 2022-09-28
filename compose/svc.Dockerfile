@@ -2,8 +2,9 @@
 FROM openresty/openresty:bullseye
 
 RUN apt-get update
+RUN apt-get install -y vim less procps net-tools
+RUN apt-get install -y curl git unzip libxml2-utils
 RUN apt-get install -y libicu67 libstemmer0d
-RUN apt-get install -y vim less procps net-tools git
 
 #
 # Install dependencies.
@@ -25,12 +26,19 @@ RUN chown -R svc:svc /var/run/openresty/ /usr/local/openresty/nginx/
 RUN chown -R root:root /usr/local/openresty/nginx/sbin/
 
 #
+# Data
+#
+WORKDIR /nxsearch
+RUN chown svc:svc /nxsearch
+ENV NXS_BASEDIR=/nxsearch
+
+WORKDIR /build
+COPY tools/fetch_ext_data.sh ./
+RUN ./fetch_ext_data.sh "$NXS_BASEDIR"
+
+#
 # Application
 #
-
-WORKDIR /data
-RUN chown svc:svc /data
-ENV NXS_BASEDIR=/data
 
 WORKDIR /app
 COPY --from=nxsearch /build/nxsearch.so /usr/local/openresty/lualib/

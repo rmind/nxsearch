@@ -142,7 +142,7 @@ run_diacritic_test(void)
 		assert(ret > 0);
 
 		ret = utf8_subs_diacritics(ctx, &buf);
-		assert(ret && strcmp(buf.value, expected) == 0);
+		assert(ret > 0 && strcmp(buf.value, expected) == 0);
 	}
 
 	strbuf_release(&buf);

@@ -156,7 +156,7 @@ tokenset_resolve(tokenset_t *tset, nxs_index_t *idx, bool stage)
 tokenset_t *
 tokenize(filter_pipeline_t *fp, const char *text, size_t text_len __unused)
 {
-	const char *sep = " \t\n";
+	const char *sep = ",.;:| \t\n";
 	char *content, *val, *brk;
 	tokenset_t *tset;
 

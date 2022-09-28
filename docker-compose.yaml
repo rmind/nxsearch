@@ -15,7 +15,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
-      - ./data:/data
+      - ./data:/nxsearch/data
 
   lib:
     build:
@@ -25,5 +25,5 @@ services:
     cap_add:
       - SYS_PTRACE
     volumes:
-      - ./data:/data
+      - ./data:/nxsearch/data
       - ./src:/src

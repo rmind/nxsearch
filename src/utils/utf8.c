@@ -24,11 +24,11 @@
 #include "utils.h"
 
 /*
-* UCI Rule for transliteration.
-* see more: https://unicode-org.github.io/icu/userguide/transforms/general/
-*/
-static const char NFKD_RULE[] = "NFKD; [:Nonspacing Mark:] Remove; Latin-ASCII; NFKC";
-
+ * UCI Rule for transliteration.  See more:
+ * https://unicode-org.github.io/icu/userguide/transforms/general/
+ */
+static const char NFKD_RULE[] =
+    "NFKD; [:Nonspacing Mark:] Remove; Latin-ASCII; NFKC";
 
 struct utf8_ctx {
 	char *			locale;
@@ -79,7 +79,8 @@ utf8_ctx_create(const char *locale)
 		return NULL;
 	}
 	ec = U_ZERO_ERROR;
-	ctx->transliterator = utrans_openU(translit_id, -1, UTRANS_FORWARD, NULL, 0, NULL, &ec);
+	ctx->transliterator = utrans_openU(translit_id, -1,
+	    UTRANS_FORWARD, NULL, 0, NULL, &ec);
 	free(translit_id);
 	if (U_FAILURE(ec)) {
 		utf8_ctx_destroy(ctx);
@@ -173,9 +174,9 @@ utf8_toupper(utf8_ctx_t *ctx, const char *s, char *buf, size_t buflen)
 
 
 /*
- * utf8_subs_diacritics: uses standard ICU transformation to remove 
+ * utf8_subs_diacritics: uses standard ICU transformation to remove the
  * diacritic characters.
- * 
+ *
  * See more: https://unicode-org.github.io/icu/userguide/transforms/general/
  */
 ssize_t
@@ -187,10 +188,8 @@ utf8_subs_diacritics(utf8_ctx_t *ctx, strbuf_t *buf)
 	int32_t len, max_len;
 
 	/*
-	 * Convert from UTF-8 to UTF-16: the buffer should be twice as
-	 * large, keeping in mind an extra unit for the NUL terminator, also the
-	 * transformation can produce more characters, therefore give
-	 * a large buffer size (XXX: 3x is an arbitrary choice).
+	 * Convert from UTF-8 to UTF-16: see the comments in the
+	 * utf8_normalize() for buffer calculations.
 	 */
 	ulen = roundup2((buf->length + 1) * 3, 64);
 	if ((ubuf = malloc(ulen * 2)) == NULL) {
@@ -201,10 +200,8 @@ utf8_subs_diacritics(utf8_ctx_t *ctx, strbuf_t *buf)
 	}
 	max_len = len;
 
-	utrans_transUChars(
-		ctx->transliterator, ubuf, &len, 
-		ulen, 0, &max_len, &ec
-	);
+	utrans_transUChars(ctx->transliterator, ubuf,
+	    &len, ulen, 0, &max_len, &ec);
 
 	if (__predict_false(U_FAILURE(ec))) {
 		const char *errmsg __unused = u_errorName(ec);
