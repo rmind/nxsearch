@@ -18,7 +18,7 @@ ssize_t		utf8_from_utf16(utf8_ctx_t *, const uint16_t *, char *, size_t);
 
 ssize_t		utf8_tolower(utf8_ctx_t *, const char *, char *, size_t);
 ssize_t		utf8_toupper(utf8_ctx_t *, const char *, char *, size_t);
-
+ssize_t		utf8_subs_diacritics(utf8_ctx_t *, strbuf_t *);
 ssize_t		utf8_normalize(utf8_ctx_t *, strbuf_t *);
 
 #endif

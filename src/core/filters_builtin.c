@@ -65,8 +65,11 @@ normalizer_filter(void *arg, strbuf_t *buf)
 	}
 
 	/*
-	 * TODO: Substitute diacritics.
+	 * Substitute diacritics.
 	 */
+	if (utf8_subs_diacritics(ctx, buf) == -1) {
+		return FILT_ERROR;
+	}
 
 	return FILT_MUTATION;
 }

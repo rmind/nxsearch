@@ -92,12 +92,6 @@ run_norm_test(void)
 		// General normalization
 		{ "Henry Ⅷ", "henry viii" },
 		{ "AirForce ①", "airforce 1" },
-#if 0
-		// Removal of diacritics
-		{ "ĄŽUOLĖLIS", "azuolelis" },
-		{ "Fuglafjørður", "fuglafjordur" },
-		{ "Árbæ", "arbae" },
-#endif
 	};
 	utf8_ctx_t *ctx;
 	strbuf_t buf;
@@ -121,12 +115,47 @@ run_norm_test(void)
 	utf8_ctx_destroy(ctx);
 }
 
+static void
+run_diacritic_test(void)
+{
+	struct {
+		const char *	input;
+		const char *	expected;
+	} test_cases[] = {
+		{ "azúl", "azul" },
+		{ "ĄŽUOLĖLIS", "AZUOLELIS" },
+		{ "Fuglafjørður", "Fuglafjordur" },
+		{ "Árbæ", "Arbae" },
+	};
+	utf8_ctx_t *ctx;
+	strbuf_t buf;
+
+	ctx = utf8_ctx_create(NULL);
+	strbuf_init(&buf);
+
+	for (unsigned i = 0; i < __arraycount(test_cases); i++) {
+		const char *input = test_cases[i].input;
+		const char *expected = test_cases[i].expected;
+		int ret;
+
+		ret = strbuf_acquire(&buf, input, strlen(input));
+		assert(ret > 0);
+
+		ret = utf8_subs_diacritics(ctx, &buf);
+		assert(ret && strcmp(buf.value, expected) == 0);
+	}
+
+	strbuf_release(&buf);
+	utf8_ctx_destroy(ctx);
+}
+
 int
 main(void)
 {
 	run_snowman_test();
 	run_case_test();
 	run_norm_test();
+	run_diacritic_test();
 	puts("OK");
 	return 0;
 }
