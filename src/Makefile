@@ -20,7 +20,7 @@ endif
 #
 # Common C compiler flags.
 #
-CFLAGS+=	-std=c2x -O2 -g -Wall -Wextra -Werror
+CFLAGS+=	-std=gnu11 -O2 -g -Wall -Wextra -Werror
 CFLAGS+=	-D_POSIX_C_SOURCE=200809L
 
 CFLAGS+=	-I core/ -I index/ -I utils/

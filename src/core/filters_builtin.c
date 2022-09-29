@@ -68,6 +68,7 @@ normalizer_filter(void *arg, strbuf_t *buf)
 	 * Substitute diacritics.
 	 */
 	if (utf8_subs_diacritics(ctx, buf) == -1) {
+		app_dbgx("diacritics substitution on [%s] failed", buf->value);
 		return FILT_ERROR;
 	}
 

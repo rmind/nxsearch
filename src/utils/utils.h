@@ -94,6 +94,10 @@
 #define	atomic_store_release(p, v)	\
     __atomic_store_n((p), (v), __ATOMIC_RELEASE)
 
+#define	atomic_cas_relaxed(p, e, d)	\
+    __atomic_compare_exchange_n((p), (e), (d), \
+    true, __ATOMIC_RELAXED, __ATOMIC_RELAXED)
+
 /*
  * Byte-order conversions.
  */

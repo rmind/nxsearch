@@ -56,6 +56,7 @@ struct nxs_index {
 
 	rhashmap_t *		term_map;
 	TAILQ_HEAD(, idxterm)	term_list;
+	size_t			term_count;
 
 	/*
 	 * Document-term index.
@@ -64,6 +65,7 @@ struct nxs_index {
 	size_t			dt_consumed;
 	rhashmap_t *		dt_map;
 	TAILQ_HEAD(, idxdoc)	dt_list;
+	size_t			dt_count;
 
 	/*
 	 * Term-document map (the reverse index).
@@ -97,8 +99,9 @@ void		idxterm_destroy(nxs_index_t *, idxterm_t *);
 
 void		idxterm_assign(nxs_index_t *, idxterm_t *, nxs_term_id_t);
 idxterm_t *	idxterm_lookup(nxs_index_t *, const char *, size_t);
+idxterm_t *	idxterm_lookup_by_id(nxs_index_t *, nxs_term_id_t);
+int		idxterm_add_doc(idxterm_t *, nxs_doc_id_t);
 void		idxterm_incr_total(nxs_index_t *, const idxterm_t *, unsigned);
-int		idxterm_add_doc(nxs_index_t *, nxs_term_id_t, nxs_doc_id_t);
 
 /*
  * Document (in-memory) interface.

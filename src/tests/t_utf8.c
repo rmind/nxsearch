@@ -109,9 +109,8 @@ run_norm_test(void)
 
 		ret = utf8_normalize(ctx, &buf);
 		assert(ret > 0 && strcmp(buf.value, expected) == 0);
+		strbuf_release(&buf);
 	}
-
-	strbuf_release(&buf);
 	utf8_ctx_destroy(ctx);
 }
 
@@ -143,9 +142,8 @@ run_diacritic_test(void)
 
 		ret = utf8_subs_diacritics(ctx, &buf);
 		assert(ret > 0 && strcmp(buf.value, expected) == 0);
+		strbuf_release(&buf);
 	}
-
-	strbuf_release(&buf);
 	utf8_ctx_destroy(ctx);
 }
 

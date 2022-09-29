@@ -84,6 +84,8 @@ idxterm_create(nxs_index_t *idx, const char *token,
 		return NULL;
 	}
 	TAILQ_INSERT_TAIL(&idx->term_list, term, entry);
+	idx->term_count++;
+
 	app_dbgx("term %p [%s]", term, term->value);
 	return term;
 }
@@ -94,6 +96,8 @@ idxterm_destroy(nxs_index_t *idx, idxterm_t *term)
 	const size_t term_len = strlen(term->value);
 
 	TAILQ_REMOVE(&idx->term_list, term, entry);
+	idx->term_count--;
+
 	if (term->id) {
 		rhashmap_del(idx->td_map, &term->id, sizeof(nxs_term_id_t));
 	}
@@ -122,36 +126,32 @@ idxterm_lookup(nxs_index_t *idx, const char *value, size_t len)
 	return rhashmap_get(idx->term_map, value, len);
 }
 
+idxterm_t *
+idxterm_lookup_by_id(nxs_index_t *idx, nxs_term_id_t term_id)
+{
+	return rhashmap_get(idx->td_map, &term_id, sizeof(nxs_term_id_t));
+}
+
 void
 idxterm_incr_total(nxs_index_t *idx, const idxterm_t *term, unsigned count)
 {
 	const idxmap_t *idxmap = &idx->terms_memmap;
 	const idxterms_hdr_t *hdr = idxmap->baseptr;
 	uint64_t *tc = MAP_GET_OFF(hdr, term->offset);
-#if 0 // FIXME
 	uint64_t old_tc, new_tc;
 
 	do {
-		old_tc = be64toh(*tc);
-		new_tc = htobe64(old_tc + count);
-	} while (!atomic_compare_exchange_weak_explicit(tc, &old_tc, new_tc,
-	    memory_order_relaxed, memory_order_relaxed));
-#else
-	atomic_fetch_add_explicit(tc, count, memory_order_relaxed);
-#endif
+		old_tc = *tc;
+		new_tc = htobe64(be64toh(old_tc) + count);
+	} while (!atomic_cas_relaxed(tc, &old_tc, new_tc));
+
 	app_dbgx("term %u count +%u ", term->id, count);
 }
 
 int
-idxterm_add_doc(nxs_index_t *idx, nxs_term_id_t term_id, nxs_doc_id_t doc_id)
+idxterm_add_doc(idxterm_t *term, nxs_doc_id_t doc_id)
 {
-	idxterm_t *term;
-
-	term = rhashmap_get(idx->td_map, &term_id, sizeof(nxs_term_id_t));
-	if (!term) {
-		return -1;
-	}
 	roaring_bitmap_add(term->doc_bitmap, doc_id);
-	app_dbgx("term %u => doc %"PRIu64, term_id, doc_id);
+	app_dbgx("term %u => doc %"PRIu64, term->id, doc_id);
 	return 0;
 }

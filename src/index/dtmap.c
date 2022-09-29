@@ -205,7 +205,7 @@ again:
 	 * Fill the terms seen in the document.
 	 */
 	TAILQ_FOREACH(token, &tokens->list, entry) {
-		const idxterm_t *idxterm = token->idxterm;
+		idxterm_t *idxterm = token->idxterm;
 
 		/* The term must be resolved. */
 		ASSERT(idxterm != NULL);
@@ -216,7 +216,7 @@ again:
 			nxs_decl_errx(idx->nxs, "dtmap I/O error", NULL);
 			goto err;
 		}
-		if (idxterm_add_doc(idx, idxterm->id, doc_id) == -1) {
+		if (idxterm_add_doc(idxterm, doc_id) == -1) {
 			nxs_decl_err(idx->nxs, "idxterm_add_doc failed", NULL);
 			goto err;
 		}
@@ -320,6 +320,7 @@ idx_dtmap_sync(nxs_index_t *idx)
 		 * Build the reverse term-document index.
 		 */
 		for (unsigned i = 0; i < n; i++) {
+			idxterm_t *term;
 			nxs_term_id_t id;
 			uint32_t count;
 
@@ -329,7 +330,8 @@ idx_dtmap_sync(nxs_index_t *idx)
 				    "corrupted dtmap index", NULL);
 				goto err;  // XXX: revert additions
 			}
-			if (idxterm_add_doc(idx, id, doc_id) == -1) {
+			if ((term = idxterm_lookup_by_id(idx, id)) == NULL ||
+			    idxterm_add_doc(term, doc_id) == -1) {
 				nxs_decl_err(idx->nxs,
 				    "idxterm_add_doc failed", NULL);
 				goto err;  // XXX: revert additions

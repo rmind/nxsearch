@@ -30,6 +30,8 @@
 static const char NFKD_RULE[] =
     "NFKD; [:Nonspacing Mark:] Remove; Latin-ASCII; NFKC";
 
+#define	NORM_BUF_MULTI		3	// XXX: 3x is an arbitrary choice
+
 struct utf8_ctx {
 	char *			locale;
 	UCaseMap *		csm;
@@ -191,7 +193,7 @@ utf8_subs_diacritics(utf8_ctx_t *ctx, strbuf_t *buf)
 	 * Convert from UTF-8 to UTF-16: see the comments in the
 	 * utf8_normalize() for buffer calculations.
 	 */
-	ulen = roundup2((buf->length + 1) * 3, 64);
+	ulen = roundup2((buf->length + 1) * NORM_BUF_MULTI, 64);
 	if ((ubuf = malloc(ulen * 2)) == NULL) {
 		goto out;
 	}
@@ -252,9 +254,9 @@ utf8_normalize(utf8_ctx_t *ctx, strbuf_t *buf)
 
 	/*
 	 * Normalization may produce more characters, therefore give
-	 * a large buffer size (XXX: 3x is an arbitrary choice).
+	 * a large buffer size.
 	 */
-	norm_ulen = roundup2((c + 1) * 3, 64);
+	norm_ulen = roundup2((c + 1) * NORM_BUF_MULTI, 64);
 	if ((norm_ubuf = malloc(norm_ulen * 2)) == NULL) {
 		goto out;
 	}
@@ -272,7 +274,7 @@ utf8_normalize(utf8_ctx_t *ctx, strbuf_t *buf)
 	 * UTF-8 might produce more bytes than UTF-16 units, therfore
 	 * again give some extra space.
 	 */
-	max_len = (c + 1) * 2;  // XXX: x2 is arbitary
+	max_len = (c + 1) * NORM_BUF_MULTI;
 	if (strbuf_prealloc(buf, max_len) == -1) {
 		goto out;
 	}

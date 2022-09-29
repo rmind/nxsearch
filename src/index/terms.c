@@ -158,6 +158,7 @@ idx_terms_add(nxs_index_t *idx, tokenset_t *tokens)
 {
 	idxmap_t *idxmap = &idx->terms_memmap;
 	size_t max_append_len, data_len, target_len, append_len = 0;
+	bool sync_ran = false;
 	idxterms_hdr_t *hdr;
 	token_t *token;
 	void *dataptr;
@@ -192,6 +193,7 @@ again:
 			flock(idxmap->fd, LOCK_UN);
 			return -1;
 		}
+		sync_ran = true;
 		goto again;
 	}
 
@@ -235,11 +237,13 @@ again:
 		 * De-duplicate: if the term is already present (because
 		 * of the above re-sync), then just put it back to the list.
 		 */
-		term = rhashmap_get(idx->term_map, val, len);
-		if (term) {
-			tokenset_moveback(tokens, token);
-			token->idxterm = term;
-			continue;
+		if (sync_ran) {
+			term = rhashmap_get(idx->term_map, val, len);
+			if (term) {
+				tokenset_moveback(tokens, token);
+				token->idxterm = term;
+				continue;
+			}
 		}
 
 		if (mmrw_store16(&mm, len) == -1 ||

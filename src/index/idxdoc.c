@@ -45,6 +45,8 @@ idxdoc_create(nxs_index_t *idx, nxs_doc_id_t id, uint64_t offset)
 		return NULL;
 	}
 	TAILQ_INSERT_TAIL(&idx->dt_list, doc, entry);
+	idx->dt_count++;
+
 	app_dbgx("doc ID %"PRIu64" at %"PRIu64, id, offset);
 	return doc;
 }
@@ -54,6 +56,7 @@ idxdoc_destroy(nxs_index_t *idx, idxdoc_t *doc)
 {
 	rhashmap_del(idx->dt_map, &doc->id, sizeof(nxs_doc_id_t));
 	TAILQ_REMOVE(&idx->dt_list, doc, entry);
+	idx->dt_count--;
 	free(doc);
 }
 
