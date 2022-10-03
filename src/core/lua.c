@@ -52,6 +52,32 @@ lua_nxs_params_getctx(lua_State *L, int idx)
 }
 
 static int
+lua_nxs_params_fromjson(lua_State *L)
+{
+	nxs_params_t *params, **pp;
+	const char *json;
+	size_t json_len;
+	void *ud;
+
+	ud = luaL_checkudata(L, 1, NXS_PARAMS_METATABLE);
+	json = lua_tolstring(L, 2, &json_len);
+	luaL_argcheck(L, json && json_len, 2, "non-empty `string' expected");
+
+	params = nxs_params_fromjson(nxs, json, json_len);
+	if (params == NULL) {
+		lua_pushnil(L);
+		lua_pushstring(L, nxs_get_error(nxs));
+		return 2;
+	}
+	pp = (nxs_params_t **)ud;
+	nxs_params_release(*pp);
+	*pp = params;
+
+	lua_pushvalue(L, -2);  // re-push the params object
+	return 1;
+}
+
+static int
 lua_nxs_params_gc(lua_State *L)
 {
 	nxs_params_t *params = lua_nxs_params_getctx(L, 1);
@@ -125,7 +151,7 @@ lua_nxs_index_create(lua_State *L)
 
 	name = lua_tostring(L, 1);
 	luaL_argcheck(L, name, 1, "non-empty `string' expected");
-	params = lua_nxs_params_getctx(L, 2);
+	params = lua_isnil(L, 2) ? NULL : lua_nxs_params_getctx(L, 2);
 
 	if ((idx = nxs_index_create(nxs, name, params)) == NULL) {
 		lua_pushnil(L);
@@ -297,6 +323,7 @@ luaopen_nxsearch(lua_State *L)
 		{ NULL,		NULL			},
 	};
 	static const struct luaL_Reg nxs_param_methods[] = {
+		{ "fromjson",	lua_nxs_params_fromjson	},
 		{ "__gc",	lua_nxs_params_gc	},
 		{ NULL,		NULL			},
 	};

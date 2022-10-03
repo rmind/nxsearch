@@ -10,9 +10,7 @@
 
 #include "strbuf.h"
 
-#define	FILTER_MAX_ENTRIES	64
-
-typedef struct filter_entry filter_entry_t;
+struct filter_pipeline;
 typedef struct filter_pipeline filter_pipeline_t;
 
 typedef enum {
@@ -22,7 +20,10 @@ typedef enum {
 } filter_action_t;
 
 typedef struct filter_ops {
-	void *		(*create)(nxs_t *, const char *);
+	void *		(*sysinit)(nxs_t *);
+	void		(*sysfini)(void *);
+
+	void *		(*create)(nxs_params_t *, void *);
 	void		(*destroy)(void *);
 	filter_action_t	(*filter)(void *, strbuf_t *);
 } filter_ops_t;
@@ -34,14 +35,12 @@ typedef struct filter_ops {
 int		filters_sysinit(nxs_t *);
 void		filters_sysfini(nxs_t *);
 int		filters_builtin_sysinit(nxs_t *);
-void		filters_builtin_sysfini(nxs_t *);
 
 /*
  * Filter pipeline.
  */
 
-filter_pipeline_t *filter_pipeline_create(nxs_t *,
-		    const char *, const char *[], size_t);
+filter_pipeline_t *filter_pipeline_create(nxs_t *, nxs_params_t *);
 void		filter_pipeline_destroy(filter_pipeline_t *);
 filter_action_t	filter_pipeline_run(filter_pipeline_t *, strbuf_t *);
 

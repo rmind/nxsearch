@@ -18,6 +18,8 @@
 #include "index.h"
 #include "rhashmap.h"
 
+typedef struct filter_entry filter_entry_t;
+
 struct nxs {
 	/* Base directory and the error message. */
 	char *			basedir;
@@ -27,15 +29,10 @@ struct nxs {
 	rhashmap_t *		indexes;
 	TAILQ_HEAD(, nxs_index)	index_list;
 
-
 	/* Filter list. */
+	TAILQ_HEAD(, filter_entry) filter_list;
 	unsigned		filters_count;
 	filter_entry_t *	filters;
-
-	/*
-	 * Internals of some built-in filters.
-	 */
-	rhashmap_t *		swdicts;
 };
 
 int	nxs_filter_register(nxs_t *, const char *, const filter_ops_t *);

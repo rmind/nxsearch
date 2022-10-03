@@ -15,10 +15,10 @@ local nxs_index_map = lrucache.new(32)
 
 -------------------------------------------------------------------------
 
-local function get_http_body()
+local function get_http_body(raise_err)
   ngx.req.read_body() -- fetch the body data
   local data = ngx.req.get_body_data()
-  if not data then
+  if not data and raise_err then
     ngx.status = ngx.HTTP_BAD_REQUEST
     ngx.say("no data")
     ngx.exit(ngx.HTTP_BAD_REQUEST)
@@ -46,9 +46,14 @@ end
 -------------------------------------------------------------------------
 
 routes:post("@/:string", function(self, name)
-  local params = nxs.newparams()
-  if not params then
-    return set_http_error("OOM")
+  local params = nil
+  local payload = get_http_body(false)
+
+  if payload then
+    local params = nxs.newparams():fromjson(payload)
+    if not params then
+      return set_http_error("OOM")
+    end
   end
 
   local index, err = nxs.create(name, params)
@@ -66,13 +71,13 @@ end)
 
 routes:post("@/:string/add/:number", function(self, name, doc_id)
   local index = get_nxs_index(name)
-  index:add(doc_id, get_http_body())
+  index:add(doc_id, get_http_body(true))
   return ngx.exit(ngx.HTTP_CREATED)
 end)
 
 routes:post("@/:string/search", function(self, name)
   local index = get_nxs_index(name)
-  local resp, err = index:search(get_http_body())
+  local resp, err = index:search(get_http_body(true))
   if not resp then
     return set_http_error(err)
   end

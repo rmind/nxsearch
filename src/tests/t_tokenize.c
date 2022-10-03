@@ -64,11 +64,22 @@ run_tokenset_test(void)
 static filter_pipeline_t *
 get_test_filter_pipeline(nxs_t *nxs)
 {
+	nxs_params_t *params = nxs_params_create();
 	const char *filters[] = { "normalizer" };
 	filter_pipeline_t *fp;
+	int ret;
 
-	fp = filter_pipeline_create(nxs, "en", filters, __arraycount(filters));
+	ret = nxs_params_set_str(params, "lang", "en");
+	assert(ret == 0);
+
+	ret = nxs_params_set_strset(params, "filters",
+	    filters, __arraycount(filters));
+	assert(ret == 0);
+
+	fp = filter_pipeline_create(nxs, params);
 	assert(fp != NULL);
+	nxs_params_release(params);
+
 	return fp;
 }
 

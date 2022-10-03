@@ -24,18 +24,25 @@
 #include "filters.h"
 #include "utils.h"
 
-typedef struct {
-	void *			context;
-	const filter_ops_t *	ops;
-} filter_t;
-
+/*
+ * Filter entry with any long-term context.
+ */
 struct filter_entry {
 	const char *		name;
 	const filter_ops_t *	ops;
+	void *			context;
+	TAILQ_ENTRY(filter_entry) entry;
 };
 
+/*
+ * Filter with its per-pipeline argument.
+ */
+typedef struct {
+	void *			arg;
+	const filter_ops_t *	ops;
+} filter_t;
+
 struct filter_pipeline {
-	char			lang[3];
 	unsigned		count;
 	filter_t		filters[];
 };
@@ -43,12 +50,9 @@ struct filter_pipeline {
 int
 filters_sysinit(nxs_t *nxs)
 {
-	nxs->filters = calloc(FILTER_MAX_ENTRIES, sizeof(filter_entry_t));
-	if (nxs->filters == NULL) {
-		return -1;
-	}
+	TAILQ_INIT(&nxs->filter_list);
+
 	if (filters_builtin_sysinit(nxs) == -1) {
-		free(nxs->filters);
 		return -1;
 	}
 	return 0;
@@ -57,88 +61,105 @@ filters_sysinit(nxs_t *nxs)
 void
 filters_sysfini(nxs_t *nxs)
 {
-	filters_builtin_sysfini(nxs);
-	free(nxs->filters);
+	filter_entry_t *filtent;
+
+	while ((filtent = TAILQ_FIRST(&nxs->filter_list)) != NULL) {
+		const filter_ops_t *ops = filtent->ops;
+
+		if (ops && ops->sysfini) {
+			ops->sysfini(filtent->context);
+		}
+		TAILQ_REMOVE(&nxs->filter_list, filtent, entry);
+		free(filtent);
+	}
 }
 
-static const filter_ops_t *
+static filter_entry_t *
 filter_lookup(nxs_t *nxs, const char *name)
 {
-	const filter_ops_t *ops = NULL;
+	filter_entry_t *filtent;
 
-	for (unsigned i = 0; i < nxs->filters_count; i++) {
-		const filter_entry_t *filtent = &nxs->filters[i];
+	ASSERT(name != NULL);
 
+	TAILQ_FOREACH(filtent, &nxs->filter_list, entry) {
 		if (strcmp(filtent->name, name) == 0) {
-			ops = filtent->ops;
-			break;
+			return filtent;
 		}
 	}
-	return ops;
+	return NULL;
 }
 
 __dso_public int
 nxs_filter_register(nxs_t *nxs, const char *name, const filter_ops_t *ops)
 {
-	unsigned count = nxs->filters_count;
+	filter_entry_t *filtent;
 
-	ASSERT(name && ops);
-
-	if (count == FILTER_MAX_ENTRIES) {
-		return -1;
-	}
 	if (filter_lookup(nxs, name)) {
 		errno = EEXIST;
 		return -1;
 	}
-	nxs->filters[count].name = name;
-	nxs->filters[count].ops = ops;
+	if ((filtent = calloc(1, sizeof(filter_entry_t))) == NULL) {
+		return -1;
+	}
+	if (ops->sysinit && (filtent->context = ops->sysinit(nxs)) == NULL) {
+		free(filtent);
+		return -1;
+	}
+	filtent->name = name;
+	filtent->ops = ops;
+
+	TAILQ_INSERT_TAIL(&nxs->filter_list, filtent, entry);
 	nxs->filters_count++;
 	return 0;
 }
 
 /*
  * filter_pipeline_create: construct a new pipeline of filters.
- *
- * => Language must be a two letter ISO 639-1 code.
  */
 filter_pipeline_t *
-filter_pipeline_create(nxs_t *nxs, const char *lang,
-    const char *filters[], size_t count)
+filter_pipeline_create(nxs_t *nxs, nxs_params_t *params)
 {
+	const char **filters;
 	filter_pipeline_t *fp;
-	size_t len;
+	size_t count, len;
 
-	// TODO: verify the language
-
+	/* Extract the filter list from the parameters. */
+	filters = nxs_params_get_strset(params, "filters", &count);
+	if (filters == NULL) {
+		nxs_decl_errx(nxs, "corrupted index params", NULL);
+		return NULL;
+	}
 	len = offsetof(filter_pipeline_t, filters[count]);
 	if ((fp = calloc(1, len)) == NULL) {
+		free(filters);
 		return NULL;
 	}
 	fp->count = count;
 
-	/* Save the language code. */
-	strncpy(fp->lang, lang, sizeof(fp->lang) - 1);
-	fp->lang[sizeof(fp->lang) - 1] = '\0';
-
 	for (unsigned i = 0; i < count; i++) {
 		const char *name = filters[i];
 		filter_t *filt = &fp->filters[i];
+		filter_entry_t *filtent;
 
-		if ((filt->ops = filter_lookup(nxs, name)) == NULL) {
+		if ((filtent = filter_lookup(nxs, name)) == NULL) {
 			goto err;
 		}
+
+		filt->ops = filtent->ops;
 		if (filt->ops->create == NULL) {
 			continue;
 		}
-		filt->context = filt->ops->create(nxs, lang);
-		if (filt->context == NULL) {
+
+		filt->arg = filt->ops->create(params, filtent->context);
+		if (filt->arg == NULL) {
 			goto err;
 		}
 	}
+	free(filters);
 	return fp;
 err:
 	filter_pipeline_destroy(fp);
+	free(filters);
 	return NULL;
 }
 
@@ -149,7 +170,7 @@ filter_pipeline_destroy(filter_pipeline_t *fp)
 		filter_t *filt = &fp->filters[i];
 
 		if (filt->ops && filt->ops->destroy) {
-			filt->ops->destroy(filt->context);
+			filt->ops->destroy(filt->arg);
 		}
 	}
 	free(fp);
@@ -169,7 +190,7 @@ filter_pipeline_run(filter_pipeline_t *fp, strbuf_t *buf)
 		const filter_ops_t *ops = filt->ops;
 		filter_action_t action;
 
-		action = ops->filter(filt->context, buf);
+		action = ops->filter(filt->arg, buf);
 		if (__predict_false(buf->length == 0)) {
 			return FILT_DROP;
 		}

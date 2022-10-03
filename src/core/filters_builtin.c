@@ -38,9 +38,9 @@
  */
 
 static void *
-normalizer_create(nxs_t *nxs, const char *lang)
+normalizer_create(nxs_params_t *params, void *arg __unused)
 {
-	(void)nxs;
+	const char *lang = nxs_params_get_str(params, "lang");
 	return utf8_ctx_create(lang);
 }
 
@@ -85,10 +85,11 @@ static const filter_ops_t normalizer_ops = {
  * Stopwords.
  */
 
-static const char *stopword_langs[] = { "en" };
+static void		stopwords_sysfini(void *);
+static const char *	stopword_langs[] = { "en" };  // TODO/XXX
 
 static int
-stopwords_load(nxs_t *nxs, const char *lang)
+stopwords_load(nxs_t *nxs, rhashmap_t *swdicts, const char *lang)
 {
 	rhashmap_t *lmap;
 	char *dbpath, *line = NULL;
@@ -111,59 +112,66 @@ stopwords_load(nxs_t *nxs, const char *lang)
 		return -1;
 	}
 	while ((len = getline(&line, &lcap, fp)) > 0) {
-		if (len == 1) {
+		if (len <= 1) {
 			continue;
 		}
 		line[--len] = '\0';
-		rhashmap_put(lmap, line, len, (void *)(uintptr_t)0x1);
+		rhashmap_put(lmap, line, len, DUMMY_PTR);
 	}
 	free(line);
 	fclose(fp);
 
-	rhashmap_put(nxs->swdicts, lang, strlen(lang), lmap);
+	rhashmap_put(swdicts, lang, strlen(lang), lmap);
 	return 0;
-}
-
-static int
-stopwords_sysinit(nxs_t *nxs)
-{
-	if ((nxs->swdicts = rhashmap_create(0, RHM_NONCRYPTO)) == NULL) {
-		return -1;
-	}
-	for (unsigned i = 0; i < __arraycount(stopword_langs); i++) {
-		const char *lang = stopword_langs[i];
-		if (stopwords_load(nxs, lang) == -1) {
-			return -1;
-		}
-	}
-	return 0;
-}
-
-static void
-stopwords_sysfini(nxs_t *nxs)
-{
-	if (nxs->swdicts) {
-		for (unsigned i = 0; i < __arraycount(stopword_langs); i++) {
-			const char *lang = stopword_langs[i];
-			rhashmap_t *lmap;
-
-			lmap = rhashmap_get(nxs->swdicts, lang, strlen(lang));
-			if (lmap) {
-				rhashmap_destroy(lmap);
-			}
-		}
-		rhashmap_destroy(nxs->swdicts);
-		nxs->swdicts = NULL;
-	}
 }
 
 static void *
-stopwords_create(nxs_t *nxs, const char *lang)
+stopwords_sysinit(nxs_t *nxs)
 {
+	rhashmap_t *swdicts;
+
+	if ((swdicts = rhashmap_create(0, RHM_NONCRYPTO)) == NULL) {
+		return NULL;
+	}
+	for (unsigned i = 0; i < __arraycount(stopword_langs); i++) {
+		const char *lang = stopword_langs[i];
+
+		if (stopwords_load(nxs, swdicts, lang) == -1) {
+			stopwords_sysfini(swdicts);
+			return NULL;
+		}
+	}
+	return swdicts;
+}
+
+static void
+stopwords_sysfini(void *ctx)
+{
+	rhashmap_t *swdicts;
+
+	if ((swdicts = ctx) == NULL) {
+		return;
+	}
+	for (unsigned i = 0; i < __arraycount(stopword_langs); i++) {
+		const char *lang = stopword_langs[i];
+		rhashmap_t *lmap;
+
+		lmap = rhashmap_get(swdicts, lang, strlen(lang));
+		if (lmap) {
+			rhashmap_destroy(lmap);
+		}
+	}
+	rhashmap_destroy(swdicts);
+}
+
+static void *
+stopwords_create(nxs_params_t *params, void *arg)
+{
+	rhashmap_t *swdicts = arg;
+	const char *lang = nxs_params_get_str(params, "lang");
 	rhashmap_t *lang_map;
 
-	if (nxs->swdicts && (lang_map = rhashmap_get(nxs->swdicts,
-	    lang, strlen(lang))) != NULL) {
+	if ((lang_map = rhashmap_get(swdicts, lang, strlen(lang))) != NULL) {
 		return lang_map;
 	}
 
@@ -174,18 +182,20 @@ stopwords_create(nxs_t *nxs, const char *lang)
 static filter_action_t
 stopwords_filter(void *arg, strbuf_t *buf)
 {
-	rhashmap_t *swmap = arg;
+	rhashmap_t *lang_map = arg;
 
-	if (swmap && swmap != DUMMY_PTR &&
-	    rhashmap_get(swmap, buf->value, buf->length)) {
+	if (lang_map != DUMMY_PTR &&
+	    rhashmap_get(lang_map, buf->value, buf->length)) {
 		return FILT_DROP;
 	}
 	return FILT_MUTATION;  // pass-through
 }
 
 static const filter_ops_t stopwords_ops = {
+	.sysinit	= stopwords_sysinit,
+	.sysfini	= stopwords_sysfini,
 	.create		= stopwords_create,
-	.destroy	= NULL,
+	.destroy	= NULL,  // NOP
 	.filter		= stopwords_filter,
 };
 
@@ -194,9 +204,9 @@ static const filter_ops_t stopwords_ops = {
  */
 
 static void *
-stemmer_create(nxs_t *nxs, const char *lang)
+stemmer_create(nxs_params_t *params, void *arg __unused)
 {
-	(void)nxs;
+	const char *lang = nxs_params_get_str(params, "lang");
 	return sb_stemmer_new(lang, NULL /* UTF-8 */);
 }
 
@@ -241,17 +251,8 @@ static const filter_ops_t stemmer_ops = {
 int
 filters_builtin_sysinit(nxs_t *nxs)
 {
-	if (stopwords_sysinit(nxs) == -1) {
-		return -1;
-	}
 	nxs_filter_register(nxs, "normalizer", &normalizer_ops);
 	nxs_filter_register(nxs, "stopwords", &stopwords_ops);
 	nxs_filter_register(nxs, "stemmer", &stemmer_ops);
 	return 0;
-}
-
-void
-filters_builtin_sysfini(nxs_t *nxs)
-{
-	stopwords_sysfini(nxs);
 }

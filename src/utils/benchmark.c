@@ -32,7 +32,7 @@ usage(void)
 	fprintf(stderr,
 	    "Usage:\t" APP_NAME " -i INDEX [ -a | -r ]\n"
 	    "      \t" APP_NAME " -i INDEX -d ID -p FILE_PATH\n"
-	    "      \t" APP_NAME " -i INDEX -p DIRECTORY_PATH ]\n"
+	    "      \t" APP_NAME " -i INDEX -p DIRECTORY_PATH\n"
 	    "      \t" APP_NAME " -i INDEX -s QUERY\n"
 	    "\n"
 	    "Options:\n"

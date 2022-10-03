@@ -84,6 +84,10 @@ nxs_params_release(nxs_params_t *params)
 
 //////////////////////////////////////////////////////////////////////////
 
+/*
+ * nxs_params_get_strset: get the set of strings; the caller is responsible
+ * to call free(3) on the returned list.
+ */
 const char **
 nxs_params_get_strset(nxs_params_t *params, const char *key, size_t *count)
 {

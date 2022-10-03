@@ -79,6 +79,8 @@
 
 #define	DEFAULT_RANKING_ALGO		BM25
 
+#define	DEFAULT_LANGUAGE		"en"
+
 static const char *default_filters[] = {
 	"normalizer", "stopwords", "stemmer"
 };
@@ -242,8 +244,10 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 	    nxs_params_set_uint(params, "algo", DEFAULT_RANKING_ALGO) == -1) {
 		goto out;
 	}
+
+	/* XXX Verify: Language must be a two letter ISO 639-1 code. */
 	if (nxs_params_get_str(params, "lang") == NULL &&
-	    nxs_params_set_str(params, "lang", "en") == -1) {
+	    nxs_params_set_str(params, "lang", DEFAULT_LANGUAGE) == -1) {
 		goto out;
 	}
 
@@ -267,15 +271,31 @@ out:
 	return idx;
 }
 
+static nxs_params_t *
+index_get_params(nxs_t *nxs, const char *name)
+{
+	nxs_params_t *params;
+	struct stat sb;
+	char *path;
+
+	if (asprintf(&path, "%s/data/%s/params.db", nxs->basedir, name) == -1)
+		return NULL;
+	if (stat(path, &sb) == -1 && errno == ENOENT) {
+		nxs_decl_errx(nxs, "index `%s' does not exist", name);
+		free(path);
+		return NULL;
+	}
+	params = nxs_params_unserialize(nxs, path);
+	free(path);
+	return params;
+}
+
 __dso_public nxs_index_t *
 nxs_index_open(nxs_t *nxs, const char *name)
 {
 	const size_t name_len = strlen(name);
-	const char *lang, **filters;
-	size_t filter_count;
 	nxs_params_t *params;
 	nxs_index_t *idx;
-	struct stat sb;
 	uint64_t uval;
 	char *path;
 	int ret;
@@ -302,24 +322,10 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	/*
 	 * Load the index parameters.
 	 */
-	if (asprintf(&path, "%s/data/%s/params.db",
-	    nxs->basedir, name) == -1) {
+	if ((params = index_get_params(nxs, name)) == NULL) {
 		nxs_index_close(idx);
 		return NULL;
 	}
-	if (stat(path, &sb) == -1 && errno == ENOENT) {
-		nxs_decl_errx(nxs, "index `%s' does not exist", name);
-		nxs_index_close(idx);
-		free(path);
-		return NULL;
-	}
-	if ((params = nxs_params_unserialize(nxs, path)) == NULL) {
-		nxs_index_close(idx);
-		free(path);
-		return NULL;
-	}
-	free(path);
-
 	if (nxs_params_get_uint(params, "algo", &uval) == -1) {
 		nxs_decl_errx(nxs, "corrupted index params", NULL);
 		nxs_params_release(params);
@@ -327,19 +333,12 @@ nxs_index_open(nxs_t *nxs, const char *name)
 		return NULL;
 	}
 	idx->algo = uval;
-	lang = nxs_params_get_str(params, "lang");
 
-	filters = nxs_params_get_strset(params, "filters", &filter_count);
-	if (filters == NULL) {
-		nxs_decl_errx(nxs, "corrupted index params", NULL);
-		nxs_params_release(params);
-		nxs_index_close(idx);
-		return NULL;
-	}
-
-	idx->fp = filter_pipeline_create(nxs, lang, filters, filter_count);
+	/*
+	 * Create the filter pipeline.
+	 */
+	idx->fp = filter_pipeline_create(nxs, params);
 	nxs_params_release(params);
-	free(filters);
 
 	if (idx->fp == NULL) {
 		nxs_index_close(idx);
