@@ -22,5 +22,6 @@ COPY ./src /build
 # Run the tests.
 RUN make distclean && make -j $(getconf _NPROCESSORS_ONLN) tests
 
-# Build the Lua lib.
+# Build the Lua lib and run the test.
 RUN make distclean && make -j $(getconf _NPROCESSORS_ONLN) lua-lib
+RUN luajit ./tests/test.lua

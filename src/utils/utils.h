@@ -62,6 +62,10 @@
 #define	__align32		__attribute__((aligned(__alignof__(uint32_t))))
 #define	__align64		__attribute__((aligned(__alignof__(uint64_t))))
 
+#ifndef ALIGNED_POINTER
+#define	ALIGNED_POINTER(p,t)	((((uintptr_t)(p)) & (sizeof(t) - 1)) == 0)
+#endif
+
 /*
  * Minimum, maximum and rounding macros.
  */

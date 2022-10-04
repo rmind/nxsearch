@@ -1,4 +1,5 @@
-local nxs = require("nxsearch")
+local nxs = require "nxsearch"
+local cjson = require "cjson"
 
 local params = nxs.newparams()
 assert(params)
@@ -11,17 +12,40 @@ end
 
 index:add(1, "The quick brown fox jumped over the lazy dog")
 index:add(2, "Once upon a time there were three little foxes")
+index:add(3, "Test")
+
+index:remove(3)
 
 local resp, err = index:search("fox")
 assert(resp)
 
-local results_json = resp:tojson()
-assert(results_json ==
-  '{"results":[{"doc_id":2,"score":0.06675427407026291},' ..
-  '{"doc_id":1,"score":0.060958366841077805}],"count":2}')
+--
+-- Get the results as JSON.
+--
 
-results_table = resp:repr()
+local SCORE_DOC_1 = "0.0610"
+local SCORE_DOC_2 = "0.0668"
+
+local function round_score(x) return string.format("%.4f", x) end
+
+local results_json = cjson.decode(resp:tojson())
+assert(results_json["count"] == 2)
+
+local doc = results_json["results"][1]
+assert(doc["doc_id"] == 2)
+assert(round_score(doc["score"]) == SCORE_DOC_2)
+
+local doc = results_json["results"][2]
+assert(doc["doc_id"] == 1)
+assert(round_score(doc["score"]) == SCORE_DOC_1)
+
+--
+-- Get the results as a table.
+--
+
+local results_table = resp:repr()
 assert(#results_table == 2)
-assert(tostring(results_table[1]) == "0.060958366841078")
-assert(tostring(results_table[2]) == "0.066754274070263")
+assert(round_score(results_table[1]) == SCORE_DOC_1)
+assert(round_score(results_table[2]) == SCORE_DOC_2)
+
 print("OK")

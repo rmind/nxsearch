@@ -403,12 +403,18 @@ nxs_index_close(nxs_index_t *idx)
 }
 
 __dso_public int
-nxs_index_add(nxs_index_t *idx, uint64_t doc_id, const char *text, size_t len)
+nxs_index_add(nxs_index_t *idx, nxs_term_id_t doc_id,
+    const char *text, size_t len)
 {
 	tokenset_t *tokens;
 	int ret = -1;
 
 	nxs_clear_error(idx->nxs);
+	if (doc_id == 0) {
+		nxs_decl_errx(idx->nxs, "document ID must be non-zero", NULL);
+		errno = EINVAL;
+		return -1;
+	}
 
 	/*
 	 * Check whether the document already exists.
@@ -447,6 +453,18 @@ nxs_index_add(nxs_index_t *idx, uint64_t doc_id, const char *text, size_t len)
 out:
 	tokenset_destroy(tokens);
 	return ret;
+}
+
+/*
+ * nxs_index_remove: remove the document from the index.
+ */
+__dso_public int
+nxs_index_remove(nxs_index_t *idx, nxs_term_id_t doc_id)
+{
+	if (idx_dtmap_sync(idx) == -1) {
+		return -1;
+	}
+	return idx_dtmap_remove(idx, doc_id);
 }
 
 /*

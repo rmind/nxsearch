@@ -71,8 +71,20 @@ end)
 
 routes:post("@/:string/add/:number", function(self, name, doc_id)
   local index = get_nxs_index(name)
-  index:add(doc_id, get_http_body(true))
+  local id, err = index:add(doc_id, get_http_body(true))
+  if not id then
+    return set_http_error(err)
+  end
   return ngx.exit(ngx.HTTP_CREATED)
+end)
+
+routes:delete("@/:string/remove/:number", function(self, name, doc_id)
+  local index = get_nxs_index(name)
+  local id, err = index:remove(doc_id, get_http_body(true))
+  if not id then
+    return set_http_error(err)
+  end
+  return ngx.exit(ngx.HTTP_OK)
 end)
 
 routes:post("@/:string/search", function(self, name)

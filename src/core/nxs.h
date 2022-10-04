@@ -54,7 +54,9 @@ typedef struct nxs_index nxs_index_t;
 nxs_index_t *	nxs_index_create(nxs_t *, const char *, nxs_params_t *);
 nxs_index_t *	nxs_index_open(nxs_t *, const char *);
 void		nxs_index_close(nxs_index_t *);
-int		nxs_index_add(nxs_index_t *, uint64_t, const char *, size_t);
+int		nxs_index_add(nxs_index_t *, nxs_term_id_t,
+		    const char *, size_t);
+int		nxs_index_remove(nxs_index_t *, nxs_term_id_t);
 
 /*
  * Query and response API.

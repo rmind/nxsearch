@@ -7,6 +7,24 @@
 
 /*
  * Document-term index.
+ *
+ * This module manages the document-term index which map.  It is generally
+ * an append only structure which follows the general idxmap synchronization
+ * logic.  The index contains the mappings of document IDs to the set of
+ * term IDs and their occurrence counters.
+ *
+ * See the storage.h header for more details on the on-disk layout.
+ *
+ * Document deletion
+ *
+ *	The document deletion is implemented by: 1) clearing the document
+ *	ID of its current record block by atomically setting it to zero;
+ *	2) adding a new record block for the document ID being deleted with
+ *	the document length being set to zero.
+ *
+ *	The former ensures that fresh opening of the index will skip the
+ *	records for the deleted documents.  The latter will notify active
+ *	index references to remove the document from the in-memory structure.
  */
 
 #include <sys/mman.h>
@@ -190,6 +208,7 @@ again:
 		nxs_decl_err(idx->nxs, "idxdoc_create failed", NULL);
 		goto err;
 	}
+	ASSERT(ALIGNED_POINTER(offset, nxs_doc_id_t));
 
 	/*
 	 * Fill the document metadata.
@@ -244,12 +263,46 @@ err:
 	if (doc) {
 		idxdoc_destroy(idx, doc);
 	}
-#if 0 // FIXME
-	while ((token = TAILQ_PREV(token, &tokens->list, entry)) != NULL) {
-		idxterm_decr_total(idx, idxterm, token->count);
+	if (token) {
+		token_t *ptoken;
+
+		TAILQ_FOREACH(ptoken, &tokens->list, entry) {
+			if (ptoken == token) {
+				break;
+			}
+			idxterm_decr_total(idx, ptoken->idxterm, ptoken->count);
+		}
 	}
-#endif
 	return -1;
+}
+
+static bool
+dtmap_deletion(nxs_index_t *idx, nxs_doc_id_t doc_id, uint32_t doc_total_len)
+{
+	/*
+	 * If the document ID is zero, then this document was
+	 * deleted.  Just skip the whole block.
+	 */
+	if (doc_id == 0) {
+		app_dbgx("doc %"PRIu64 " deleted, skipping", doc_id);
+		return true;
+	}
+
+	/*
+	 * If the document length is zero, then it is mark that
+	 * this document ID was deleted.  Check the in-memory
+	 * structure and remove it if still present.
+	 */
+	if (doc_total_len == 0) {
+		idxdoc_t *doc = idxdoc_lookup(idx, doc_id);
+		if (doc) {
+			app_dbgx("doc %"PRIu64 " deleted, cleanup", doc_id);
+			idxdoc_destroy(idx, doc);
+		}
+		return true;
+	}
+
+	return false;
 }
 
 int
@@ -303,6 +356,7 @@ idx_dtmap_sync(nxs_index_t *idx)
 		uint64_t offset;
 
 		offset = (uintptr_t)mm.curptr - (uintptr_t)hdr;
+		ASSERT(ALIGNED_POINTER(offset, nxs_doc_id_t));
 
 		if (mmrw_fetch64(&mm, &doc_id) == -1 ||
 		    mmrw_fetch32(&mm, &doc_total_len) == -1 ||
@@ -310,6 +364,36 @@ idx_dtmap_sync(nxs_index_t *idx)
 			nxs_decl_errx(idx->nxs, "corrupted dtmap index", NULL);
 			goto err;
 		}
+
+		/*
+		 * Check and handle the document deletion marks.
+		 * If deleted or marked block, then just advance.
+		 */
+		if (dtmap_deletion(idx, doc_id, doc_total_len)) {
+			ASSERT(doc_total_len || n == 0);
+
+			if (mmrw_advance(&mm, n * (4 + 4)) == -1) {
+				goto err;
+			}
+			consumed_len += IDXDT_META_LEN(n);
+			continue;
+		}
+
+		/*
+		 * If the document length is zero, then it is mark that
+		 * this document ID was deleted.  Check the in-memory
+		 * structure and remove it if still present.
+		 */
+		if (doc_total_len == 0) {
+			idxdoc_t *doc = idxdoc_lookup(idx, doc_id);
+			if (doc) {
+				app_dbgx("doc %"PRIu64 " deleted; "
+				    "removing", doc_id);
+				idxdoc_destroy(idx, doc);
+			}
+			continue;
+		}
+
 		if (!idxdoc_create(idx, doc_id, offset)) {
 			nxs_decl_err(idx->nxs,
 			    "idxdoc_create failed", NULL);
@@ -344,6 +428,110 @@ idx_dtmap_sync(nxs_index_t *idx)
 err:
 	idx->dt_consumed = consumed_len;
 	app_dbgx("consumed = %zu", consumed_len);
+	return ret;
+}
+
+int
+idx_dtmap_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
+{
+	idxmap_t *idxmap = &idx->dt_memmap;
+	size_t append_len, data_len, target_len;
+	uint64_t *doc_id_ptr;
+	idxdt_hdr_t *hdr;
+	idxdoc_t *doc;
+	uint32_t seen;
+	unsigned n;
+	int ret = -1;
+	mmrw_t mm;
+
+	/*
+	 * Lock the index and ensure it is synced.
+	 */
+	if (flock(idxmap->fd, LOCK_EX) == -1) {
+		return -1;
+	}
+	if (idx_dtmap_sync(idx) == -1) {
+		goto out;
+	}
+
+	if ((doc = idxdoc_lookup(idx, doc_id)) == NULL) {
+		nxs_decl_err(idx->nxs, "document %"PRIu64 "not found", doc_id);
+		goto out;
+	}
+
+	hdr = idxmap->baseptr;
+	ASSERT(idxmap->fd > 0 && hdr != NULL);
+
+	append_len = 8 + 8;
+	data_len = be64toh(atomic_load_acquire(&hdr->data_len));
+	target_len = sizeof(idxdt_hdr_t) + data_len + append_len;
+	if ((hdr = idx_db_map(idxmap, target_len, true)) == NULL) {
+		nxs_decl_err(idx->nxs, "dtmap mapping failed", NULL);
+		goto out;
+	}
+
+	/*
+	 * Find the document in the index.
+	 */
+	doc_id_ptr = MAP_GET_OFF(idxmap->baseptr, doc->offset);
+	mmrw_init(&mm, doc_id_ptr,
+	    (sizeof(idxdt_hdr_t) + idx->dt_consumed) - doc->offset);
+
+	/*
+	 * Set the document ID to zero.  This indicates to the fresh
+	 * consumers that this document entry is no longer valid.
+	 */
+	atomic_store_release(doc_id_ptr, 0);
+
+	/*
+	 * Iterate the document terms and decrement the term counters.
+	 */
+	if (mmrw_advance(&mm, 8) == -1 ||
+	    mmrw_fetch32(&mm, &seen) == -1 ||
+	    mmrw_fetch32(&mm, &n) == -1) {
+		return -1;
+	}
+	for (unsigned i = 0; i < n; i++) {
+		nxs_term_id_t term_id;
+		idxterm_t *term;
+		uint32_t count;
+
+		if (mmrw_fetch32(&mm, &term_id) == -1 ||
+		    mmrw_fetch32(&mm, &count) == -1) {
+			goto out;
+		}
+		if ((term = idxterm_lookup_by_id(idx, term_id)) == NULL) {
+			goto out;
+		}
+		idxterm_del_doc(term, doc->id);
+		idxterm_decr_total(idx, term, count);
+	}
+
+	/*
+	 * Append the index with a special entry: document ID with document
+	 * length and term count being set to zero.  This indicates to the
+	 * active consumers that the document has been removed.
+	 *
+	 * Finally, remove the in-memory document entry.
+	 */
+	mmrw_init(&mm, IDXDT_DATA_PTR(hdr, data_len), append_len);
+	if (mmrw_store64(&mm, doc_id) == -1 || mmrw_store64(&mm, 0) == -1) {
+		goto out;
+	}
+	idxdoc_destroy(idx, doc);
+
+	/* Decrement the counters. */
+	atomic_store_relaxed(&hdr->doc_count,
+	    htobe32(IDXDT_DOC_COUNT(hdr) - 1));
+	atomic_store_relaxed(&hdr->token_count,
+	    htobe64(IDXDT_TOKEN_COUNT(hdr) - seen));
+
+	/* Publish the new data length. */
+	idx->dt_consumed = data_len + append_len;
+	atomic_store_release(&hdr->data_len, htobe64(idx->dt_consumed));
+	ret = 0;
+out:
+	flock(idxmap->fd, LOCK_UN);
 	return ret;
 }
 

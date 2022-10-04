@@ -188,6 +188,8 @@ lua_nxs_index_add(lua_State *L)
 	size_t len;
 
 	doc_id = lua_tointeger(L, 2);
+	luaL_argcheck(L, doc_id, 2, "document ID must be non-zero");
+
 	text = lua_tolstring(L, 3, &len);
 	luaL_argcheck(L, text && len, 3, "non-empty `string' expected");
 
@@ -199,6 +201,24 @@ lua_nxs_index_add(lua_State *L)
 	lua_pushinteger(L, doc_id);
 	lua_pushnil(L);
 	return 2;
+}
+
+static int
+lua_nxs_index_remove(lua_State *L)
+{
+	nxs_index_t *idx = lua_nxs_index_getctx(L);
+	uint64_t doc_id;
+
+	doc_id = lua_tointeger(L, 2);
+	luaL_argcheck(L, doc_id, 2, "document ID must be non-zero");
+
+	if (nxs_index_remove(idx, doc_id) == -1) {
+		lua_pushnil(L);
+		lua_pushstring(L, nxs_get_error(nxs));
+		return 2;
+	}
+	lua_pushinteger(L, doc_id);
+	return 1;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -329,8 +349,8 @@ luaopen_nxsearch(lua_State *L)
 	};
 	static const struct luaL_Reg nxs_index_methods[] = {
 		{ "add",	lua_nxs_index_add	},
+		{ "remove",	lua_nxs_index_remove	},
 		{ "search",	lua_nxs_index_search	},
-		//{ "remove",	lua_nxs_index_remove	},
 		{ "__gc",	lua_nxs_index_gc	},
 		{ NULL,		NULL			},
 	};

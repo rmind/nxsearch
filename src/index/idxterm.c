@@ -126,11 +126,19 @@ idxterm_lookup(nxs_index_t *idx, const char *value, size_t len)
 	return rhashmap_get(idx->term_map, value, len);
 }
 
+/*
+ * idxterm_lookup: find the term object given the term ID.
+ */
 idxterm_t *
 idxterm_lookup_by_id(nxs_index_t *idx, nxs_term_id_t term_id)
 {
 	return rhashmap_get(idx->td_map, &term_id, sizeof(nxs_term_id_t));
 }
+
+/*
+ * idxterm_{incr,decr}_total: helpers to increment or decrement the
+ * term counters (for total term occurrence).
+ */
 
 void
 idxterm_incr_total(nxs_index_t *idx, const idxterm_t *term, unsigned count)
@@ -140,6 +148,8 @@ idxterm_incr_total(nxs_index_t *idx, const idxterm_t *term, unsigned count)
 	uint64_t *tc = MAP_GET_OFF(hdr, term->offset);
 	uint64_t old_tc, new_tc;
 
+	ASSERT(ALIGNED_POINTER(tc, uint64_t));
+
 	do {
 		old_tc = *tc;
 		new_tc = htobe64(be64toh(old_tc) + count);
@@ -148,10 +158,48 @@ idxterm_incr_total(nxs_index_t *idx, const idxterm_t *term, unsigned count)
 	app_dbgx("term %u count +%u ", term->id, count);
 }
 
+void
+idxterm_decr_total(nxs_index_t *idx, const idxterm_t *term, unsigned count)
+{
+	const idxmap_t *idxmap = &idx->terms_memmap;
+	const idxterms_hdr_t *hdr = idxmap->baseptr;
+	uint64_t *tc = MAP_GET_OFF(hdr, term->offset);
+	uint64_t old_tc, new_tc;
+
+	ASSERT(ALIGNED_POINTER(tc, uint64_t));
+
+	do {
+		uint64_t old_tc_val;
+
+		old_tc = *tc;
+		old_tc_val = be64toh(old_tc);
+		if (old_tc_val < count) {
+			/*
+			 * This should never happen, but nevertheless we do
+			 * not want to overflow in the event of inconsistency.
+			 */
+			app_dbgx("term %u count -%u ", term->id, count);
+			return;
+		}
+		new_tc = htobe64(old_tc_val - count);
+
+	} while (!atomic_cas_relaxed(tc, &old_tc, new_tc));
+
+	app_dbgx("term %u count -%u ", term->id, count);
+}
+
 int
 idxterm_add_doc(idxterm_t *term, nxs_doc_id_t doc_id)
 {
 	roaring_bitmap_add(term->doc_bitmap, doc_id);
 	app_dbgx("term %u => doc %"PRIu64, term->id, doc_id);
+	return 0;
+}
+
+int
+idxterm_del_doc(idxterm_t *term, nxs_doc_id_t doc_id)
+{
+	roaring_bitmap_remove(term->doc_bitmap, doc_id);
+	app_dbgx("unlinking doc %"PRIu64" from term %u", doc_id, term->id);
 	return 0;
 }

@@ -89,6 +89,9 @@ static_assert(sizeof(idxterms_hdr_t) % 8 == 0, "alignment guard");
  * Term is a tuple of 32-bit term ID and the 32-bit count of its
  * occurrences in the document.
  *
+ * => Invariant: document ID is always 64-bit aligned.
+ * => Document ID is atomically set to zero on deletion.
+ *
  * CAUTION: All values must be converted to big-endian for storage.
  */
 
@@ -100,7 +103,7 @@ typedef struct {
 	uint8_t		reserved0[2];
 
 	/*
-	 * Data length, excluding the header.
+	 * Data length (in bytes), excluding the header.
 	 * Updated atomically after the data gets appended.
 	 */
 	uint64_t	data_len;
