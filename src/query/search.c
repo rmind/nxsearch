@@ -74,7 +74,7 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 	if ((text = strdup(query)) == NULL) {
 		return NULL;
 	}
-	if ((tokens = tokenize(idx->fp, text, len)) == NULL) {
+	if ((tokens = tokenize(idx->fp, idx->params, text, len)) == NULL) {
 		nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
 		    "tokenizer failed", NULL);
 		free(text);

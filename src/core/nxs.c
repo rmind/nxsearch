@@ -437,7 +437,7 @@ nxs_index_open(nxs_t *nxs, const char *name)
 		nxs_index_close(idx);
 		return NULL;
 	}
-
+	idx->params = params;
 	idx->name = strdup(name);
 	rhashmap_put(nxs->indexes, name, name_len, idx);
 	TAILQ_INSERT_TAIL(&nxs->index_list, idx, entry);
@@ -472,7 +472,6 @@ nxs_index_close(nxs_index_t *idx)
 	idxterm_sysfini(idx);
 	free(idx);
 }
-
 __dso_public int
 nxs_index_add(nxs_index_t *idx, nxs_doc_id_t doc_id,
     const char *text, size_t len)
@@ -499,7 +498,7 @@ nxs_index_add(nxs_index_t *idx, nxs_doc_id_t doc_id,
 	/*
 	 * Tokenize and resolve tokens to terms.
 	 */
-	if ((tokens = tokenize(idx->fp, text, len)) == NULL) {
+	if ((tokens = tokenize(idx->fp, idx->params, text, len)) == NULL) {
 		nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
 		    "tokenizer failed", NULL);
 		return -1;

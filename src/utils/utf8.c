@@ -121,6 +121,8 @@ utf8_to_utf16(utf8_ctx_t *ctx __unused, const char *u8,
 
 	u_strFromUTF8(buf, count, &nunits, u8, -1 /* NUL-terminated */, &ec);
 	if (__predict_false(U_FAILURE(ec) || (size_t)nunits >= count)) {
+		const char *errmsg __unused = u_errorName(ec);
+		app_dbgx("u_strFromUTF8() failed: %s", errmsg);
 		return -1;
 	}
 	return nunits;
@@ -141,8 +143,36 @@ utf8_from_utf16(utf8_ctx_t *ctx __unused, const uint16_t *u16,
 
 	u_strToUTF8(buf, buflen, &nbytes, u16, -1 /* NUL-terminated */, &ec);
 	if (__predict_false(U_FAILURE(ec) || (size_t)nbytes >= buflen)) {
+		const char *errmsg __unused = u_errorName(ec);
+		app_dbgx("u_strToUTF8() failed: %s", errmsg);
 		return -1;
 	}
+	return nbytes;
+}
+
+ssize_t
+utf8_from_utf16_new(utf8_ctx_t *ctx __unused, const uint16_t *u16, 
+    size_t ulen, strbuf_t *buf)
+{
+	UErrorCode ec = U_ZERO_ERROR;
+	int32_t nbytes = 0;
+	int max_len = (ulen + 1) * NORM_BUF_MULTI;
+
+	if (strbuf_prealloc(buf, max_len) == -1) {
+		goto out;
+	}
+
+	u_strToUTF8(buf->value, buf->bufsize, &nbytes, u16, ulen, &ec);
+	if (__predict_false(U_FAILURE(ec) || (size_t)nbytes >= buf->bufsize)) {
+		const char *errmsg __unused = u_errorName(ec);
+		app_dbgx("u_strToUTF8() failed: %s", errmsg);
+		nbytes = -1;
+		goto out;
+	}
+	buf->length = nbytes;
+out:
+	/* Always ensure the string is NUL terminated. */
+	buf->value[buf->length] = '\0';
 	return nbytes;
 }
 
