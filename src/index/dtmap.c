@@ -379,21 +379,6 @@ idx_dtmap_sync(nxs_index_t *idx)
 			continue;
 		}
 
-		/*
-		 * If the document length is zero, then it is mark that
-		 * this document ID was deleted.  Check the in-memory
-		 * structure and remove it if still present.
-		 */
-		if (doc_total_len == 0) {
-			idxdoc_t *doc = idxdoc_lookup(idx, doc_id);
-			if (doc) {
-				app_dbgx("doc %"PRIu64 " deleted; "
-				    "removing", doc_id);
-				idxdoc_destroy(idx, doc);
-			}
-			continue;
-		}
-
 		if (!idxdoc_create(idx, doc_id, offset)) {
 			nxs_decl_err(idx->nxs,
 			    "idxdoc_create failed", NULL);

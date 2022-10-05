@@ -48,4 +48,7 @@ assert(#results_table == 2)
 assert(round_score(results_table[1]) == SCORE_DOC_1)
 assert(round_score(results_table[2]) == SCORE_DOC_2)
 
+local ok, err = nxs.destroy("test-index")
+assert(ok)
+
 print("OK")

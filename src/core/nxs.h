@@ -52,6 +52,8 @@ struct nxs_index;
 typedef struct nxs_index nxs_index_t;
 
 nxs_index_t *	nxs_index_create(nxs_t *, const char *, nxs_params_t *);
+int		nxs_index_destroy(nxs_t *, const char *);
+
 nxs_index_t *	nxs_index_open(nxs_t *, const char *);
 void		nxs_index_close(nxs_index_t *);
 int		nxs_index_add(nxs_index_t *, nxs_term_id_t,

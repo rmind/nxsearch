@@ -167,14 +167,20 @@ lua_nxs_index_create(lua_State *L)
 }
 
 static int
-lua_nxs_index_drop(lua_State *L)
+lua_nxs_index_destroy(lua_State *L)
 {
 	const char *name;
 
 	name = lua_tostring(L, 1);
 	luaL_argcheck(L, name, 1, "non-empty `string' expected");
 
-	return luaL_error(L, "not yet implemented");
+	if (nxs_index_destroy(nxs, name) == -1) {
+		lua_pushboolean(L, false);
+		lua_pushstring(L, nxs_get_error(nxs));
+		return 2;
+	}
+	lua_pushboolean(L, true);
+	return 1;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -338,7 +344,7 @@ luaopen_nxsearch(lua_State *L)
 	static const struct luaL_Reg nxs_lib_methods[] = {
 		{ "open",	lua_nxs_index_open	},
 		{ "create",	lua_nxs_index_create	},
-		{ "drop",	lua_nxs_index_drop	},
+		{ "destroy",	lua_nxs_index_destroy	},
 		{ "newparams",	lua_nxs_params_create	},
 		{ NULL,		NULL			},
 	};

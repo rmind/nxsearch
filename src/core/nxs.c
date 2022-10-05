@@ -68,6 +68,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <stdarg.h>
+#include <unistd.h>
 #include <errno.h>
 
 #define __NXSLIB_PRIVATE
@@ -101,8 +102,11 @@ nxs_create(const char *basedir)
 	}
 	TAILQ_INIT(&nxs->index_list);
 
+	/*
+	 * Get the base directory and save the sanitized path.
+	 */
 	s = basedir ? basedir : getenv("NXS_BASEDIR");
-	if (s && (nxs->basedir = strdup(s)) == NULL) {
+	if (s == NULL || (nxs->basedir = realpath(s, NULL)) == NULL) {
 		goto err;
 	}
 	if (asprintf(&path, "%s/data", nxs->basedir) == -1) {
@@ -269,6 +273,47 @@ out:
 	free(filters);
 	free(path);
 	return idx;
+}
+
+__dso_public int
+nxs_index_destroy(nxs_t *nxs, const char *name)
+{
+	const char *idx_files[] = { "params.db", "nxsterms", "nxsdtmap", "" };
+	const unsigned n = __arraycount(idx_files);
+	int ec = 0, ret = -1;
+	char *paths[n];
+
+	/* Initialize all paths. */
+	for (unsigned i = 0; i < n; i++) {
+		ec += asprintf(&paths[i], "%s/data/%s/%s",
+		    nxs->basedir, name, idx_files[i]) == -1;
+	}
+	if (ec) {
+		goto out;
+	}
+
+	/*
+	 * Remove all index files, but skip the last entry.
+	 */
+	for (unsigned i = 0; i < n - 1 /* last entry is directory */; i++) {
+		if (unlink(paths[i]) == -1) {
+			nxs_decl_err(nxs, "could not remove `%s'", paths[i]);
+			goto out;
+		}
+	}
+	/*
+	 * Finally, remove the directory stored in the last entry.
+	 */
+	if (rmdir(paths[n - 1]) == -1) {
+		nxs_decl_err(nxs, "could not remove `%s'", paths[n - 1]);
+		goto out;
+	}
+	ret = 0;
+out:
+	for (unsigned i = 0; i < n; i++) {
+		free(paths[i]);
+	}
+	return ret;
 }
 
 static nxs_params_t *

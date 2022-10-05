@@ -66,7 +66,11 @@ routes:post("@/:string", function(self, name)
 end)
 
 routes:delete("@/:string", function(self, name)
-  return set_http_error("not implemented yet")
+  local ok, err = nxs.destroy(name)
+  if not ok then
+    return set_http_error(err)
+  end
+  return ngx.exit(ngx.HTTP_OK)
 end)
 
 routes:post("@/:string/add/:number", function(self, name, doc_id)
