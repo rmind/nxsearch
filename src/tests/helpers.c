@@ -100,7 +100,7 @@ mmap_cmp_file(const char *path, const unsigned char *buf, size_t len)
 }
 
 tokenset_t *
-get_test_tokenset(const char *values[], size_t count)
+get_test_tokenset(const char *values[], size_t count, bool stage)
 {
 	tokenset_t *tokens;
 
@@ -114,9 +114,11 @@ get_test_tokenset(const char *values[], size_t count)
 		tokenset_add(tokens, t);
 	}
 
-	/* Stage all tokens, as we will be adding them. */
-	TAILQ_CONCAT(&tokens->staging, &tokens->list, entry);
-	tokens->staged = tokens->count;
+	if (stage) {
+		/* Stage all tokens, as we will be adding them. */
+		TAILQ_CONCAT(&tokens->staging, &tokens->list, entry);
+		tokens->staged = tokens->count;
+	}
 
 	return tokens;
 }

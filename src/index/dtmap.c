@@ -145,6 +145,25 @@ idx_dtmap_close(nxs_index_t *idx)
 	idx_db_release(idxmap);
 }
 
+/*
+ * dtmap_termblock_cmp: comparator for the term blocks (containing
+ * the term ID and counter tuple), based on term ID value.
+ */
+static int
+dtmap_termblock_cmp(const void * restrict b1, const void * restrict b2)
+{
+	ASSERT(ALIGNED_POINTER(b1, uint32_t) && ALIGNED_POINTER(b2, uint32_t));
+
+	const nxs_term_id_t b1_term_id = be32toh(*(const uint32_t *)b1);
+	const nxs_term_id_t b2_term_id = be32toh(*(const uint32_t *)b2);
+
+	if (b1_term_id < b2_term_id)
+		return -1;
+	if (b1_term_id > b2_term_id)
+		return 1;
+	return 0;
+}
+
 int
 idx_dtmap_add(nxs_index_t *idx, nxs_doc_id_t doc_id, tokenset_t *tokens)
 {
@@ -153,6 +172,7 @@ idx_dtmap_add(nxs_index_t *idx, nxs_doc_id_t doc_id, tokenset_t *tokens)
 	idxdoc_t *doc = NULL;
 	token_t *token = NULL;
 	idxdt_hdr_t *hdr;
+	void *termblocks;
 	void *dataptr;
 	mmrw_t mm;
 
@@ -223,6 +243,7 @@ again:
 	/*
 	 * Fill the terms seen in the document.
 	 */
+	termblocks = mm.curptr;
 	TAILQ_FOREACH(token, &tokens->list, entry) {
 		idxterm_t *idxterm = token->idxterm;
 
@@ -241,6 +262,10 @@ again:
 		}
 		idxterm_incr_total(idx, idxterm, token->count);
 	}
+
+	/* Sort them by term IDs. */
+	qsort(termblocks, tokens->count,
+	    sizeof(uint32_t) * 2, dtmap_termblock_cmp);
 
 	/*
 	 * Increment the document totals and publish the new data length.

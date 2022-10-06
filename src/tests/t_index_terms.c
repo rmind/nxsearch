@@ -97,7 +97,8 @@ run_terms_test(void)
 	ret = idx_terms_open(&idx, testdb_path);
 	assert(ret == 0);
 
-	tokens = get_test_tokenset(test_tokens, __arraycount(test_tokens));
+	tokens = get_test_tokenset(test_tokens,
+	    __arraycount(test_tokens), true);
 	assert(tokens != NULL);
 
 	ret = idx_terms_add(&idx, tokens);

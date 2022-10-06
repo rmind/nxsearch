@@ -15,8 +15,7 @@
 #include "helpers.h"
 #include "utils.h"
 
-// FIXME: #define	TERM_TARGET	UINT16_MAX
-#define	TERM_TARGET	(UINT16_MAX / 3)
+#define	TERM_TARGET	UINT16_MAX
 #define	DOC_ID		1001
 
 static char

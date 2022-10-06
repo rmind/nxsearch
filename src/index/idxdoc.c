@@ -97,7 +97,8 @@ idxdoc_get_termcount(const nxs_index_t *idx,
 {
 	const idxmap_t *idxmap = &idx->dt_memmap;
 	const idxdt_hdr_t *hdr = idxmap->baseptr;
-	unsigned n;
+	const uint32_t *termblocks;
+	unsigned n, off = 0;
 	mmrw_t mm;
 
 	mmrw_init(&mm, MAP_GET_OFF(hdr, doc->offset),
@@ -107,23 +108,29 @@ idxdoc_get_termcount(const nxs_index_t *idx,
 	    mmrw_fetch32(&mm, &n) == -1) {
 		return -1;
 	}
+	termblocks = (const void *)mm.curptr;
 
 	/*
-	 * XXX: O(n) scan; sort by term ID on indexing and use
-	 * binary search here?
+	 * The algorithm is inspired by the BSD bsearch(3):
+	 * - Half the range on each move to the left or right.
+	 * - Set the offset to the next after pivot when moving right.
 	 */
-	for (unsigned i = 0; i < n; i++) {
-		nxs_term_id_t id;
-		uint32_t count;
+	while (n) {
+		unsigned i = off + (n >> 1);
+		nxs_term_id_t target_term_id = be32toh(termblocks[i * 2]);
 
-		if (mmrw_fetch32(&mm, &id) == -1 ||
-		    mmrw_fetch32(&mm, &count) == -1) {
-			return -1;
+		if (term_id == target_term_id) {
+			/* Match: return the count. */
+			return be32toh(termblocks[i * 2 + 1]);
 		}
-		if (term_id == id) {
-			return count;
+		if (term_id > target_term_id) {
+			/* Move right */
+			off = i + 1;
+			n--;
+		} else {
+			/* Moving left */
 		}
+		n >>= 1;
 	}
-
 	return -1;
 }

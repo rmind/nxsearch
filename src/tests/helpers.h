@@ -35,7 +35,7 @@ char *		get_tmpdir(void);
 char *		get_tmpfile(const char *);
 int		mmap_cmp_file(const char *, const unsigned char *, size_t);
 
-tokenset_t *	get_test_tokenset(const char *[], size_t);
+tokenset_t *	get_test_tokenset(const char *[], size_t, bool);
 
 void		run_with_index(const char *, const char *, bool, test_func_t);
 

@@ -23,7 +23,7 @@ endif
 CFLAGS+=	-std=gnu11 -O2 -g -Wall -Wextra -Werror
 CFLAGS+=	-D_POSIX_C_SOURCE=200809L
 
-CFLAGS+=	-I core/ -I index/ -I utils/
+CFLAGS+=	-I core/ -I index/ -I algo/ -I utils/
 
 #
 # Extended warning flags.
@@ -97,8 +97,6 @@ OBJS+=		core/nxs.o
 OBJS+=		core/tokenizer.o
 OBJS+=		core/filters.o
 OBJS+=		core/filters_builtin.o
-OBJS+=		core/ranking.o
-OBJS+=		core/levdist.o
 OBJS+=		core/params.o
 OBJS+=		core/results.o
 
@@ -107,6 +105,9 @@ OBJS+=		index/idxterm.o
 OBJS+=		index/idxdoc.o
 OBJS+=		index/terms.o
 OBJS+=		index/dtmap.o
+
+OBJS+=		algo/ranking.o
+OBJS+=		algo/levdist.o
 
 OBJS+=		utils/strbuf.o
 OBJS+=		utils/mmrw.o

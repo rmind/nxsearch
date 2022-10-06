@@ -111,7 +111,8 @@ run_dtmap_test(void)
 	 * Add a document 1 with the terms to the index.
 	 */
 
-	tokens1 = get_test_tokenset(test_tokens1, __arraycount(test_tokens1));
+	tokens1 = get_test_tokenset(test_tokens1,
+	    __arraycount(test_tokens1), true);
 	assert(tokens1 != NULL);
 	prepare_terms(&idx, tokens1, true);
 
@@ -125,7 +126,8 @@ run_dtmap_test(void)
 	 * Add a document 2.
 	 */
 
-	tokens2 = get_test_tokenset(test_tokens2, __arraycount(test_tokens2));
+	tokens2 = get_test_tokenset(test_tokens2,
+	    __arraycount(test_tokens2), true);
 	assert(tokens2 != NULL);
 	prepare_terms(&idx, tokens2, false);
 
@@ -170,11 +172,63 @@ run_dtmap_test(void)
 	idxterm_sysfini(&idx);
 }
 
+static void
+run_dtmap_term_order_test(void)
+{
+	char *testdb_path = get_tmpfile(NULL);
+	tokenset_t *tokens;
+	nxs_index_t idx;
+	int ret;
+
+	memset(&idx, 0, sizeof(idx));
+	ret = idxterm_sysinit(&idx);
+	assert(ret == 0);
+
+	ret = idx_dtmap_open(&idx, testdb_path);
+	assert(ret == 0);
+
+	/*
+	 * Add two documents in different token order.
+	 */
+
+	static const char *t1[] = { "a", "m", "c", "x", "n", "z" };
+	tokens = get_test_tokenset(t1, __arraycount(t1), true);
+	prepare_terms(&idx, tokens, true);
+	ret = idx_dtmap_add(&idx, 1001, tokens);
+	assert(ret == 0);
+	tokenset_destroy(tokens);
+
+	static const char *t2[] = { "z", "m", "x", "c", "n", "a" };
+	tokens = get_test_tokenset(t2, __arraycount(t2), false);
+	prepare_terms(&idx, tokens, false);
+	ret = idx_dtmap_add(&idx, 1002, tokens);
+	assert(ret == 0);
+	tokenset_destroy(tokens);
+
+	/*
+	 * The order in the second document will not be sequential.
+	 * Check the term counts.
+	 */
+	idxdoc_t *doc = idxdoc_lookup(&idx, 1002);
+	for (unsigned i = 1; i <= 6; i++) {
+		int c;
+
+		c = idxdoc_get_termcount(&idx, doc, i);
+		assert(c == 1);
+	}
+
+	// Cleanup
+	idx_dtmap_close(&idx);
+	idx_terms_close(&idx);
+	idxterm_sysfini(&idx);
+}
+
 int
 main(void)
 {
 	(void)get_tmpdir();
 	run_dtmap_test();
+	run_dtmap_term_order_test();
 	puts("OK");
 	return 0;
 }
