@@ -49,7 +49,7 @@ run_removal_test(void)
 	nxs_t *nxs, *alt_nxs;
 	int ret;
 
-	nxs = nxs_create(basedir);
+	nxs = nxs_open(basedir);
 	assert(nxs);
 
 	idx = nxs_index_create(nxs, "test-idx", NULL);
@@ -66,7 +66,7 @@ run_removal_test(void)
 	/*
 	 * Open another active descriptor in parallel.
 	 */
-	alt_nxs = nxs_create(basedir);
+	alt_nxs = nxs_open(basedir);
 	assert(alt_nxs);
 	alt_idx = nxs_index_open(alt_nxs, "test-idx");
 	assert(alt_idx);
@@ -88,7 +88,7 @@ run_removal_test(void)
 	verify_docs(alt_idx);
 
 	nxs_index_close(alt_idx);
-	nxs_destroy(alt_nxs);
+	nxs_close(alt_nxs);
 
 	/*
 	 * Verify using the fresh descriptor.
@@ -100,7 +100,7 @@ run_removal_test(void)
 	verify_docs(idx);
 
 	nxs_index_close(idx);
-	nxs_destroy(nxs);
+	nxs_close(nxs);
 }
 
 int

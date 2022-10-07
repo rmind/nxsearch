@@ -88,7 +88,7 @@ static const char *default_filters[] = {
 };
 
 __dso_public nxs_t *
-nxs_create(const char *basedir)
+nxs_open(const char *basedir)
 {
 	nxs_t *nxs;
 	const char *s;
@@ -129,13 +129,13 @@ nxs_create(const char *basedir)
 
 	return nxs;
 err:
-	nxs_destroy(nxs);
+	nxs_close(nxs);
 	free(path);
 	return NULL;
 }
 
 __dso_public void
-nxs_destroy(nxs_t *nxs)
+nxs_close(nxs_t *nxs)
 {
 	nxs_index_t *idx;
 
@@ -449,7 +449,7 @@ nxs_index_close(nxs_index_t *idx)
 }
 
 __dso_public int
-nxs_index_add(nxs_index_t *idx, nxs_term_id_t doc_id,
+nxs_index_add(nxs_index_t *idx, nxs_doc_id_t doc_id,
     const char *text, size_t len)
 {
 	tokenset_t *tokens;
@@ -505,7 +505,7 @@ out:
  * nxs_index_remove: remove the document from the index.
  */
 __dso_public int
-nxs_index_remove(nxs_index_t *idx, nxs_term_id_t doc_id)
+nxs_index_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
 {
 	if (idx_dtmap_sync(idx) == -1) {
 		return -1;

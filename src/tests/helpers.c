@@ -213,7 +213,7 @@ test_index_search(const test_score_case_t *test_case)
 	nxs_t *nxs;
 	unsigned i;
 
-	nxs = nxs_create(basedir);
+	nxs = nxs_open(basedir);
 	assert(nxs);
 
 	idx = nxs_index_create(nxs, "test-idx", NULL);
@@ -246,5 +246,5 @@ test_index_search(const test_score_case_t *test_case)
 	}
 
 	nxs_index_close(idx);
-	nxs_destroy(nxs);
+	nxs_close(nxs);
 }

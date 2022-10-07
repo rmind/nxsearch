@@ -374,8 +374,8 @@ luaopen_nxsearch(lua_State *L)
 	if (!nxs) {
 		static int lua_regkey_dtor;
 
-		if ((nxs = nxs_create(NULL)) == NULL) {
-			return luaL_error(L, "nxs_create failed");
+		if ((nxs = nxs_open(NULL)) == NULL) {
+			return luaL_error(L, "nxs_open() failed");
 		}
 
 		/*
@@ -407,7 +407,7 @@ static int
 luaclose_nxsearch(lua_State *L)
 {
 	if (nxs) {
-		nxs_destroy(nxs);
+		nxs_close(nxs);
 		nxs = NULL;
 	}
 	(void)L;

@@ -93,7 +93,7 @@ run_tokenizer_test(void)
 	nxs_t *nxs;
 	unsigned i;
 
-	nxs = nxs_create(basedir);
+	nxs = nxs_open(basedir);
 	assert(nxs != NULL);
 
 	fp = get_test_filter_pipeline(nxs);
@@ -115,7 +115,7 @@ run_tokenizer_test(void)
 
 	tokenset_destroy(tset);
 	filter_pipeline_destroy(fp);
-	nxs_destroy(nxs);
+	nxs_close(nxs);
 }
 
 int

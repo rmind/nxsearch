@@ -20,6 +20,8 @@
 
 #define	IDX_SIZE_STEP		(32UL * 1024)	// 32 KB
 
+typedef uint32_t nxs_term_id_t;
+
 typedef enum {
 	TF_IDF		= 0,
 	BM25		= 1,

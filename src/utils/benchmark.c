@@ -191,7 +191,7 @@ main(int argc, char **argv)
 	if (!index)
 		usage();
 
-	if ((nxs = nxs_create(NULL)) == NULL) {
+	if ((nxs = nxs_open(NULL)) == NULL) {
 		err(EXIT_FAILURE, "could not initialize nxsearch");
 	}
 
@@ -245,7 +245,7 @@ main(int argc, char **argv)
 	}
 
 	benchmark_start();
-	nxs_destroy(nxs);
+	nxs_close(nxs);
 	benchmark_end("closing index");
 
 	return 0;
