@@ -15,6 +15,7 @@
 #define __NXSLIB_PRIVATE
 #include "nxs_impl.h"
 #include "rhashmap.h"
+#include "heap.h"
 #include "utils.h"
 
 typedef struct {
@@ -25,7 +26,9 @@ typedef struct {
 
 struct nxs_resp {
 	rhashmap_t *		doc_map;
-	unsigned		count;
+	heap_t *		heap;
+	size_t			count;
+
 	result_entry_t *	results;
 
 	char *			errmsg;
@@ -38,6 +41,10 @@ struct nxs_resp {
 	yyjson_mut_arr_iter	results_iter;
 };
 
+#define	DEFAULT_RESULTS_CAP	1000
+
+static int	result_entry_cmp(const void *, const void *);
+
 nxs_resp_t *
 nxs_resp_create(void)
 {
@@ -47,8 +54,17 @@ nxs_resp_create(void)
 	if ((resp = calloc(1, sizeof(nxs_resp_t))) == NULL) {
 		return NULL;
 	}
+
+	/*
+	 * Create the document map and the heap.
+	 */
 	resp->doc_map = rhashmap_create(0, RHM_NOCOPY | RHM_NONCRYPTO);
 	if (resp->doc_map == NULL) {
+		nxs_resp_release(resp);
+		return NULL;
+	}
+	resp->heap = heap_create(DEFAULT_RESULTS_CAP, result_entry_cmp);
+	if (resp->heap == NULL) {
 		nxs_resp_release(resp);
 		return NULL;
 	}
@@ -88,6 +104,9 @@ nxs_resp_release(nxs_resp_t *resp)
 	}
 	if (resp->doc_map) {
 		rhashmap_destroy(resp->doc_map);
+	}
+	if (resp->heap) {
+		heap_destroy(resp->heap);
 	}
 	free(resp->errmsg);
 	free(resp);
@@ -156,23 +175,56 @@ add_json_result_entry(nxs_resp_t *resp, result_entry_t *entry)
 }
 
 /*
+ * result_entry_cmp: comparator for the result entries.
+ */
+static int
+result_entry_cmp(const void *p1, const void *p2)
+{
+	const result_entry_t *e1 = p1;
+	const result_entry_t *e2 = p2;
+
+	if (e1->score < e2->score)
+		return -1;
+	if (e1->score > e2->score)
+		return 1;
+	return 0;
+}
+
+/*
  * nxs_resp_build: finish up the response object (build any structures,
  * initialize the iterators, etc).
  */
 void
 nxs_resp_build(nxs_resp_t *resp)
 {
-	result_entry_t *entry = resp->results;
+	result_entry_t **top_results, *entry;
 
 	/*
-	 * Build the JSON entries.
+	 * Sort the entries with a cap and build the JSON entries.
 	 */
+	entry = resp->results;
 	while (entry) {
 		result_entry_t *next = entry->next;
-		add_json_result_entry(resp, entry);
+		heap_add(resp->heap, entry);
+		entry = next;
+	}
+	top_results = heap_sort(resp->heap, &resp->count);
+	for (size_t i = 0; i < resp->count; i++) {
+		add_json_result_entry(resp, top_results[i]);
+	}
+	heap_destroy(resp->heap);
+	resp->heap = NULL;
+
+	/*
+	 * Destroy the entries.
+	 */
+	entry = resp->results;
+	while (entry) {
+		result_entry_t *next = entry->next;
 		free(entry);
 		entry = next;
 	}
+
 	rhashmap_destroy(resp->doc_map);
 	resp->doc_map = NULL;
 	resp->results = NULL;

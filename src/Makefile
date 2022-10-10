@@ -108,6 +108,7 @@ OBJS+=		index/dtmap.o
 
 OBJS+=		algo/ranking.o
 OBJS+=		algo/levdist.o
+OBJS+=		algo/heap.o
 
 OBJS+=		utils/strbuf.o
 OBJS+=		utils/mmrw.o

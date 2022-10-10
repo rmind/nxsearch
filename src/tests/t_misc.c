@@ -83,13 +83,18 @@ run_resp_tests(void)
 
 	ret = nxs_resp_addresult(resp, &(const idxdoc_t){ .id = 1 }, 1.5);
 	assert(ret == 0);
+
+	ret = nxs_resp_addresult(resp, &(const idxdoc_t){ .id = 2 }, 3);
+	assert(ret == 0);
+
 	nxs_resp_build(resp);
 
 	s = nxs_resp_tojson(resp, NULL);
 	nxs_resp_release(resp);
 
 	assert(strcmp(s,
-	    "{\"results\":[{\"doc_id\":1,\"score\":1.5}],\"count\":1}") == 0);
+	    "{\"results\":[{\"doc_id\":2,\"score\":3.0},"
+	    "{\"doc_id\":1,\"score\":1.5}],\"count\":2}") == 0);
 	free(s);
 }
 
