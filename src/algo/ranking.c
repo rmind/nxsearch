@@ -6,6 +6,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 
 #define __NXSLIB_PRIVATE
@@ -157,4 +158,34 @@ bm25(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	idf_bm25 = log(((doc_count - doc_freq + 0.5) / (doc_freq + 0.5)) + 1);
 
 	return tf_bm25 * idf_bm25;
+}
+
+/*
+ * Helpers to get the ranking function by name or enum.
+ */
+
+ranking_algo_t
+get_ranking_func_id(const char *name)
+{
+	if (strcasecmp(name, "TF-IDF") == 0) {
+		return TF_IDF;
+	}
+	if (strcasecmp(name, "BM25") == 0) {
+		return BM25;
+	}
+	return INVALID_ALGO;
+}
+
+ranking_func_t
+get_ranking_func(ranking_algo_t algo)
+{
+	switch (algo) {
+	case TF_IDF:
+		return tf_idf;
+	case BM25:
+		return bm25;
+	default:
+		break;
+	}
+	return NULL;
 }

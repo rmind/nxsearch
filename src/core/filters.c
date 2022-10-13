@@ -126,7 +126,8 @@ filter_pipeline_create(nxs_t *nxs, nxs_params_t *params)
 	/* Extract the filter list from the parameters. */
 	filters = nxs_params_get_strset(params, "filters", &count);
 	if (filters == NULL) {
-		nxs_decl_errx(nxs, "corrupted index params", NULL);
+		nxs_decl_errx(nxs, NXS_ERR_FATAL,
+		    "corrupted index params", NULL);
 		return NULL;
 	}
 	len = offsetof(filter_pipeline_t, filters[count]);

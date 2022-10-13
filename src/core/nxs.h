@@ -25,7 +25,25 @@ typedef struct nxs nxs_t;
 
 nxs_t *		nxs_open(const char *);
 void		nxs_close(nxs_t *);
-const char *	nxs_get_error(const nxs_t *);
+
+/*
+ * Errors.
+ */
+
+typedef enum {
+	/*
+	 * WARNING: maintain ABI compatibility (do not reorder)!
+	 */
+	NXS_ERR_SUCCESS		= 0,
+	NXS_ERR_FATAL,		// unspecified fatal error
+	NXS_ERR_SYSTEM,		// operating system error
+	NXS_ERR_INVALID,	// invalid parameter or value
+	NXS_ERR_EXISTS,		// resource already exists
+	NXS_ERR_MISSING,	// resource is missing
+	NXS_ERR_LIMIT,		// resource limit reached
+} nxs_err_t;
+
+nxs_err_t	nxs_get_error(const nxs_t *, const char **);
 
 /*
  * Parameters API.
@@ -66,13 +84,13 @@ int		nxs_index_remove(nxs_index_t *, nxs_doc_id_t);
 struct nxs_resp;
 typedef struct nxs_resp nxs_resp_t;
 
-nxs_resp_t *	nxs_index_search(nxs_index_t *, const char *, size_t);
+nxs_resp_t *	nxs_index_search(nxs_index_t *, nxs_params_t *,
+		    const char *, size_t);
 
 void		nxs_resp_iter_reset(nxs_resp_t *);
 bool		nxs_resp_iter_result(nxs_resp_t *, nxs_doc_id_t *, float *);
 unsigned	nxs_resp_resultcount(const nxs_resp_t *);
 
-const char *	nxs_resp_geterror(const nxs_resp_t *);
 char *		nxs_resp_tojson(nxs_resp_t *, size_t *);
 void		nxs_resp_release(nxs_resp_t *);
 

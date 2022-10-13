@@ -27,7 +27,10 @@ local function get_http_body(raise_err)
 end
 
 local function set_http_error(err)
-  ngx.say(cjson.encode({["error"] = err}))
+  ngx.say(cjson.encode({["error"] = {
+    ["code"] = err.code,
+    ["msg"] = err.msg,
+  }}))
   return ngx.exit(ngx.HTTP_BAD_REQUEST)
 end
 

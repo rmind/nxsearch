@@ -27,7 +27,6 @@
 #include <string.h>
 #include <inttypes.h>
 #include <unistd.h>
-#include <errno.h>
 
 #define	__NXSLIB_PRIVATE
 #include "nxs_impl.h"

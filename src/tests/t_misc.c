@@ -78,7 +78,7 @@ run_resp_tests(void)
 	char *s;
 	int ret;
 
-	resp = nxs_resp_create();
+	resp = nxs_resp_create(1000);
 	assert(resp);
 
 	ret = nxs_resp_addresult(resp, &(const idxdoc_t){ .id = 1 }, 1.5);

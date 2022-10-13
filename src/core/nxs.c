@@ -79,10 +79,6 @@
 #include "storage.h"
 #include "index.h"
 
-#define	DEFAULT_RANKING_ALGO		BM25
-
-#define	DEFAULT_LANGUAGE		"en"
-
 static const char *default_filters[] = {
 	"normalizer", "stopwords", "stemmer"
 };
@@ -147,15 +143,16 @@ nxs_close(nxs_t *nxs)
 	}
 	filters_sysfini(nxs);
 	free(nxs->basedir);
-	free(nxs->error);
+	free(nxs->errmsg);
 	free(nxs);
 }
 
 void
 nxs_clear_error(nxs_t *nxs)
 {
-	free(nxs->error);
-	nxs->error = NULL;
+	free(nxs->errmsg);
+	nxs->errmsg = NULL;
+	nxs->errcode = NXS_ERR_SUCCESS;
 }
 
 /*
@@ -164,7 +161,7 @@ nxs_clear_error(nxs_t *nxs)
  */
 void
 _nxs_decl_err(nxs_t *nxs, int level, const char *file, int line,
-    const char *func, const char *fmt, ...)
+    const char *func, nxs_err_t code, const char *fmt, ...)
 {
 	const int error = errno;
 	char *s = NULL, *msg = NULL;
@@ -181,8 +178,9 @@ _nxs_decl_err(nxs_t *nxs, int level, const char *file, int line,
 		msg = s;
 	}
 
-	free(nxs->error);
-	nxs->error = msg;
+	free(nxs->errmsg);
+	nxs->errmsg = msg;
+	nxs->errcode = code;
 #if 0
 	va_copy or add another primitive?
 	_app_log(level, file, line, func, fmt, ap);
@@ -191,10 +189,13 @@ _nxs_decl_err(nxs_t *nxs, int level, const char *file, int line,
 #endif
 }
 
-__dso_public const char *
-nxs_get_error(const nxs_t *nxs)
+__dso_public nxs_err_t
+nxs_get_error(const nxs_t *nxs, const char **errmsg)
 {
-	return nxs->error;
+	if (errmsg) {
+		*errmsg = nxs->errmsg;
+	}
+	return nxs->errcode;
 }
 
 __dso_public nxs_index_t *
@@ -204,7 +205,6 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 	const char **filters = NULL;
 	nxs_index_t *idx = NULL;
 	size_t filter_count;
-	uint64_t uval;
 	char *path;
 
 	nxs_clear_error(nxs);
@@ -213,8 +213,8 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 	 * Create the index directory.
 	 */
 	if (str_isalnumdu(name) == -1) {
-		nxs_decl_errx(nxs, "invalid characters in index name", NULL);
-		errno = EINVAL;
+		nxs_decl_errx(nxs, NXS_ERR_INVALID,
+		    "invalid characters in index name", NULL);
 		return NULL;
 	}
 	if (asprintf(&path, "%s/data/%s", nxs->basedir, name) == -1) {
@@ -222,10 +222,12 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 	}
 	if (mkdir(path, 0755) == -1) {
 		if (errno == EEXIST) {
-			nxs_decl_err(nxs, "index `%s' already exists", name);
+			nxs_decl_err(nxs, NXS_ERR_EXISTS,
+			    "index `%s' already exists", name);
 			goto out;
 		}
-		nxs_decl_err(nxs, "could not create directory at %s", path);
+		nxs_decl_err(nxs, NXS_ERR_SYSTEM,
+		    "could not create directory at %s", path);
 		goto out;
 	}
 	free(path);
@@ -245,14 +247,14 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 	    default_filters, __arraycount(default_filters)) == -1) {
 		goto out;
 	}
-	if (nxs_params_get_uint(params, "algo", &uval) == -1 &&
-	    nxs_params_set_uint(params, "algo", DEFAULT_RANKING_ALGO) == -1) {
+	if (nxs_params_get_str(params, "algo") == NULL &&
+	    nxs_params_set_str(params, "algo", NXS_DEFAULT_RANKING_ALGO) == -1) {
 		goto out;
 	}
 
 	/* XXX Verify: Language must be a two letter ISO 639-1 code. */
 	if (nxs_params_get_str(params, "lang") == NULL &&
-	    nxs_params_set_str(params, "lang", DEFAULT_LANGUAGE) == -1) {
+	    nxs_params_set_str(params, "lang", NXS_DEFAULT_LANGUAGE) == -1) {
 		goto out;
 	}
 
@@ -298,7 +300,8 @@ nxs_index_destroy(nxs_t *nxs, const char *name)
 	 */
 	for (unsigned i = 0; i < n - 1 /* last entry is directory */; i++) {
 		if (unlink(paths[i]) == -1) {
-			nxs_decl_err(nxs, "could not remove `%s'", paths[i]);
+			nxs_decl_err(nxs, NXS_ERR_SYSTEM,
+			    "could not remove `%s'", paths[i]);
 			goto out;
 		}
 	}
@@ -306,7 +309,8 @@ nxs_index_destroy(nxs_t *nxs, const char *name)
 	 * Finally, remove the directory stored in the last entry.
 	 */
 	if (rmdir(paths[n - 1]) == -1) {
-		nxs_decl_err(nxs, "could not remove `%s'", paths[n - 1]);
+		nxs_decl_err(nxs, NXS_ERR_SYSTEM,
+		    "could not remove `%s'", paths[n - 1]);
 		goto out;
 	}
 	ret = 0;
@@ -327,7 +331,8 @@ index_get_params(nxs_t *nxs, const char *name)
 	if (asprintf(&path, "%s/data/%s/params.db", nxs->basedir, name) == -1)
 		return NULL;
 	if (stat(path, &sb) == -1 && errno == ENOENT) {
-		nxs_decl_errx(nxs, "index `%s' does not exist", name);
+		nxs_decl_errx(nxs, NXS_ERR_MISSING,
+		    "index `%s' does not exist", name);
 		free(path);
 		return NULL;
 	}
@@ -340,22 +345,22 @@ __dso_public nxs_index_t *
 nxs_index_open(nxs_t *nxs, const char *name)
 {
 	const size_t name_len = strlen(name);
+	const char *algo_name;
 	nxs_params_t *params;
 	nxs_index_t *idx;
-	uint64_t uval;
 	char *path;
 	int ret;
 
 	nxs_clear_error(nxs);
 
 	if (str_isalnumdu(name) == -1) {
-		nxs_decl_errx(nxs, "invalid characters in index name", NULL);
-		errno = EINVAL;
+		nxs_decl_errx(nxs, NXS_ERR_INVALID,
+		    "invalid characters in index name", NULL);
 		return NULL;
 	}
 	if (rhashmap_get(nxs->indexes, name, name_len)) {
-		nxs_decl_errx(nxs, "index `%s' is already open", name);
-		errno = EEXIST;
+		nxs_decl_errx(nxs, NXS_ERR_EXISTS,
+		    "index `%s' is already open", name);
 		return NULL;
 	}
 
@@ -372,13 +377,14 @@ nxs_index_open(nxs_t *nxs, const char *name)
 		nxs_index_close(idx);
 		return NULL;
 	}
-	if (nxs_params_get_uint(params, "algo", &uval) == -1) {
-		nxs_decl_errx(nxs, "corrupted index params", NULL);
+	if ((algo_name = nxs_params_get_str(params, "algo")) == NULL) {
+		nxs_decl_errx(nxs, NXS_ERR_FATAL,
+		    "corrupted index params", NULL);
 		nxs_params_release(params);
 		nxs_index_close(idx);
 		return NULL;
 	}
-	idx->algo = uval;
+	idx->algo = get_ranking_func_id(algo_name);
 
 	/*
 	 * Create the filter pipeline.
@@ -457,8 +463,8 @@ nxs_index_add(nxs_index_t *idx, nxs_doc_id_t doc_id,
 
 	nxs_clear_error(idx->nxs);
 	if (doc_id == 0) {
-		nxs_decl_errx(idx->nxs, "document ID must be non-zero", NULL);
-		errno = EINVAL;
+		nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
+		    "document ID must be non-zero", NULL);
 		return -1;
 	}
 
@@ -466,9 +472,8 @@ nxs_index_add(nxs_index_t *idx, nxs_doc_id_t doc_id,
 	 * Check whether the document already exists.
 	 */
 	if (idxdoc_lookup(idx, doc_id)) {
-		nxs_decl_errx(idx->nxs,
+		nxs_decl_errx(idx->nxs, NXS_ERR_EXISTS,
 		    "document %"PRIu64" is already indexed", doc_id);
-		errno = EEXIST;
 		return -1;
 	}
 
@@ -476,7 +481,8 @@ nxs_index_add(nxs_index_t *idx, nxs_doc_id_t doc_id,
 	 * Tokenize and resolve tokens to terms.
 	 */
 	if ((tokens = tokenize(idx->fp, text, len)) == NULL) {
-		nxs_decl_errx(idx->nxs, "tokenizer failed", NULL);
+		nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+		    "tokenizer failed", NULL);
 		return -1;
 	}
 	tokenset_resolve(tokens, idx, true);
@@ -519,34 +525,51 @@ nxs_index_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
  * => Returns the response object (which must be released by the caller).
  */
 __dso_public nxs_resp_t *
-nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
+nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
+    const char *query, size_t len)
 {
 	nxs_resp_t *resp = NULL;
+	ranking_algo_t algo;
 	ranking_func_t rank;
 	tokenset_t *tokens;
 	token_t *token;
+	uint64_t limit;
 	char *text;
 	int err = -1;
 
 	nxs_clear_error(idx->nxs);
 
 	/*
+	 * Check the parameters and set some defaults.
+	 */
+	limit = NXS_DEFAULT_RESULTS_LIMIT;
+	algo = idx->algo;
+
+	if (params) {
+		const char *algo_name;
+
+		if (nxs_params_get_uint(params, "limit", &limit) == -1) {
+			nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
+			    "invalid limit", NULL);
+			return NULL;
+		}
+		if ((algo_name = nxs_params_get_str(params, "algo")) != NULL &&
+		    (algo = get_ranking_func_id(algo_name)) == INVALID_ALGO) {
+			nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
+			    "invalid algorithm", NULL);
+			return NULL;
+		}
+	}
+
+	/* Determine the ranking algorithm. */
+	rank = get_ranking_func(algo);
+	ASSERT(rank != NULL);
+
+	/*
 	 * Sync the latest updates to the index.
 	 */
 	if (idx_terms_sync(idx) == -1 || idx_dtmap_sync(idx) == -1) {
 		return NULL;
-	}
-
-	/* Determine the ranking algorithm. */
-	switch (idx->algo) {
-	case TF_IDF:
-		rank = tf_idf;
-		break;
-	case BM25:
-		rank = bm25;
-		break;
-	default:
-		abort();
 	}
 
 	/*
@@ -556,7 +579,8 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 		return NULL;
 	}
 	if ((tokens = tokenize(idx->fp, text, len)) == NULL) {
-		nxs_decl_errx(idx->nxs, "tokenizer failed", NULL);
+		nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+		    "tokenizer failed", NULL);
 		free(text);
 		return NULL;
 	}
@@ -566,7 +590,7 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 	/*
 	 * Lookup the documents given the terms.
 	 */
-	if ((resp = nxs_resp_create()) == NULL) {
+	if ((resp = nxs_resp_create(limit)) == NULL) {
 		goto out;
 	}
 	TAILQ_FOREACH(token, &tokens->list, entry) {
@@ -602,8 +626,8 @@ nxs_index_search(nxs_index_t *idx, const char *query, size_t len)
 	err = 0;
 out:
 	if (err && resp) {
-		const char *errmsg = nxs_get_error(idx->nxs);
-		nxs_resp_adderror(resp, errmsg);
+		nxs_resp_release(resp);
+		resp = NULL;
 	}
 	tokenset_destroy(tokens);
 	return resp;

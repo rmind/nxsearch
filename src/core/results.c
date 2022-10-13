@@ -41,12 +41,10 @@ struct nxs_resp {
 	yyjson_mut_arr_iter	results_iter;
 };
 
-#define	DEFAULT_RESULTS_CAP	1000
-
 static int	result_entry_cmp(const void *, const void *);
 
 nxs_resp_t *
-nxs_resp_create(void)
+nxs_resp_create(size_t limit)
 {
 	nxs_resp_t *resp;
 	yyjson_mut_val *results_key;
@@ -63,7 +61,7 @@ nxs_resp_create(void)
 		nxs_resp_release(resp);
 		return NULL;
 	}
-	resp->heap = heap_create(DEFAULT_RESULTS_CAP, result_entry_cmp);
+	resp->heap = heap_create(limit, result_entry_cmp);
 	if (resp->heap == NULL) {
 		nxs_resp_release(resp);
 		return NULL;
@@ -123,12 +121,6 @@ nxs_resp_tojson(nxs_resp_t *resp, size_t *len)
 	return yyjson_mut_write(resp->doc, 0, len);
 }
 
-__dso_public const char *
-nxs_resp_geterror(const nxs_resp_t *resp)
-{
-	return resp->errmsg;
-}
-
 /*
  * nxs_resp_addresult: insert the new result entry (document ID and score)
  * or update the existing entry by adding the score.
@@ -155,13 +147,6 @@ nxs_resp_addresult(nxs_resp_t *resp, const idxdoc_t *doc, float score)
 	resp->results = entry;
 	resp->count++;
 	return 0;
-}
-
-void
-nxs_resp_adderror(nxs_resp_t *resp, const char *errmsg)
-{
-	resp->errmsg = strdup(errmsg);
-	yyjson_mut_obj_add_str(resp->doc, resp->root, "error", resp->errmsg);
 }
 
 static inline void

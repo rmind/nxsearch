@@ -21,9 +21,10 @@
 typedef struct filter_entry filter_entry_t;
 
 struct nxs {
-	/* Base directory and the error message. */
+	/* Base directory and the error message with code. */
 	char *			basedir;
-	char *			error;
+	char *			errmsg;
+	nxs_err_t		errcode;
 
 	/* Opened index map and list. */
 	rhashmap_t *		indexes;
@@ -34,6 +35,10 @@ struct nxs {
 	unsigned		filters_count;
 	filter_entry_t *	filters;
 };
+
+#define	NXS_DEFAULT_RESULTS_LIMIT	1000
+#define	NXS_DEFAULT_RANKING_ALGO	"BM25"
+#define	NXS_DEFAULT_LANGUAGE		"en"
 
 int	nxs_filter_register(nxs_t *, const char *, const filter_ops_t *);
 
@@ -49,6 +54,9 @@ typedef float (*ranking_func_t)(const nxs_index_t *,
 float	tf_idf(const nxs_index_t *, const idxterm_t *, const idxdoc_t *);
 float	bm25(const nxs_index_t *, const idxterm_t *, const idxdoc_t *);
 
+ranking_algo_t	get_ranking_func_id(const char *);
+ranking_func_t	get_ranking_func(ranking_algo_t);
+
 /*
  * Internal params and response API.
  */
@@ -59,9 +67,9 @@ const char **	nxs_params_get_strset(nxs_params_t *, const char *, size_t *);
 const char *	nxs_params_get_str(nxs_params_t *, const char *);
 int		nxs_params_get_uint(nxs_params_t *, const char *, uint64_t *);
 
-nxs_resp_t *	nxs_resp_create(void);
+nxs_resp_t *	nxs_resp_create(size_t);
 int		nxs_resp_addresult(nxs_resp_t *, const idxdoc_t *, float);
-void		nxs_resp_adderror(nxs_resp_t *, const char *);
+void		nxs_resp_adderror(nxs_resp_t *, nxs_err_t, const char *);
 void		nxs_resp_build(nxs_resp_t *);
 
 /*
@@ -69,14 +77,14 @@ void		nxs_resp_build(nxs_resp_t *);
  */
 
 void		_nxs_decl_err(nxs_t *, int, const char *, int,
-		    const char *, const char *, ...);
+		    const char *, nxs_err_t, const char *, ...);
 
-#define	nxs_decl_errx(nxs, msg, ...) \
+#define	nxs_decl_errx(nxs, code, msg, ...) \
     _nxs_decl_err((nxs), LOG_ERR, \
-    __FILE__, __LINE__, __func__, (msg), __VA_ARGS__)
+    __FILE__, __LINE__, __func__, (code), (msg), __VA_ARGS__)
 
-#define	nxs_decl_err(nxs, msg, ...) \
+#define	nxs_decl_err(nxs, code, msg, ...) \
     _nxs_decl_err((nxs), LOG_ERR|LOG_EMSG, \
-    __FILE__, __LINE__, __func__, (msg), __VA_ARGS__)
+    __FILE__, __LINE__, __func__, (code), (msg), __VA_ARGS__)
 
 #endif

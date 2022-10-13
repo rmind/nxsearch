@@ -16,7 +16,6 @@
 #include <sys/queue.h>
 #include <stdlib.h>
 #include <inttypes.h>
-#include <errno.h>
 
 #define	__NXSLIB_PRIVATE
 #include "nxs_impl.h"
@@ -41,7 +40,6 @@ idxdoc_create(nxs_index_t *idx, nxs_doc_id_t id, uint64_t offset)
 	if (rhashmap_put(idx->dt_map, &doc->id,
 	    sizeof(nxs_doc_id_t), doc) != doc) {
 		free(doc);
-		errno = EINVAL;
 		return NULL;
 	}
 	TAILQ_INSERT_TAIL(&idx->dt_list, doc, entry);

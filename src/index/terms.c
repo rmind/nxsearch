@@ -63,12 +63,18 @@ idx_terms_init(idxmap_t *idxmap)
 }
 
 static int
-idx_terms_verify(const idxmap_t *idxmap)
+idx_terms_verify(nxs_index_t *idx, const idxmap_t *idxmap)
 {
 	const idxterms_hdr_t *hdr = idxmap->baseptr;
 
-	if (memcmp(hdr->mark, NXS_T_MARK, sizeof(hdr->mark)) != 0 ||
-	    hdr->ver != NXS_ABI_VER) {
+	if (memcmp(hdr->mark, NXS_T_MARK, sizeof(hdr->mark)) != 0) {
+		nxs_decl_err(idx->nxs, NXS_ERR_FATAL,
+		    "corrupted terms index header", NULL);
+		return -1;
+	}
+	if (hdr->ver != NXS_ABI_VER) {
+		nxs_decl_err(idx->nxs, NXS_ERR_FATAL,
+		    "incompatible nxsearch index version", NULL);
 		return -1;
 	}
 	return 0;
@@ -87,7 +93,8 @@ idx_terms_open(nxs_index_t *idx, const char *path)
 	 * => Returns the descriptor with the lock held.
 	 */
 	if ((fd = idx_db_open(&idx->terms_memmap, path, &created)) == -1) {
-		nxs_decl_err(idx->nxs, "could not open terms index", NULL);
+		nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
+		    "could not open terms index", NULL);
 		return -1;
 	}
 
@@ -96,14 +103,14 @@ idx_terms_open(nxs_index_t *idx, const char *path)
 	 */
 	baseptr = idx_db_map(&idx->terms_memmap, IDX_SIZE_STEP, false);
 	if (baseptr == NULL) {
-		nxs_decl_err(idx->nxs, "terms mapping failed", NULL);
+		nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
+		    "terms mapping failed", NULL);
 		goto err;
 	}
 	if (created && idx_terms_init(&idx->terms_memmap) == -1) {
 		goto err;
 	}
-	if (!created && idx_terms_verify(&idx->terms_memmap) == -1) {
-		nxs_decl_err(idx->nxs, "corrupted terms index header", NULL);
+	if (!created && idx_terms_verify(idx, &idx->terms_memmap) == -1) {
 		goto err;
 	}
 
@@ -204,7 +211,8 @@ again:
 	    (tokens->staged * IDXTERMS_META_MAXLEN);
 	target_len = sizeof(idxterms_hdr_t) + data_len + max_append_len;
 	if ((hdr = idx_db_map(idxmap, target_len, true)) == NULL) {
-		nxs_decl_err(idx->nxs, "terms mapping failed", NULL);
+		nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
+		    "terms mapping failed", NULL);
 		flock(idxmap->fd, LOCK_UN);
 		return -1;
 	}
@@ -223,12 +231,12 @@ again:
 		size_t offset;
 
 		if (len > UINT16_MAX) {
-			nxs_decl_errx(idx->nxs,
+			nxs_decl_errx(idx->nxs, NXS_ERR_LIMIT,
 			    "term too long (%zu)", len);
 			goto err;
 		}
 		if (idx->terms_last_id == MAX_TERM_ID) {
-			nxs_decl_errx(idx->nxs,
+			nxs_decl_errx(idx->nxs, NXS_ERR_LIMIT,
 			    "reached the term limit (%u)", MAX_TERM_ID);
 			goto err;
 		}
@@ -249,14 +257,16 @@ again:
 		if (mmrw_store16(&mm, len) == -1 ||
 		    mmrw_store(&mm, val, len + 1) == -1 ||
 		    mmrw_advance(&mm, IDXTERMS_PAD_LEN(len)) == -1) {
-			nxs_decl_errx(idx->nxs, "terms I/O error", NULL);
+			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+			    "terms I/O error", NULL);
 			goto err;
 		}
 
 		offset = (uintptr_t)mm.curptr - (uintptr_t)hdr;
 
 		if (mmrw_store64(&mm, token->count) == -1) {
-			nxs_decl_errx(idx->nxs, "terms I/O error", NULL);
+			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+			    "terms I/O error", NULL);
 			goto err;
 		}
 
@@ -266,7 +276,8 @@ again:
 		 */
 		term = idxterm_create(idx, val, len, offset);
 		if (term == NULL) {
-			nxs_decl_err(idx->nxs, "idxterm_create failed", NULL);
+			nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
+			    "idxterm_create failed", NULL);
 			goto err;
 		}
 		id = ++idx->terms_last_id;
@@ -333,7 +344,8 @@ idx_terms_sync(nxs_index_t *idx)
 	 */
 	hdr = idx_db_map(idxmap, sizeof(idxterms_hdr_t) + seen_data_len, false);
 	if (hdr == NULL) {
-		nxs_decl_err(idx->nxs, "terms mapping failed", NULL);
+		nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
+		    "terms mapping failed", NULL);
 		return -1;
 	}
 	target_len = seen_data_len - idx->terms_consumed;
@@ -353,7 +365,8 @@ idx_terms_sync(nxs_index_t *idx)
 		uint16_t len;
 
 		if (mmrw_fetch16(&mm, &len) == -1 || len == 0) {
-			nxs_decl_errx(idx->nxs, "corrupted terms index", NULL);
+			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+			    "corrupted terms index", NULL);
 			goto err;
 		}
 
@@ -364,18 +377,21 @@ idx_terms_sync(nxs_index_t *idx)
 		 */
 		val = (const char *)mm.curptr;
 		if (mmrw_advance(&mm, len + 1 + IDXTERMS_PAD_LEN(len)) == -1) {
-			nxs_decl_errx(idx->nxs, "corrupted terms index", NULL);
+			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+			    "corrupted terms index", NULL);
 			goto err;
 		}
 		offset = (uintptr_t)mm.curptr - (uintptr_t)hdr;
 
 		if (mmrw_fetch64(&mm, &count) == -1) {
-			nxs_decl_errx(idx->nxs, "corrupted terms index", NULL);
+			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+			    "corrupted terms index", NULL);
 			goto err;
 		}
 		term = idxterm_create(idx, val, len, offset);
 		if (term == NULL) {
-			nxs_decl_err(idx->nxs, "idxterm_create failed", NULL);
+			nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
+			    "idxterm_create failed", NULL);
 			goto err;
 		}
 		id = ++idx->terms_last_id;

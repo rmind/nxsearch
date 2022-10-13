@@ -138,7 +138,8 @@ nxs_params_serialize(nxs_t *nxs, const nxs_params_t *params, const char *path)
 
 	if (!yyjson_mut_write_file(path, params->doc,
 	    YYJSON_WRITE_PRETTY, NULL, &err)) {
-		nxs_decl_errx(nxs, "params serialize failed: %s", err.msg);
+		nxs_decl_errx(nxs, NXS_ERR_SYSTEM,
+		    "params serialize failed: %s", err.msg);
 		return -1;
 	}
 	return 0;
@@ -150,8 +151,8 @@ nxs_params_load(nxs_t *nxs, yyjson_doc *doc, yyjson_read_err *err)
 	nxs_params_t *params;
 
 	if (!doc) {
-		nxs_decl_errx(nxs, "params parsing failed: %s at %u",
-		    err->msg, err->pos);
+		nxs_decl_errx(nxs, NXS_ERR_SYSTEM,
+		    "params parsing failed: %s at %u", err->msg, err->pos);
 		return NULL;
 	}
 	if ((params = calloc(1, sizeof(nxs_params_t))) == NULL) {

@@ -14,6 +14,11 @@ index:add(1, "The quick brown fox jumped over the lazy dog")
 index:add(2, "Once upon a time there were three little foxes")
 index:add(3, "Test")
 
+local doc_id, err = index:add(3, "Test")
+assert(doc_id == nil)
+assert(err.code == nxs.ERR_EXISTS)
+assert(err.msg == "document 3 is already indexed")
+
 index:remove(3)
 
 local resp, err = index:search("fox")

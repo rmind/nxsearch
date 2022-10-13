@@ -65,12 +65,18 @@ idx_dtmap_init(idxmap_t *idxmap)
 }
 
 static int
-idx_dtmap_verify(const idxmap_t *idxmap)
+idx_dtmap_verify(nxs_index_t *idx, const idxmap_t *idxmap)
 {
 	const idxdt_hdr_t *hdr = idxmap->baseptr;
 
-	if (memcmp(hdr->mark, NXS_D_MARK, sizeof(hdr->mark)) != 0 ||
-	    hdr->ver != NXS_ABI_VER) {
+	if (memcmp(hdr->mark, NXS_D_MARK, sizeof(hdr->mark)) != 0) {
+		nxs_decl_err(idx->nxs, NXS_ERR_FATAL,
+		    "corrupted dtmap index header", NULL);
+		return -1;
+	}
+	if (hdr->ver != NXS_ABI_VER) {
+		nxs_decl_err(idx->nxs, NXS_ERR_FATAL,
+		    "incompatible nxsearch index version", NULL);
 		return -1;
 	}
 	return 0;
@@ -89,7 +95,8 @@ idx_dtmap_open(nxs_index_t *idx, const char *path)
 	 * => Returns the descriptor with the lock held.
 	 */
 	if ((fd = idx_db_open(&idx->dt_memmap, path, &created)) == -1) {
-		nxs_decl_err(idx->nxs, "could not open dtmap index", NULL);
+		nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
+		    "could not open dtmap index", NULL);
 		return -1;
 	}
 
@@ -98,14 +105,14 @@ idx_dtmap_open(nxs_index_t *idx, const char *path)
 	 */
 	baseptr = idx_db_map(&idx->dt_memmap, IDX_SIZE_STEP, false);
 	if (baseptr == NULL) {
-		nxs_decl_err(idx->nxs, "tmap mapping failed", NULL);
+		nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
+		    "dtmap mapping failed", NULL);
 		goto err;
 	}
 	if (created && idx_dtmap_init(&idx->dt_memmap) == -1) {
 		goto err;
 	}
-	if (!created && idx_dtmap_verify(&idx->dt_memmap) == -1) {
-		nxs_decl_err(idx->nxs, "corrupted dtmap index header", NULL);
+	if (!created && idx_dtmap_verify(idx, &idx->dt_memmap) == -1) {
 		goto err;
 	}
 
@@ -202,7 +209,7 @@ again:
 	}
 	if (idxdoc_lookup(idx, doc_id)) {
 		flock(idxmap->fd, LOCK_UN);
-		nxs_decl_errx(idx->nxs,
+		nxs_decl_errx(idx->nxs, NXS_ERR_EXISTS,
 		    "document %"PRIu64" is already indexed", doc_id);
 		return -1;
 	}
@@ -213,7 +220,8 @@ again:
 	append_len = IDXDT_META_LEN(tokens->count);
 	target_len = sizeof(idxdt_hdr_t) + data_len + append_len;
 	if ((hdr = idx_db_map(idxmap, target_len, true)) == NULL) {
-		nxs_decl_err(idx->nxs, "dtmap mapping failed", NULL);
+		nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
+		    "dtmap mapping failed", NULL);
 		goto err;
 	}
 
@@ -225,7 +233,8 @@ again:
 	 */
 	offset = (uintptr_t)mm.curptr - (uintptr_t)hdr;
 	if ((doc = idxdoc_create(idx, doc_id, offset)) == NULL) {
-		nxs_decl_err(idx->nxs, "idxdoc_create failed", NULL);
+		nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
+		    "idxdoc_create failed", NULL);
 		goto err;
 	}
 	ASSERT(ALIGNED_POINTER(offset, nxs_doc_id_t));
@@ -236,7 +245,8 @@ again:
 	if (mmrw_store64(&mm, doc_id) == -1 ||
 	    mmrw_store32(&mm, tokens->seen) == -1 ||
 	    mmrw_store32(&mm, tokens->count) == -1) {
-		nxs_decl_errx(idx->nxs, "dtmap I/O error", NULL);
+		nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+		    "dtmap I/O error", NULL);
 		goto err;
 	}
 
@@ -253,11 +263,13 @@ again:
 
 		if (mmrw_store32(&mm, idxterm->id) == -1 ||
 		    mmrw_store32(&mm, token->count) == -1) {
-			nxs_decl_errx(idx->nxs, "dtmap I/O error", NULL);
+			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+			    "dtmap I/O error", NULL);
 			goto err;
 		}
 		if (idxterm_add_doc(idxterm, doc_id) == -1) {
-			nxs_decl_err(idx->nxs, "idxterm_add_doc failed", NULL);
+			nxs_decl_err(idx->nxs, NXS_ERR_FATAL,
+			    "idxterm_add_doc failed", NULL);
 			goto err;
 		}
 		idxterm_incr_total(idx, idxterm, token->count);
@@ -364,7 +376,8 @@ idx_dtmap_sync(nxs_index_t *idx)
 	 */
 	hdr = idx_db_map(idxmap, sizeof(idxdt_hdr_t) + seen_data_len, false);
 	if (hdr == NULL) {
-		nxs_decl_err(idx->nxs, "dtmap mapping failed", NULL);
+		nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
+		    "dtmap mapping failed", NULL);
 		return -1;
 	}
 	target_len = seen_data_len - idx->dt_consumed;
@@ -386,7 +399,8 @@ idx_dtmap_sync(nxs_index_t *idx)
 		if (mmrw_fetch64(&mm, &doc_id) == -1 ||
 		    mmrw_fetch32(&mm, &doc_total_len) == -1 ||
 		    mmrw_fetch32(&mm, &n) == -1) {
-			nxs_decl_errx(idx->nxs, "corrupted dtmap index", NULL);
+			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+			    "corrupted dtmap index", NULL);
 			goto err;
 		}
 
@@ -405,7 +419,7 @@ idx_dtmap_sync(nxs_index_t *idx)
 		}
 
 		if (!idxdoc_create(idx, doc_id, offset)) {
-			nxs_decl_err(idx->nxs,
+			nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
 			    "idxdoc_create failed", NULL);
 			goto err;
 		}
@@ -421,12 +435,14 @@ idx_dtmap_sync(nxs_index_t *idx)
 			if (mmrw_fetch32(&mm, &id) == -1 ||
 			    mmrw_fetch32(&mm, &count) == -1) {
 				nxs_decl_errx(idx->nxs,
+				    NXS_ERR_FATAL,
 				    "corrupted dtmap index", NULL);
 				goto err;  // XXX: revert additions
 			}
 			if ((term = idxterm_lookup_by_id(idx, id)) == NULL ||
 			    idxterm_add_doc(term, doc_id) == -1) {
 				nxs_decl_err(idx->nxs,
+				    NXS_ERR_FATAL,
 				    "idxterm_add_doc failed", NULL);
 				goto err;  // XXX: revert additions
 			}
@@ -465,7 +481,8 @@ idx_dtmap_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
 	}
 
 	if ((doc = idxdoc_lookup(idx, doc_id)) == NULL) {
-		nxs_decl_err(idx->nxs, "document %"PRIu64 "not found", doc_id);
+		nxs_decl_err(idx->nxs, NXS_ERR_MISSING,
+		    "document %"PRIu64 "not found", doc_id);
 		goto out;
 	}
 
@@ -476,7 +493,8 @@ idx_dtmap_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
 	data_len = be64toh(atomic_load_acquire(&hdr->data_len));
 	target_len = sizeof(idxdt_hdr_t) + data_len + append_len;
 	if ((hdr = idx_db_map(idxmap, target_len, true)) == NULL) {
-		nxs_decl_err(idx->nxs, "dtmap mapping failed", NULL);
+		nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
+		    "dtmap mapping failed", NULL);
 		goto out;
 	}
 

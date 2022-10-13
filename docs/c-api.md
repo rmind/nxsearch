@@ -17,9 +17,26 @@ represented by the `nxs_t *` reference.
   * Close the library instance. This will also close any opened indexes,
   making the existing references no longer valid.
 
-* `const char *nxs_get_error(const nxs_t *nxs)`
+* `nxs_err_t nxs_get_error(const nxs_t *nxs, const char **error_msg)`
   * Get the last recorded error. This is used to retrieve the error code
-  with the associated message for the last failed operation.
+  with the associated message for the last failed operation.  See the section
+  on [errors](#errors) below for more details.
+
+# Errors
+
+The error code is represented by the `nxs_err_t` enumeration.  The list
+of symbolic error names defined:
+
+* `NXS_ERR_SUCCESS`: indicate the success of last operation i.e. no error.
+The value is this error code can be assumed to be zero.
+* `NXS_ERR_FATAL`: unspecified fatal error; generally not expected to occur,
+unless index files get corrupted, there is an unusual system-level error
+condition or a flaw in the application.
+* `NXS_ERR_SYSTEM`: system-level error, e.g. access denial or out-of-memory.
+* `NXS_ERR_INVALID`: invalid parameter or value, e.g. invalid ranking algorithm.
+* `NXS_ERR_EXISTS`: resource already exists, e.g. document ID already exists.
+* `NXS_ERR_MISSING`: resource is missing, e.g. index was not created.
+* `NXS_ERR_LIMIT`: resource limit reached, e.g. term is too large.
 
 ## Parameters
 
@@ -86,10 +103,16 @@ The `nxs_index_t *` is an active reference to an index.
 The `nxs_resp_t *` is a reference to a response containing the results.
 It is the user's responsibility to release them after use.
 
-* `nxs_resp_t *nxs_index_search(nxs_index_t *idx, const char *query, size_t len)`
+* `nxs_resp_t *nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
+  const char *query, size_t len)`
   * Search the index using the `query` string (with its length in `len`).
-  Returns `NULL` on failure or the response object on success.  The response
-  object must be released using `nxs_resp_release()`.
+  Custom search parameters may be specified in `params` or it may be set
+  to `NULL` for defaults.  Returns `NULL` on failure or the response object
+  on success.  The response object must be released using `nxs_resp_release()`.
+  Currently, the following
+  parameters are supported:
+    * `algo`: override ranking algorithm (see `nxs_index_create()` description).
+    * `limit`: the cap for the results (default: 1000).
 
 * `char *nxs_resp_tojson(nxs_resp_t *resp, size_t *len)`
   * Return the response as a JSON string representation.  If the `len` is not

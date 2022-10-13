@@ -230,7 +230,7 @@ test_index_search(const test_score_case_t *test_case)
 
 	for (ranking_algo_t algo = TF_IDF; algo <= BM25; algo++) {
 		idx->algo = algo;
-		resp = nxs_index_search(idx, q, strlen(q));
+		resp = nxs_index_search(idx, NULL, q, strlen(q));
 		assert(resp);
 
 		for (i = 0; ; i++) {

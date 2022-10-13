@@ -27,6 +27,24 @@ static int	luaclose_nxsearch(lua_State *L);
 ///////////////////////////////////////////////////////////////////////////////
 
 static int
+lua_nxs_push_error(lua_State *L)
+{
+	const char *msg;
+	nxs_err_t code;
+
+	code = nxs_get_error(nxs, &msg);
+
+	lua_createtable(L, 0, 2);
+	lua_pushinteger(L, code);
+	lua_setfield(L, -2, "code");
+	lua_pushstring(L, msg);
+	lua_setfield(L, -2, "msg");
+	return 1;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+static int
 lua_nxs_params_create(lua_State *L)
 {
 	nxs_params_t **p, *params;
@@ -66,7 +84,7 @@ lua_nxs_params_fromjson(lua_State *L)
 	params = nxs_params_fromjson(nxs, json, json_len);
 	if (params == NULL) {
 		lua_pushnil(L);
-		lua_pushstring(L, nxs_get_error(nxs));
+		lua_nxs_push_error(L);
 		return 2;
 	}
 	pp = (nxs_params_t **)ud;
@@ -128,7 +146,7 @@ lua_nxs_index_open(lua_State *L)
 
 	if ((idx = nxs_index_open(nxs, name)) == NULL) {
 		lua_pushnil(L);
-		lua_pushstring(L, nxs_get_error(nxs));
+		lua_nxs_push_error(L);
 		return 2;
 	}
 	if ((ret = lua_nxs_index_newctx(L, idx)) == -1) {
@@ -151,11 +169,11 @@ lua_nxs_index_create(lua_State *L)
 
 	name = lua_tostring(L, 1);
 	luaL_argcheck(L, name, 1, "non-empty `string' expected");
-	params = lua_isnil(L, 2) ? NULL : lua_nxs_params_getctx(L, 2);
+	params = lua_isnoneornil(L, 2) ? NULL : lua_nxs_params_getctx(L, 2);
 
 	if ((idx = nxs_index_create(nxs, name, params)) == NULL) {
 		lua_pushnil(L);
-		lua_pushstring(L, nxs_get_error(nxs));
+		lua_nxs_push_error(L);
 		return 2;
 	}
 	if ((ret = lua_nxs_index_newctx(L, idx)) == -1) {
@@ -176,7 +194,7 @@ lua_nxs_index_destroy(lua_State *L)
 
 	if (nxs_index_destroy(nxs, name) == -1) {
 		lua_pushboolean(L, false);
-		lua_pushstring(L, nxs_get_error(nxs));
+		lua_nxs_push_error(L);
 		return 2;
 	}
 	lua_pushboolean(L, true);
@@ -201,7 +219,7 @@ lua_nxs_index_add(lua_State *L)
 
 	if (nxs_index_add(idx, doc_id, text, len) == -1) {
 		lua_pushnil(L);
-		lua_pushstring(L, nxs_get_error(nxs));
+		lua_nxs_push_error(L);
 		return 2;
 	}
 	lua_pushinteger(L, doc_id);
@@ -220,7 +238,7 @@ lua_nxs_index_remove(lua_State *L)
 
 	if (nxs_index_remove(idx, doc_id) == -1) {
 		lua_pushnil(L);
-		lua_pushstring(L, nxs_get_error(nxs));
+		lua_nxs_push_error(L);
 		return 2;
 	}
 	lua_pushinteger(L, doc_id);
@@ -295,6 +313,7 @@ static int
 lua_nxs_index_search(lua_State *L)
 {
 	nxs_index_t *idx = lua_nxs_index_getctx(L);
+	nxs_params_t *params;
 	nxs_resp_t *resp;
 	const char *text;
 	size_t len;
@@ -302,11 +321,12 @@ lua_nxs_index_search(lua_State *L)
 
 	text = lua_tolstring(L, 2, &len);
 	luaL_argcheck(L, text && len, 2, "non-empty `string' expected");
+	params = lua_isnoneornil(L, 3) ? NULL : lua_nxs_params_getctx(L, 3);
 
-	resp = nxs_index_search(idx, text, len);
+	resp = nxs_index_search(idx, params, text, len);
 	if (resp == NULL) {
 		lua_pushnil(L);
-		lua_pushstring(L, nxs_get_error(nxs));
+		lua_nxs_push_error(L);
 		return 2;
 	}
 	if ((ret = lua_nxs_resp_acquire(L, resp)) == -1) {
@@ -317,6 +337,27 @@ lua_nxs_index_search(lua_State *L)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+static void
+lua_nxs_setup_constants(lua_State *L)
+{
+	static const struct {
+		const char *	name;
+		int		value;
+	} nxs_errors[] = {
+		{ "ERR_SUCCEED",	NXS_ERR_SUCCESS	},
+		{ "ERR_FATAL",		NXS_ERR_FATAL	},
+		{ "ERR_SYSTEM",		NXS_ERR_SYSTEM	},
+		{ "ERR_INVALID",	NXS_ERR_INVALID	},
+		{ "ERR_EXISTS",		NXS_ERR_EXISTS	},
+		{ "ERR_MISSING",	NXS_ERR_MISSING	},
+		{ "ERR_LIMIT",		NXS_ERR_LIMIT	},
+	};
+	for (unsigned i = 0; i < __arraycount(nxs_errors); i++) {
+		lua_pushinteger(L, nxs_errors[i].value);
+		lua_setfield(L, -2, nxs_errors[i].name);
+	}
+}
 
 static void
 lua_push_class(lua_State *L, const char *name, const struct luaL_Reg *methods)
@@ -400,6 +441,7 @@ luaopen_nxsearch(lua_State *L)
 #else
 	luaL_register(L, "nxsearch", nxs_lib_methods);
 #endif
+	lua_nxs_setup_constants(L);
 	return 1;
 }
 

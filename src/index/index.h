@@ -25,6 +25,7 @@ typedef uint32_t nxs_term_id_t;
 typedef enum {
 	TF_IDF		= 0,
 	BM25		= 1,
+	INVALID_ALGO	= -1,
 } ranking_algo_t;
 
 typedef struct idxterm {
