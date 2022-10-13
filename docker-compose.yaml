@@ -16,6 +16,8 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - ./data:/nxsearch/data
+      # DEV-only:
+      #- ./svc-src/nxsearch_svc.lua:/usr/local/openresty/lualib/nxsearch_svc.lua
 
   lib:
     build:

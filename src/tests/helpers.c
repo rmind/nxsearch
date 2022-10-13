@@ -216,7 +216,7 @@ test_index_search(const test_score_case_t *test_case)
 	nxs = nxs_open(basedir);
 	assert(nxs);
 
-	idx = nxs_index_create(nxs, "test-idx", NULL);
+	idx = nxs_index_create(nxs, "__test-idx-1", NULL);
 	assert(idx);
 
 	for (i = 0; i < test_case->doc_count; i++) {

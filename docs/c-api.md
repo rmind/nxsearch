@@ -22,7 +22,7 @@ represented by the `nxs_t *` reference.
   with the associated message for the last failed operation.  See the section
   on [errors](#errors) below for more details.
 
-# Errors
+### Errors
 
 The error code is represented by the `nxs_err_t` enumeration.  The list
 of symbolic error names defined:

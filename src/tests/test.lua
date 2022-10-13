@@ -4,9 +4,9 @@ local cjson = require "cjson"
 local params = nxs.newparams()
 assert(params)
 
-local index, err = nxs.create("test-index", params)
+local index, err = nxs.create("__test-index-lua-1", params)
 if not index then
-  index, err = nxs.open("test-index")
+  index, err = nxs.open("__test-index-lua-1")
   assert(index)
 end
 
@@ -53,7 +53,7 @@ assert(#results_table == 2)
 assert(round_score(results_table[1]) == SCORE_DOC_1)
 assert(round_score(results_table[2]) == SCORE_DOC_2)
 
-local ok, err = nxs.destroy("test-index")
+local ok, err = nxs.destroy("__test-index-lua-1")
 assert(ok)
 
 print("OK")

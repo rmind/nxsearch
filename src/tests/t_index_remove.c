@@ -52,7 +52,7 @@ run_removal_test(void)
 	nxs = nxs_open(basedir);
 	assert(nxs);
 
-	idx = nxs_index_create(nxs, "test-idx", NULL);
+	idx = nxs_index_create(nxs, "__test-idx-1", NULL);
 	assert(idx);
 
 	/*
@@ -68,7 +68,7 @@ run_removal_test(void)
 	 */
 	alt_nxs = nxs_open(basedir);
 	assert(alt_nxs);
-	alt_idx = nxs_index_open(alt_nxs, "test-idx");
+	alt_idx = nxs_index_open(alt_nxs, "__test-idx-1");
 	assert(alt_idx);
 	ASSERT(idxdoc_lookup(alt_idx, 2));
 
@@ -93,7 +93,7 @@ run_removal_test(void)
 	/*
 	 * Verify using the fresh descriptor.
 	 */
-	idx = nxs_index_open(nxs, "test-idx");
+	idx = nxs_index_open(nxs, "__test-idx-1");
 	assert(idx);
 
 	assert(idx_terms_sync(idx) == 0 && idx_dtmap_sync(idx) == 0);

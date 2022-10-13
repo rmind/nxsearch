@@ -548,7 +548,8 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 	if (params) {
 		const char *algo_name;
 
-		if (nxs_params_get_uint(params, "limit", &limit) == -1) {
+		if (nxs_params_get_uint(params, "limit", &limit) == 0 &&
+		    (limit == 0 || limit > UINT_MAX)) {
 			nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
 			    "invalid limit", NULL);
 			return NULL;

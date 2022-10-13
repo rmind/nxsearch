@@ -1,2 +1,11 @@
 *.o
 *.lo
+*.a
+*.so
+
+**/CRoaring/build
+**/CRoaring/benchmarks
+
+**/yyjson/build
+**/yyjson/doc
+**/yyjson/test

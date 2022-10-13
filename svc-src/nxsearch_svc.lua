@@ -36,6 +36,8 @@ end
 
 local function get_nxs_index(name)
   local index = nxs_index_map:get(name)
+  local err
+
   if not index then
     index, err = nxs.open(name)
     if not index then
@@ -96,7 +98,15 @@ end)
 
 routes:post("@/:string/search", function(self, name)
   local index = get_nxs_index(name)
-  local resp, err = index:search(get_http_body(true))
+  local query_string = ngx.req.get_uri_args()
+  local params = nil
+
+  if next(query_string) ~= nil then
+    local qstr_json = cjson.encode(query_string)
+    params = nxs.newparams():fromjson(qstr_json)
+  end
+
+  local resp, err = index:search(get_http_body(true), params)
   if not resp then
     return set_http_error(err)
   end
