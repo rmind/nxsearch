@@ -485,6 +485,11 @@ nxs_index_add(nxs_index_t *idx, nxs_doc_id_t doc_id,
 		    "tokenizer failed", NULL);
 		return -1;
 	}
+	if (tokens->count == 0) {
+		nxs_decl_errx(idx->nxs, NXS_ERR_MISSING,
+		    "the text is empty or no meaningful tokens found", NULL);
+		goto out;
+	}
 	tokenset_resolve(tokens, idx, true);
 
 	/*
@@ -585,8 +590,13 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 		free(text);
 		return NULL;
 	}
-	tokenset_resolve(tokens, idx, false);
 	free(text);
+	if (tokens->count == 0) {
+		nxs_decl_errx(idx->nxs, NXS_ERR_MISSING,
+		    "the query is empty or has no meaningful tokens", NULL);
+		goto out;
+	}
+	tokenset_resolve(tokens, idx, false);
 
 	/*
 	 * Lookup the documents given the terms.

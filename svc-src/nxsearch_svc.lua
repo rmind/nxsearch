@@ -6,12 +6,14 @@
 --
 
 local nxs = require "nxsearch"
+local routes = require "resty.route".new()
 local lrucache = require "resty.lrucache"
 local cjson = require "cjson"
-local routes = require "resty.route".new()
 
 local nxs_index_ttl = 86400
 local nxs_index_map = lrucache.new(32)
+
+local PARAMS_NUMFIELDS = {"limit"}
 
 -------------------------------------------------------------------------
 
@@ -46,6 +48,27 @@ local function get_nxs_index(name)
     nxs_index_map:set(name, index, nxs_index_ttl)
   end
   return index
+end
+
+local function query_string_to_params(args)
+  local i
+
+  -- If empty table, then return nil.
+  if next(args) == nil then
+    return nil
+  end
+
+  -- Adjust the type of the numeric fields.
+  for i = 1, #PARAMS_NUMFIELDS do
+    local field = PARAMS_NUMFIELDS[i]
+    local value = args[field]
+    if value ~= nil then
+      args[field] = tonumber(value)
+    end
+  end
+
+  local qstr_json = cjson.encode(args)
+  return nxs.newparams():fromjson(qstr_json)
 end
 
 -------------------------------------------------------------------------
@@ -99,12 +122,7 @@ end)
 routes:post("@/:string/search", function(self, name)
   local index = get_nxs_index(name)
   local query_string = ngx.req.get_uri_args()
-  local params = nil
-
-  if next(query_string) ~= nil then
-    local qstr_json = cjson.encode(query_string)
-    params = nxs.newparams():fromjson(qstr_json)
-  end
+  local params = query_string_to_params(query_string)
 
   local resp, err = index:search(get_http_body(true), params)
   if not resp then
