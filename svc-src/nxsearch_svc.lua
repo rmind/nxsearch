@@ -6,6 +6,7 @@
 --
 
 local nxs = require "nxsearch"
+local nxs_fs = require "nxsearch_storage"
 local routes = require "resty.route".new()
 local lrucache = require "resty.lrucache"
 local cjson = require "cjson"
@@ -71,6 +72,24 @@ local function query_string_to_params(args)
   return nxs.newparams():fromjson(qstr_json)
 end
 
+local function fetch_resp_to_json(index_name, repr)
+  local results = {}
+  local doc_id, score
+
+  for doc_id, score in pairs(repr) do
+    table.insert(results, {
+      ["doc_id"] = doc_id,
+      ["score"] = score,
+      ["content"] = nxs_fs.fetch_file(index_name, doc_id),
+    })
+  end
+
+  return cjson.encode({
+    ["results"] = results,
+    ["count"] = #results
+  })
+end
+
 -------------------------------------------------------------------------
 
 routes:post("@/:string", function(self, name)
@@ -103,10 +122,23 @@ end)
 
 routes:post("@/:string/add/:number", function(self, name, doc_id)
   local index = get_nxs_index(name)
-  local id, err = index:add(doc_id, get_http_body(true))
+  local query_string = ngx.req.get_uri_args()
+  local params = query_string_to_params(query_string)
+  local payload = get_http_body(true)
+
+  if query_string["store"] then
+    doc_id = tonumber(doc_id)
+    local ok, err = nxs_fs.store_file(name, doc_id, payload)
+    if not ok then
+      return set_http_error(err)
+    end
+  end
+
+  local id, err = index:add(doc_id, payload)
   if not id then
     return set_http_error(err)
   end
+
   return ngx.exit(ngx.HTTP_CREATED)
 end)
 
@@ -129,7 +161,12 @@ routes:post("@/:string/search", function(self, name)
     return set_http_error(err)
   end
 
-  ngx.say(resp:tojson())
+  if query_string["fetch"] then
+    ngx.say(fetch_resp_to_json(name, resp:repr()))
+  else
+    ngx.say(resp:tojson())
+  end
+
   return ngx.exit(ngx.HTTP_OK)
 end)
 

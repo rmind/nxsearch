@@ -18,6 +18,7 @@ services:
       - ./data:/nxsearch/data
       # DEV-only:
       #- ./svc-src/nxsearch_svc.lua:/usr/local/openresty/lualib/nxsearch_svc.lua
+      #- ./svc-src/nxsearch_storage.lua:/usr/local/openresty/lualib/nxsearch_storage.lua
 
   lib:
     build:

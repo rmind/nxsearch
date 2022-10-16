@@ -10,7 +10,9 @@ RUN apt-get install -y libicu67 libstemmer0d
 # Install dependencies.
 #
 RUN apt-get install -y luarocks
-RUN luarocks install resty-route
+RUN luarocks install resty-route 0.1-2
+RUN luarocks install luafilesystem 1.8.0-1
+RUN luarocks install lua-path 0.3.1-2
 
 #
 # Install Nginx/Openresty configuration.
@@ -43,6 +45,7 @@ RUN ./fetch_ext_data.sh "$NXS_BASEDIR"
 WORKDIR /app
 COPY --from=nxsearch /build/nxsearch.so /usr/local/openresty/lualib/
 COPY ./svc-src/nxsearch_svc.lua /usr/local/openresty/lualib/
+COPY ./svc-src/nxsearch_storage.lua /usr/local/openresty/lualib/
 
 #
 # Run the service.
