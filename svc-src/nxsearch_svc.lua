@@ -113,10 +113,16 @@ routes:post("@/:string", function(self, name)
 end)
 
 routes:delete("@/:string", function(self, name)
+  -- Destroy the reference first.
+  nxs_index_map:delete(name)
+  collectgarbage() -- ensure index gets closed
+  nxs_fs.destroy_index(name)
+
   local ok, err = nxs.destroy(name)
   if not ok then
     return set_http_error(err)
   end
+
   return ngx.exit(ngx.HTTP_OK)
 end)
 

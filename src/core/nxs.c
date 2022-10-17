@@ -286,6 +286,12 @@ nxs_index_destroy(nxs_t *nxs, const char *name)
 	int ec = 0, ret = -1;
 	char *paths[n];
 
+	if (str_isalnumdu(name) == -1) {
+		nxs_decl_errx(nxs, NXS_ERR_INVALID,
+		    "invalid characters in index name", NULL);
+		return -1;
+	}
+
 	/* Initialize all paths. */
 	for (unsigned i = 0; i < n; i++) {
 		ec += asprintf(&paths[i], "%s/data/%s/%s",

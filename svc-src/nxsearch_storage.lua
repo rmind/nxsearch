@@ -17,9 +17,14 @@ local function get_dirlevels(doc_id)
   return string.format("%x/%02x", l1, l2)
 end
 
+local function get_idxdoc_dirpath(index_name)
+  return string.format("%s/data/%s/docs",
+    lua_path.fullpath(NXS_BASEDIR), index_name)
+end
+
 local function get_doc_dirpath(index_name, doc_id)
-  return string.format("%s/data/%s/docs/%s",
-    lua_path.fullpath(NXS_BASEDIR), index_name, get_dirlevels(doc_id))
+  return string.format("%s/%s",
+    get_idxdoc_dirpath(index_name), get_dirlevels(doc_id))
 end
 
 local function get_doc_path(index_name, doc_id)
@@ -67,6 +72,18 @@ function _M.fetch_file(index_name, doc_id)
   file:close()
 
   return content
+end
+
+function _M.destroy_index(index_name)
+  local path = get_idxdoc_dirpath(index_name) .. "/"
+  if lua_path.isdir(path) then
+    lua_path.each(path, function(p)
+      lua_path.remove(p)
+    end, {
+      param = "f", recurse = true, reverse = true
+    })
+    lua_path.remove(path)
+  end
 end
 
 -------------------------------------------------------------------------
