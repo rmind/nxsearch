@@ -3,7 +3,7 @@ on: [push]
 
 jobs:
   build_and_tests:
-    name: Build and run tests
+    name: Build and run tests lib
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
@@ -12,6 +12,31 @@ jobs:
       - name: Checkout submodules
         run: git submodule update --init --recursive
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: build
         shell: bash
-        run: docker build -f compose/nxsearch.Dockerfile .
+        run: |
+          docker pull rmind/nxsearch-svc:ci || echo "Can't download" \
+          docker build \
+            --tag rmind/nxsearch-svc:ci \
+            --target nxsearch-svc \
+            -f compose/svc.Dockerfile .
+
+      - name: Integration test
+        shell: bash
+        run: |
+          docker run -d --name test-svc -p "127.0.0.1:8000:8000" rmind/nxsearch-svc:ci && \
+          sh ./tools/svc_test.sh \
+          docker rm -f test-svc
+
+      - name: push
+        shell: bash
+        run: docker push rmind/nxsearch-svc:ci
