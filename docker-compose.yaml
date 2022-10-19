@@ -5,9 +5,8 @@ services:
     build:
       context: .
       dockerfile: compose/svc.Dockerfile
+      target: nxsearch-svc
     image: nxsearch-svc
-    depends_on:
-      - lib
     ulimits:
       nofile:
         soft: 65536
@@ -23,7 +22,8 @@ services:
   lib:
     build:
       context: .
-      dockerfile: compose/nxsearch.Dockerfile
+      dockerfile: compose/svc.Dockerfile
+      target: nxsearch
     image: nxsearch
     cap_add:
       - SYS_PTRACE
