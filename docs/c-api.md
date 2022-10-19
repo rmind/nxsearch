@@ -93,7 +93,7 @@ The `nxs_index_t *` is an active reference to an index.
 
 * `nxs_params_t *nxs_index_get_params(nxs_index_t *idx)`
   Get the current parameters of the index. This is an active reference which
-  MUST NOT be released with `nxs_params_release()`.
+  must not be destroyed with `nxs_params_release()`.
 
 ## Add/remove documents
 

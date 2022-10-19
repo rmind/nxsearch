@@ -1,8 +1,8 @@
-FROM debian:11.4 as nxsearch
+#
+# nxsearch library image
+#
 
-#
-# Lib image
-#
+FROM debian:11.5-slim AS nxsearch
 
 #
 # Install dependencies.
@@ -30,15 +30,14 @@ RUN make distclean && make -j $(getconf _NPROCESSORS_ONLN) tests
 RUN make distclean && make -j $(getconf _NPROCESSORS_ONLN) lua-lib
 RUN luajit ./tests/test.lua
 
-
 ##############################################################################
 
 #
-# SVC image
+# nxsearch-svc image
 #
 
 # OpenResty on Debian (11.x -- Bullseye)
-FROM openresty/openresty:bullseye as nxsearch-svc
+FROM openresty/openresty:bullseye AS nxsearch-svc
 
 RUN apt-get update
 RUN apt-get install -y vim less procps net-tools
@@ -67,7 +66,7 @@ RUN chown -R svc:svc /var/run/openresty/ /usr/local/openresty/nginx/
 RUN chown -R root:root /usr/local/openresty/nginx/sbin/
 
 #
-# Data
+# Data directory.
 #
 WORKDIR /nxsearch
 RUN chown svc:svc /nxsearch
