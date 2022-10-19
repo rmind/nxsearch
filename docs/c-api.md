@@ -61,6 +61,11 @@ It is a container for key-value pairs representing some configuration.
   * Set the key to the given integer value.  Returns `0` on success or non-zero
   on error.
 
+* `char *nxs_params_tojson(const nxs_params_t *params, size_t *len)`
+  * Return parameters as a JSON string (or `NULL` on failure).  The length
+  is stored in `len` parameter if it is non-NULL.  The user is responsible
+  for calling `free(3)` on the string after use.
+
 ## Index
 
 The `nxs_index_t *` is an active reference to an index.
@@ -85,6 +90,10 @@ The `nxs_index_t *` is an active reference to an index.
 
 * `int nxs_index_destroy(nxs_t *nxs, const char *name)`
   * Destroy the index, specified by `name`, deleting all of its data.
+
+* `nxs_params_t *nxs_index_get_params(nxs_index_t *idx)`
+  Get the current parameters of the index. This is an active reference which
+  MUST NOT be released with `nxs_params_release()`.
 
 ## Add/remove documents
 

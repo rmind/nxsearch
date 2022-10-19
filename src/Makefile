@@ -100,6 +100,8 @@ OBJS+=		core/filters_builtin.o
 OBJS+=		core/params.o
 OBJS+=		core/results.o
 
+OBJS+=		query/search.o
+
 OBJS+=		index/idxmap.o
 OBJS+=		index/idxterm.o
 OBJS+=		index/idxdoc.o

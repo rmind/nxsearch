@@ -77,8 +77,9 @@ struct nxs_index {
 	filter_pipeline_t *	fp;
 	ranking_algo_t		algo;
 
-	/* Instance backpointer, index name, list entry. */
+	/* Instance backpointer, params, index name, list entry. */
 	nxs_t *			nxs;
+	nxs_params_t *		params;
 	char *			name;
 	TAILQ_ENTRY(nxs_index)	entry;
 };

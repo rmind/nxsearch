@@ -61,6 +61,9 @@
  *	to obtain the list of document IDs where the term is present.  The
  *	relevant counters are provided to the ranking algorithm to produce
  *	the relevance score for each document.
+ *
+ *	The nxs_index_search() API function and query handling is located
+ *	in the src/query/ sub-directory.
  */
 
 #include <sys/stat.h>
@@ -383,6 +386,8 @@ nxs_index_open(nxs_t *nxs, const char *name)
 		nxs_index_close(idx);
 		return NULL;
 	}
+	idx->params = params;
+
 	if ((algo_name = nxs_params_get_str(params, "algo")) == NULL) {
 		nxs_decl_errx(nxs, NXS_ERR_FATAL,
 		    "corrupted index params", NULL);
@@ -396,8 +401,6 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	 * Create the filter pipeline.
 	 */
 	idx->fp = filter_pipeline_create(nxs, params);
-	nxs_params_release(params);
-
 	if (idx->fp == NULL) {
 		nxs_index_close(idx);
 		return NULL;
@@ -441,6 +444,13 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	return idx;
 }
 
+__dso_public nxs_params_t *
+nxs_index_get_params(nxs_index_t *idx)
+{
+	ASSERT(idx->params);
+	return idx->params;
+}
+
 __dso_public void
 nxs_index_close(nxs_index_t *idx)
 {
@@ -453,6 +463,9 @@ nxs_index_close(nxs_index_t *idx)
 	}
 	if (idx->fp) {
 		filter_pipeline_destroy(idx->fp);
+	}
+	if (idx->params) {
+		nxs_params_release(idx->params);
 	}
 	idx_dtmap_close(idx);
 	idx_terms_close(idx);
@@ -528,124 +541,4 @@ nxs_index_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
 		return -1;
 	}
 	return idx_dtmap_remove(idx, doc_id);
-}
-
-/*
- * nxs_index_search: perform  a search query on the given index.
- *
- * => Returns the response object (which must be released by the caller).
- */
-__dso_public nxs_resp_t *
-nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
-    const char *query, size_t len)
-{
-	nxs_resp_t *resp = NULL;
-	ranking_algo_t algo;
-	ranking_func_t rank;
-	tokenset_t *tokens;
-	token_t *token;
-	uint64_t limit;
-	char *text;
-	int err = -1;
-
-	nxs_clear_error(idx->nxs);
-
-	/*
-	 * Check the parameters and set some defaults.
-	 */
-	limit = NXS_DEFAULT_RESULTS_LIMIT;
-	algo = idx->algo;
-
-	if (params) {
-		const char *algo_name;
-
-		if (nxs_params_get_uint(params, "limit", &limit) == 0 &&
-		    (limit == 0 || limit > UINT_MAX)) {
-			nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
-			    "invalid limit", NULL);
-			return NULL;
-		}
-		if ((algo_name = nxs_params_get_str(params, "algo")) != NULL &&
-		    (algo = get_ranking_func_id(algo_name)) == INVALID_ALGO) {
-			nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
-			    "invalid algorithm", NULL);
-			return NULL;
-		}
-	}
-
-	/* Determine the ranking algorithm. */
-	rank = get_ranking_func(algo);
-	ASSERT(rank != NULL);
-
-	/*
-	 * Sync the latest updates to the index.
-	 */
-	if (idx_terms_sync(idx) == -1 || idx_dtmap_sync(idx) == -1) {
-		return NULL;
-	}
-
-	/*
-	 * Tokenize and resolve tokens to terms.
-	 */
-	if ((text = strdup(query)) == NULL) {
-		return NULL;
-	}
-	if ((tokens = tokenize(idx->fp, text, len)) == NULL) {
-		nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
-		    "tokenizer failed", NULL);
-		free(text);
-		return NULL;
-	}
-	free(text);
-	if (tokens->count == 0) {
-		nxs_decl_errx(idx->nxs, NXS_ERR_MISSING,
-		    "the query is empty or has no meaningful tokens", NULL);
-		goto out;
-	}
-	tokenset_resolve(tokens, idx, false);
-
-	/*
-	 * Lookup the documents given the terms.
-	 */
-	if ((resp = nxs_resp_create(limit)) == NULL) {
-		goto out;
-	}
-	TAILQ_FOREACH(token, &tokens->list, entry) {
-		roaring_uint32_iterator_t *bm_iter;
-		idxterm_t *term;
-
-		if ((term = token->idxterm) == NULL) {
-			/* The term is not in the index: just skip. */
-			continue;
-		}
-
-		bm_iter = roaring_create_iterator(term->doc_bitmap);
-		while (bm_iter->has_value) {
-			const nxs_doc_id_t doc_id = bm_iter->current_value;
-			idxdoc_t *doc;
-			float score;
-
-			/*
-			 * Lookup the document and compute its score.
-			 */
-			if ((doc = idxdoc_lookup(idx, doc_id)) == NULL) {
-				goto out;
-			}
-			score = rank(idx, term, doc);
-			if (nxs_resp_addresult(resp, doc, score) == -1) {
-				goto out;
-			}
-			roaring_advance_uint32_iterator(bm_iter);
-		}
-		roaring_free_uint32_iterator(bm_iter);
-	}
-	nxs_resp_build(resp);
-	err = 0;
-out:
-	if (err && resp) {
-		nxs_resp_release(resp);
-		resp = NULL;
-	}
-	tokenset_destroy(tokens);
-	return resp;
 }

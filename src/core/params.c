@@ -180,3 +180,14 @@ nxs_params_fromjson(nxs_t *nxs, const char *json, size_t len)
 	    (char *)(uintptr_t)json, len, 0, NULL, &err);
 	return nxs_params_load(nxs, doc, &err);
 }
+
+/*
+ * nxs_params_tojson: return parameters as a JSON string.
+ *
+ * => Must be released with free(3).
+ */
+__dso_public char *
+nxs_params_tojson(const nxs_params_t *params, size_t *len)
+{
+	return yyjson_mut_write(params->doc, YYJSON_WRITE_PRETTY, len);
+}
