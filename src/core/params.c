@@ -36,7 +36,7 @@ nxs_params_create(void)
 }
 
 __dso_public int
-nxs_params_set_strset(nxs_params_t *params, const char *key,
+nxs_params_set_strlist(nxs_params_t *params, const char *key,
     const char **vals, size_t count)
 {
 	yyjson_mut_val *ckey = yyjson_mut_strcpy(params->doc, key);
@@ -85,11 +85,11 @@ nxs_params_release(nxs_params_t *params)
 //////////////////////////////////////////////////////////////////////////
 
 /*
- * nxs_params_get_strset: get the set of strings; the caller is responsible
+ * nxs_params_get_strlist: get the set of strings; the caller is responsible
  * to call free(3) on the returned list.
  */
 const char **
-nxs_params_get_strset(nxs_params_t *params, const char *key, size_t *count)
+nxs_params_get_strlist(nxs_params_t *params, const char *key, size_t *count)
 {
 	yyjson_mut_val *arr = yyjson_mut_obj_get(params->root, key);
 	size_t i = 0, c, idx, max;

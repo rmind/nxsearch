@@ -72,7 +72,7 @@ get_test_filter_pipeline(nxs_t *nxs)
 	ret = nxs_params_set_str(params, "lang", "en");
 	assert(ret == 0);
 
-	ret = nxs_params_set_strset(params, "filters",
+	ret = nxs_params_set_strlist(params, "filters",
 	    filters, __arraycount(filters));
 	assert(ret == 0);
 

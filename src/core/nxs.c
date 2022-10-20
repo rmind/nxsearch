@@ -125,7 +125,6 @@ nxs_open(const char *basedir)
 	if (nxs->indexes == NULL) {
 		goto err;
 	}
-
 	return nxs;
 err:
 	nxs_close(nxs);
@@ -156,6 +155,19 @@ nxs_clear_error(nxs_t *nxs)
 	free(nxs->errmsg);
 	nxs->errmsg = NULL;
 	nxs->errcode = NXS_ERR_SUCCESS;
+}
+
+void
+nxs_error_checkpoint(nxs_t *nxs)
+{
+	/*
+	 * There are error paths where error declaration is missing.
+	 * In such case, just provide a general fatal error.
+	 */
+	if (!nxs->errcode) {
+		nxs_decl_err(nxs, NXS_ERR_FATAL,
+		    "internal error; last system errno", NULL);
+	}
 }
 
 /*
@@ -245,8 +257,8 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 		}
 		params = def_params;
 	}
-	filters = nxs_params_get_strset(params, "filters", &filter_count);
-	if (filters == NULL && nxs_params_set_strset(params, "filters",
+	filters = nxs_params_get_strlist(params, "filters", &filter_count);
+	if (filters == NULL && nxs_params_set_strlist(params, "filters",
 	    default_filters, __arraycount(default_filters)) == -1) {
 		goto out;
 	}
@@ -273,6 +285,9 @@ nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)
 	}
 	idx = nxs_index_open(nxs, name);
 out:
+	if (!idx) {
+		nxs_error_checkpoint(nxs);
+	}
 	if (def_params) {
 		nxs_params_release(def_params);
 	}
@@ -327,6 +342,9 @@ out:
 	for (unsigned i = 0; i < n; i++) {
 		free(paths[i]);
 	}
+	if (ret != 0) {
+		nxs_error_checkpoint(nxs);
+	}
 	return ret;
 }
 
@@ -375,6 +393,7 @@ nxs_index_open(nxs_t *nxs, const char *name)
 
 	idx = calloc(1, sizeof(nxs_index_t));
 	if (idx == NULL) {
+		nxs_error_checkpoint(nxs);
 		return NULL;
 	}
 	idx->nxs = nxs;
@@ -383,17 +402,14 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	 * Load the index parameters.
 	 */
 	if ((params = index_get_params(nxs, name)) == NULL) {
-		nxs_index_close(idx);
-		return NULL;
+		goto err;
 	}
 	idx->params = params;
 
 	if ((algo_name = nxs_params_get_str(params, "algo")) == NULL) {
 		nxs_decl_errx(nxs, NXS_ERR_FATAL,
 		    "corrupted index params", NULL);
-		nxs_params_release(params);
-		nxs_index_close(idx);
-		return NULL;
+		goto err;
 	}
 	idx->algo = get_ranking_func_id(algo_name);
 
@@ -402,26 +418,23 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	 */
 	idx->fp = filter_pipeline_create(nxs, params);
 	if (idx->fp == NULL) {
-		nxs_index_close(idx);
-		return NULL;
+		goto err;
 	}
 
 	/*
 	 * Open the terms index.
 	 */
 	if (idxterm_sysinit(idx) == -1) {
-		nxs_index_close(idx);
-		return NULL;
+		goto err;
 	}
 	if (asprintf(&path, "%s/data/%s/%s",
 	    nxs->basedir, name, "nxsterms") == -1) {
-		return NULL;
+		goto err;
 	}
 	ret = idx_terms_open(idx, path);
 	free(path);
 	if (ret == -1) {
-		nxs_index_close(idx);
-		return NULL;
+		goto err;
 	}
 
 	/*
@@ -429,19 +442,22 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	 */
 	if (asprintf(&path, "%s/data/%s/%s",
 	    nxs->basedir, name, "nxsdtmap") == -1) {
-		return NULL;
+		goto err;
 	}
 	ret = idx_dtmap_open(idx, path);
 	free(path);
 	if (ret == -1) {
-		nxs_index_close(idx);
-		return NULL;
+		goto err;
 	}
 
 	idx->name = strdup(name);
 	rhashmap_put(nxs->indexes, name, name_len, idx);
 	TAILQ_INSERT_TAIL(&nxs->index_list, idx, entry);
 	return idx;
+err:
+	nxs_error_checkpoint(nxs);
+	nxs_index_close(idx);
+	return NULL;
 }
 
 __dso_public nxs_params_t *
@@ -528,6 +544,9 @@ nxs_index_add(nxs_index_t *idx, nxs_doc_id_t doc_id,
 	ret = 0;
 out:
 	tokenset_destroy(tokens);
+	if (ret != 0) {
+		nxs_error_checkpoint(idx->nxs);
+	}
 	return ret;
 }
 
@@ -537,8 +556,9 @@ out:
 __dso_public int
 nxs_index_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
 {
-	if (idx_dtmap_sync(idx) == -1) {
+	if (idx_dtmap_sync(idx) == -1 || idx_dtmap_remove(idx, doc_id) == -1) {
+		nxs_error_checkpoint(idx->nxs);
 		return -1;
 	}
-	return idx_dtmap_remove(idx, doc_id);
+	return 0;
 }

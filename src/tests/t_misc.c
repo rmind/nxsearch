@@ -40,7 +40,7 @@ run_params_tests(void)
 	ret = nxs_params_set_uint(params, "n", 0xdeadbeef);
 	assert(ret == 0);
 
-	ret = nxs_params_set_strset(params, "filters",
+	ret = nxs_params_set_strlist(params, "filters",
 	    test_filters, __arraycount(test_filters));
 	assert(ret == 0);
 
@@ -61,7 +61,7 @@ run_params_tests(void)
 	ret = nxs_params_get_uint(params, "n", &val);
 	assert(ret == 0 && val == 0xdeadbeef);
 
-	arr = nxs_params_get_strset(params, "filters", &count);
+	arr = nxs_params_get_strlist(params, "filters", &count);
 	assert(arr && count == 3);
 	assert(strcmp(arr[0], "a") == 0);
 	assert(strcmp(arr[1], "b") == 0);

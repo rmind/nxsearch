@@ -43,6 +43,7 @@ struct nxs {
 int	nxs_filter_register(nxs_t *, const char *, const filter_ops_t *);
 
 void	nxs_clear_error(nxs_t *);
+void	nxs_error_checkpoint(nxs_t *);
 
 /*
  * Ranking algorithms.
@@ -63,7 +64,7 @@ ranking_func_t	get_ranking_func(ranking_algo_t);
 
 int		nxs_params_serialize(nxs_t *, const nxs_params_t *, const char *);
 nxs_params_t *	nxs_params_unserialize(nxs_t *, const char *);
-const char **	nxs_params_get_strset(nxs_params_t *, const char *, size_t *);
+const char **	nxs_params_get_strlist(nxs_params_t *, const char *, size_t *);
 const char *	nxs_params_get_str(nxs_params_t *, const char *);
 int		nxs_params_get_uint(nxs_params_t *, const char *, uint64_t *);
 
