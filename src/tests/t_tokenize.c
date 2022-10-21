@@ -121,7 +121,9 @@ get_test_filter_pipeline(nxs_t *nxs, nxs_params_t *params,
 	ret = nxs_params_set_str(params, "lang", "en");
 	assert(ret == 0);
 
-	ret = nxs_params_set_strset(params, "filters", filters, count);
+	ret = nxs_params_set_strlist(params, "filters",
+	    filters, __arraycount(filters));
+
 	assert(ret == 0);
 
 	fp = filter_pipeline_create(nxs, params);
@@ -177,7 +179,7 @@ run_tokenizer_no_filters_test(void)
 	token_t *token;
 	nxs_t *nxs;
 	nxs_params_t *params = nxs_params_create();
-	const char *filters[] = { "normalizer" };
+	const char *filters[] = { };
 	unsigned i;
 	unsigned c;
 

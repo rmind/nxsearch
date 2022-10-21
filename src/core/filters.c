@@ -121,15 +121,18 @@ filter_pipeline_create(nxs_t *nxs, nxs_params_t *params)
 {
 	const char **filters;
 	filter_pipeline_t *fp;
-	size_t count, len;
+	size_t count = 0, len;
 
-	/* Extract the filter list from the parameters. */
-	filters = nxs_params_get_strset(params, "filters", &count);
-	if (filters == NULL) {
-		nxs_decl_errx(nxs, NXS_ERR_FATAL,
-		    "corrupted index params", NULL);
-		return NULL;
-	}
+	/*
+	 * Extract the filter list from the parameters.
+	 *
+	 * Note: support no filters in which case the count will be zero.
+	 * We will allocate all the structures to keep the code simple,
+	 * but is will effectively be a NOP.
+	 */
+	filters = nxs_params_get_strlist(params, "filters", &count);
+	ASSERT(filters || count == 0);
+
 	len = offsetof(filter_pipeline_t, filters[count]);
 	if ((fp = calloc(1, len)) == NULL) {
 		free(filters);

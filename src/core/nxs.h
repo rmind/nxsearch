@@ -55,7 +55,7 @@ typedef struct nxs_params nxs_params_t;
 nxs_params_t *	nxs_params_create(void);
 nxs_params_t *	nxs_params_fromjson(nxs_t *, const char *, size_t);
 
-int		nxs_params_set_strset(nxs_params_t *, const char *,
+int		nxs_params_set_strlist(nxs_params_t *, const char *,
 		    const char **, size_t);
 int		nxs_params_set_str(nxs_params_t *, const char *, const char *);
 int		nxs_params_set_uint(nxs_params_t *, const char *, uint64_t);
