@@ -15,10 +15,19 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <unicode/ustring.h>
+#include <unicode/ubrk.h>
+#include <unicode/utypes.h>
 
+
+#define __NXSLIB_PRIVATE
 #include "tokenizer.h"
 #include "index.h"
 #include "utils.h"
+#include "utf8.h"
+#include "nxs_impl.h"
+
+
 
 /*
  * token_create: create a token by creating a copy of the given token.
@@ -141,6 +150,7 @@ tokenset_resolve(tokenset_t *tset, nxs_index_t *idx, bool stage)
 			tset->staged++;
 			app_dbgx("staging %p [%s]", token, sbuf->value);
 		}
+
 		if (term) {
 			app_dbgx("[%s] => %u", sbuf->value, term->id);
 		}
@@ -150,30 +160,77 @@ tokenset_resolve(tokenset_t *tset, nxs_index_t *idx, bool stage)
 }
 
 /*
- * tokenize: split the text into tokens separated by a whitespace
- * and pass the token through the filter pipeline.
+ * tokenize: Uses ICU segmentation UBRK_WORD
+ * See: https://unicode.org/reports/tr29/
  */
 tokenset_t *
-tokenize(filter_pipeline_t *fp, const char *text, size_t text_len __unused)
+tokenize(filter_pipeline_t *fp, nxs_params_t *params, const char *text, 
+    size_t text_len)
 {
-	const char *sep = ",.;:| \t\n";
-	char *content, *val, *brk;
+	UBreakIterator *it_token = NULL;
+	UChar *utext = NULL;
+	UErrorCode ec = U_ZERO_ERROR;
+	int32_t	end, start, ulen;
 	tokenset_t *tset;
+	strbuf_t buf;
+
+	strbuf_init(&buf);
 
 	if ((tset = tokenset_create()) == NULL) {
 		return NULL;
 	}
-	if ((content = strdup(text)) == NULL) {
+
+	ulen = roundup2((text_len + 1) * 2, 64);
+	if ((utext = malloc(ulen)) == NULL) {
+		goto err;
+	}
+	if (utf8_to_utf16(NULL, text, utext, ulen) == -1) {
 		goto err;
 	}
 
-	for (val = strtok_r(content, sep, &brk); val;
-	    val = strtok_r(NULL, sep, &brk)) {
-		const size_t len = strlen(val);  // XXX
+	/*
+	* TODO: Use word brake rules to customize.
+	* 	see: https://unicode-org.github.io/icu/userguide/boundaryanalysis/break-rules.html
+	*/ 
+	it_token = ubrk_open(UBRK_WORD, nxs_params_get_str(params, "lang"), 
+	utext, -1, &ec);
+	if (__predict_false(U_FAILURE(ec))) {
+		const char *errmsg __unused = u_errorName(ec);
+		app_dbgx("ubrk_open() failed: %s", errmsg);
+		goto err;
+	}
+
+	start = ubrk_first(it_token);
+	for (
+		end = ubrk_next(it_token);
+		end != UBRK_DONE;
+		start = end, end = ubrk_next(it_token)
+	) {
 		filter_action_t action;
 		token_t *token;
 
-		token = token_create(val, len);
+		/*
+		 * NOTE: Skip all boundary chars, spaces are not part of boundaries.
+		 */
+		while (start < end) {
+			if(ubrk_isBoundary(it_token, start+1) || utext[start] == ' ' ) {
+				start += 1;
+				continue;
+			}
+			break;
+		}
+
+		if (start == end){
+			continue;
+		}
+
+		if (utf8_from_utf16_new(NULL, 
+		    utext + start, (end - start), &buf) == -1) {
+			goto err;
+		}
+
+		token = token_create(buf.value, buf.length);
+
 		if (__predict_false(token == NULL)) {
 			goto err;
 		}
@@ -188,10 +245,11 @@ tokenize(filter_pipeline_t *fp, const char *text, size_t text_len __unused)
 		}
 		tokenset_add(tset, token);
 	}
-	free(content);
-	return tset;
 err:
-	tokenset_destroy(tset);
-	free(content);
-	return NULL;
+	if (it_token != NULL){
+		ubrk_close(it_token);
+	}
+	free(utext);
+	strbuf_release(&buf);
+	return tset;
 }
