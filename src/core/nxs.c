@@ -449,7 +449,6 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	if (ret == -1) {
 		goto err;
 	}
-	idx->params = params;
 	idx->name = strdup(name);
 	rhashmap_put(nxs->indexes, name, name_len, idx);
 	TAILQ_INSERT_TAIL(&nxs->index_list, idx, entry);
@@ -488,6 +487,7 @@ nxs_index_close(nxs_index_t *idx)
 	idxterm_sysfini(idx);
 	free(idx);
 }
+
 __dso_public int
 nxs_index_add(nxs_index_t *idx, nxs_doc_id_t doc_id,
     const char *text, size_t len)

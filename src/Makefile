@@ -217,7 +217,7 @@ t_%: $(ALL_OBJS) $(TEST_OBJS)
 	$(CC) $(CFLAGS) $^ tests/$@.c -o $@ $(LDFLAGS)
 
 tests: $(TESTS)
-	@ for T in $(TESTS); do echo ./$$T; ./$$T; done
+	@ set -e && for T in $(TESTS); do echo ./$$T; ./$$T; done
 
 #
 # Debugging

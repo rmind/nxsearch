@@ -150,8 +150,11 @@ utf8_from_utf16(utf8_ctx_t *ctx __unused, const uint16_t *u16,
 	return nbytes;
 }
 
+/*
+ * utf8_from_utf16_new: like utf8_from_utf16() but fills a string buffer.
+ */
 ssize_t
-utf8_from_utf16_new(utf8_ctx_t *ctx __unused, const uint16_t *u16, 
+utf8_from_utf16_new(utf8_ctx_t *ctx __unused, const uint16_t *u16,
     size_t ulen, strbuf_t *buf)
 {
 	UErrorCode ec = U_ZERO_ERROR;
@@ -301,7 +304,7 @@ utf8_normalize(utf8_ctx_t *ctx, strbuf_t *buf)
 	/*
 	 * Convert back from UTF-16 to UTF-8.  Ensure the sufficient
 	 * buffer size and set the new string length.  Note that the
-	 * UTF-8 might produce more bytes than UTF-16 units, therfore
+	 * UTF-8 might produce more bytes than UTF-16 units, therefore
 	 * again give some extra space.
 	 */
 	max_len = (c + 1) * NORM_BUF_MULTI;

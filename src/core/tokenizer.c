@@ -19,15 +19,12 @@
 #include <unicode/ubrk.h>
 #include <unicode/utypes.h>
 
-
 #define __NXSLIB_PRIVATE
 #include "tokenizer.h"
 #include "index.h"
 #include "utils.h"
 #include "utf8.h"
 #include "nxs_impl.h"
-
-
 
 /*
  * token_create: create a token by creating a copy of the given token.
@@ -150,7 +147,6 @@ tokenset_resolve(tokenset_t *tset, nxs_index_t *idx, bool stage)
 			tset->staged++;
 			app_dbgx("staging %p [%s]", token, sbuf->value);
 		}
-
 		if (term) {
 			app_dbgx("[%s] => %u", sbuf->value, term->id);
 		}
@@ -160,17 +156,18 @@ tokenset_resolve(tokenset_t *tset, nxs_index_t *idx, bool stage)
 }
 
 /*
- * tokenize: Uses ICU segmentation UBRK_WORD
+ * tokenize: uses ICU segmentation UBRK_WORD.
+ *
  * See: https://unicode.org/reports/tr29/
  */
 tokenset_t *
-tokenize(filter_pipeline_t *fp, nxs_params_t *params, const char *text, 
-    size_t text_len)
+tokenize(filter_pipeline_t *fp, nxs_params_t *params,
+    const char *text, size_t text_len)
 {
 	UBreakIterator *it_token = NULL;
-	UChar *utext = NULL;
 	UErrorCode ec = U_ZERO_ERROR;
-	int32_t	end, start, ulen;
+	UChar *utext = NULL;
+	int32_t end, start, ulen;
 	tokenset_t *tset;
 	strbuf_t buf;
 
@@ -189,11 +186,12 @@ tokenize(filter_pipeline_t *fp, nxs_params_t *params, const char *text,
 	}
 
 	/*
-	* TODO: Use word brake rules to customize.
-	* 	see: https://unicode-org.github.io/icu/userguide/boundaryanalysis/break-rules.html
-	*/ 
-	it_token = ubrk_open(UBRK_WORD, nxs_params_get_str(params, "lang"), 
-	utext, -1, &ec);
+	 * TODO: Use word brake rules to customize.  See:
+	 *
+	 * https://unicode-org.github.io/icu/userguide/boundaryanalysis/break-rules.html
+	 */
+	it_token = ubrk_open(UBRK_WORD, nxs_params_get_str(params, "lang"),
+	    utext, -1, &ec);
 	if (__predict_false(U_FAILURE(ec))) {
 		const char *errmsg __unused = u_errorName(ec);
 		app_dbgx("ubrk_open() failed: %s", errmsg);
@@ -201,36 +199,35 @@ tokenize(filter_pipeline_t *fp, nxs_params_t *params, const char *text,
 	}
 
 	start = ubrk_first(it_token);
-	for (
-		end = ubrk_next(it_token);
-		end != UBRK_DONE;
-		start = end, end = ubrk_next(it_token)
-	) {
+	for (end = ubrk_next(it_token); end != UBRK_DONE;
+	    start = end, end = ubrk_next(it_token)) {
 		filter_action_t action;
 		token_t *token;
 
 		/*
-		 * NOTE: Skip all boundary chars, spaces are not part of boundaries.
+		 * Note: skip all boundary chars, spaces are not part
+		 * of boundaries.
 		 */
-		while (start < end) {
-			if(ubrk_isBoundary(it_token, start+1) || utext[start] == ' ' ) {
-				start += 1;
-				continue;
+		if (ubrk_getRuleStatus(it_token) != UBRK_WORD_LETTER) {
+			while (start < end) {
+				if (ubrk_isBoundary(it_token, start + 1) ||
+				    utext[start] == ' ') {
+					start += 1;
+					continue;
+				}
+				break;
 			}
-			break;
 		}
-
-		if (start == end){
+		if (start == end) {
 			continue;
 		}
 
-		if (utf8_from_utf16_new(NULL, 
-		    utext + start, (end - start), &buf) == -1) {
+		if (utf8_from_utf16_new(NULL, utext + start,
+		    end - start, &buf) == -1) {
 			goto err;
 		}
 
 		token = token_create(buf.value, buf.length);
-
 		if (__predict_false(token == NULL)) {
 			goto err;
 		}
@@ -246,10 +243,10 @@ tokenize(filter_pipeline_t *fp, nxs_params_t *params, const char *text,
 		tokenset_add(tset, token);
 	}
 err:
-	if (it_token != NULL){
+	if (it_token) {
 		ubrk_close(it_token);
 	}
-	free(utext);
 	strbuf_release(&buf);
+	free(utext);
 	return tset;
 }
