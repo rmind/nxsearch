@@ -18,6 +18,7 @@
 #include <unicode/ustring.h>
 #include <unicode/ubrk.h>
 #include <unicode/utypes.h>
+#include <unicode/uchar.h>
 
 #define __NXSLIB_PRIVATE
 #include "tokenizer.h"
@@ -189,6 +190,7 @@ tokenize(filter_pipeline_t *fp, nxs_params_t *params,
 	 * TODO: Use word brake rules to customize.  See:
 	 *
 	 * https://unicode-org.github.io/icu/userguide/boundaryanalysis/break-rules.html
+	 * https://github.com/unicode-org/icu/blob/main/icu4c/source/data/brkitr/rules/word.txt
 	 */
 	it_token = ubrk_open(UBRK_WORD, nxs_params_get_str(params, "lang"),
 	    utext, -1, &ec);
@@ -201,29 +203,15 @@ tokenize(filter_pipeline_t *fp, nxs_params_t *params,
 	start = ubrk_first(it_token);
 	for (end = ubrk_next(it_token); end != UBRK_DONE;
 	    start = end, end = ubrk_next(it_token)) {
+
 		filter_action_t action;
 		token_t *token;
 
-		/*
-		 * Note: skip all boundary chars, spaces are not part
-		 * of boundaries.
-		 */
-		if (ubrk_getRuleStatus(it_token) != UBRK_WORD_LETTER) {
-			while (start < end) {
-				if (ubrk_isBoundary(it_token, start + 1) ||
-				    utext[start] == ' ') {
-					start += 1;
-					continue;
-				}
-				break;
-			}
-		}
-		if (start == end) {
+		if (ubrk_getRuleStatus(it_token) == UBRK_WORD_NONE) {
 			continue;
 		}
 
-		if (utf8_from_utf16_new(NULL, utext + start,
-		    end - start, &buf) == -1) {
+		if (utf8_from_utf16_new(NULL, utext + start, end - start, &buf) == -1) {
 			goto err;
 		}
 
