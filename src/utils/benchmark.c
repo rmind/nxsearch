@@ -110,7 +110,8 @@ index_file(nxs_t *nxs, nxs_index_t *idx, nxs_doc_id_t doc_id, const char *path)
 
 	text = read_file(path, &len);
 	if (nxs_index_add(idx, doc_id, text, len) == -1) {
-		const char *e = nxs_get_error(nxs);
+		const char *e = NULL;
+		nxs_get_error(nxs, &e);
 		errx(EXIT_FAILURE, "could not index %s: %s", path, e);
 	}
 	free(text);
@@ -154,7 +155,7 @@ main(int argc, char **argv)
 	};
 	nxs_t *nxs;
 	nxs_index_t *idx;
-	const char *index = NULL, *query = NULL, *path = NULL;
+	const char *index = NULL, *query = NULL, *path = NULL, *e = NULL;
 	bool add = false, drop = false;
 	nxs_doc_id_t doc_id = 0;
 	int ch;
@@ -199,7 +200,7 @@ main(int argc, char **argv)
 		benchmark_start();
 		idx = nxs_index_create(nxs, index, NULL);
 		if (idx == NULL) {
-			const char *e = nxs_get_error(nxs);
+			nxs_get_error(nxs, &e);
 			errx(EXIT_FAILURE, "could not create the index: %s", e);
 		}
 		benchmark_end("creating index");
@@ -207,7 +208,7 @@ main(int argc, char **argv)
 		benchmark_start();
 		idx = nxs_index_open(nxs, index);
 		if (idx == NULL) {
-			const char *e = nxs_get_error(nxs);
+			nxs_get_error(nxs, &e);
 			errx(EXIT_FAILURE, "could not open the index: %s", e);
 		}
 		benchmark_end("loading index");
@@ -230,9 +231,9 @@ main(int argc, char **argv)
 		nxs_resp_t *resp;
 
 		benchmark_start();
-		resp = nxs_index_search(idx, query, strlen(query));
+		resp = nxs_index_search(idx, NULL, query, strlen(query));
 		if (resp == NULL) {
-			const char *e = nxs_resp_geterror(resp);
+			nxs_get_error(nxs, &e);
 			errx(EXIT_FAILURE, "search error: %s", e);
 		}
 		benchmark_end("search");
