@@ -18,7 +18,6 @@
 #include <unicode/ustring.h>
 #include <unicode/ubrk.h>
 #include <unicode/utypes.h>
-#include <unicode/uchar.h>
 
 #define __NXSLIB_PRIVATE
 #include "tokenizer.h"
@@ -203,15 +202,17 @@ tokenize(filter_pipeline_t *fp, nxs_params_t *params,
 	start = ubrk_first(it_token);
 	for (end = ubrk_next(it_token); end != UBRK_DONE;
 	    start = end, end = ubrk_next(it_token)) {
-
 		filter_action_t action;
 		token_t *token;
+
+		ASSERT(start < end);
 
 		if (ubrk_getRuleStatus(it_token) == UBRK_WORD_NONE) {
 			continue;
 		}
 
-		if (utf8_from_utf16_new(NULL, utext + start, end - start, &buf) == -1) {
+		if (utf8_from_utf16_new(NULL, utext + start,
+		    end - start, &buf) == -1) {
 			goto err;
 		}
 

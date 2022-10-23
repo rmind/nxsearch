@@ -34,14 +34,13 @@ struct test_case_type test_case_1 = {
 
 // Acronims and emojis.
 struct test_case_type test_case_2 = {
-	"We will play 🥎 with I.B.M.",
-	// { "we", "will", "play", "🥎",  "with", "i.b.m", NULL }
+	"We will play with I.B.M.",
 	{ "we", "will", "play", "with", "i.b.m", NULL }
 };
 
 // Snake case.
 struct test_case_type test_case_3 = {
-	"Hello_I_m_arbitrary_concatenated,    foo and bar",
+	"Hello_I_m_arbitrary_concatenated, foo and bar",
 	{ "hello_i_m_arbitrary_concatenated", "foo", "and", "bar", NULL }
 };
 
@@ -60,8 +59,12 @@ struct test_case_type test_case_5 = {
 	}
 };
 
+struct test_case_type test_case_6 = {
+	"", { NULL }
+};
+
 struct test_case_type test_case_not_passing = {
-	"_underscore_, year-end, join--double Some.Text",
+	"_underscore_, year-end, join--double Some.Text, 🥎",
 	{ "underscore", "year-end", "join--double", "Some", "text", NULL }
 };
 
@@ -72,6 +75,7 @@ struct test_case_type *test_cases[] = {
 	&test_case_3,
 	&test_case_4,
 	&test_case_5,
+	&test_case_6,
 	// TODO: &test_case_not_passing
 };
 
