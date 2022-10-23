@@ -29,7 +29,6 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 	tokenset_t *tokens;
 	token_t *token;
 	uint64_t limit;
-	char *text;
 	int err = -1;
 
 	nxs_clear_error(idx->nxs);
@@ -71,16 +70,11 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 	/*
 	 * Tokenize and resolve tokens to terms.
 	 */
-	if ((text = strdup(query)) == NULL) {
-		return NULL;
-	}
-	if ((tokens = tokenize(idx->fp, idx->params, text, len)) == NULL) {
+	if ((tokens = tokenize(idx->fp, idx->params, query, len)) == NULL) {
 		nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
 		    "tokenizer failed", NULL);
-		free(text);
 		return NULL;
 	}
-	free(text);
 	if (tokens->count == 0) {
 		nxs_decl_errx(idx->nxs, NXS_ERR_MISSING,
 		    "the query is empty or has no meaningful tokens", NULL);
