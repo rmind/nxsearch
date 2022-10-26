@@ -1,5 +1,5 @@
 /*
- * Unit test: dtmap index structures.
+ * Unit tests: dtmap index structures.
  * This code is in the public domain.
  */
 
@@ -54,7 +54,7 @@ prepare_terms(nxs_index_t *idx, tokenset_t *tokens, bool init)
 	ret = idx_terms_add(idx, tokens);
 	assert(ret == 0);
 
-	tokenset_resolve(tokens, idx, true);
+	tokenset_resolve(tokens, idx, TOKENSET_STAGE);
 	assert(TAILQ_EMPTY(&tokens->staging));
 }
 
@@ -101,9 +101,6 @@ run_dtmap_test(void)
 	int ret;
 
 	memset(&idx, 0, sizeof(idx));
-	ret = idxterm_sysinit(&idx);
-	assert(ret == 0);
-
 	ret = idx_dtmap_open(&idx, testdb_path);
 	assert(ret == 0);
 
@@ -169,7 +166,6 @@ run_dtmap_test(void)
 	// Cleanup
 	idx_dtmap_close(&idx);
 	idx_terms_close(&idx);
-	idxterm_sysfini(&idx);
 }
 
 static void
@@ -181,9 +177,6 @@ run_dtmap_term_order_test(void)
 	int ret;
 
 	memset(&idx, 0, sizeof(idx));
-	ret = idxterm_sysinit(&idx);
-	assert(ret == 0);
-
 	ret = idx_dtmap_open(&idx, testdb_path);
 	assert(ret == 0);
 
@@ -220,7 +213,6 @@ run_dtmap_term_order_test(void)
 	// Cleanup
 	idx_dtmap_close(&idx);
 	idx_terms_close(&idx);
-	idxterm_sysfini(&idx);
 }
 
 int

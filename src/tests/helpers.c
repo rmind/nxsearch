@@ -135,9 +135,6 @@ run_with_index(const char *terms_testdb_path, const char *dtmap_testdb_path,
 	memset(&idx, 0, sizeof(idx));
 	idx.nxs = &nxs;
 
-	ret = idxterm_sysinit(&idx);
-	assert(ret == 0);
-
 	// Open the terms and dtmap indexes.
 	ret = idx_terms_open(&idx, terms_testdb_path);
 	assert(ret == 0);
@@ -160,7 +157,6 @@ run_with_index(const char *terms_testdb_path, const char *dtmap_testdb_path,
 	nxs_clear_error(&nxs);
 	idx_dtmap_close(&idx);
 	idx_terms_close(&idx);
-	idxterm_sysfini(&idx);
 }
 
 static void

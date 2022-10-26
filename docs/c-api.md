@@ -122,6 +122,7 @@ It is the user's responsibility to release them after use.
   parameters are supported:
     * `algo`: override ranking algorithm (see `nxs_index_create()` description).
     * `limit`: the cap for the results (default: 1000).
+    * `fuzzymatch`: fuzzy-match the terms (default: false).
 
 * `char *nxs_resp_tojson(nxs_resp_t *resp, size_t *len)`
   * Return the response as a JSON string representation.  If the `len` is not

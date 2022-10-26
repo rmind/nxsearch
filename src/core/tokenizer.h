@@ -17,6 +17,9 @@
 #include "rhashmap.h"
 #include "filters.h"
 
+#define	TOKENSET_STAGE		(0x1)
+#define	TOKENSET_FUZZYMATCH	(0x2)
+
 typedef struct token {
 	/*
 	 * Token: list entry, counter of how many times the token
@@ -53,7 +56,7 @@ typedef struct {
 tokenset_t *	tokenset_create(void);
 void		tokenset_add(tokenset_t *, token_t *);
 void		tokenset_moveback(tokenset_t *, token_t *);
-void		tokenset_resolve(tokenset_t *, nxs_index_t *, bool);
+void		tokenset_resolve(tokenset_t *, nxs_index_t *, unsigned);
 void		tokenset_destroy(tokenset_t *);
 
 token_t *	token_create(const char *, size_t);

@@ -73,6 +73,18 @@ nxs_params_set_uint(nxs_params_t *params, const char *key, uint64_t val)
 	return 0;
 }
 
+__dso_public int
+nxs_params_set_bool(nxs_params_t *params, const char *key, bool val)
+{
+	yyjson_mut_val *ckey = yyjson_mut_strcpy(params->doc, key);
+	yyjson_mut_val *cval = yyjson_mut_bool(params->doc, val);
+
+	if (!yyjson_mut_obj_add(params->root, ckey, cval)) {
+		return -1;
+	}
+	return 0;
+}
+
 __dso_public void
 nxs_params_release(nxs_params_t *params)
 {
@@ -122,10 +134,23 @@ int
 nxs_params_get_uint(nxs_params_t *params, const char *key, uint64_t *val)
 {
 	yyjson_mut_val *jval = yyjson_mut_obj_get(params->root, key);
+
 	if (!yyjson_mut_is_uint(jval)) {
 		return -1;
 	}
 	*val = yyjson_mut_get_uint(jval);
+	return 0;
+}
+
+int
+nxs_params_get_bool(nxs_params_t *params, const char *key, bool *val)
+{
+	yyjson_mut_val *jval = yyjson_mut_obj_get(params->root, key);
+
+	if (!yyjson_mut_is_bool(jval)) {
+		return -1;
+	}
+	*val = yyjson_mut_get_bool(jval);
 	return 0;
 }
 

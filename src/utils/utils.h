@@ -66,6 +66,14 @@
 #define	ALIGNED_POINTER(p,t)	((((uintptr_t)(p)) & (sizeof(t) - 1)) == 0)
 #endif
 
+#ifndef ffs64
+#define	ffs64(x)		((uint64_t)ffsll(x))
+#endif
+
+#ifndef popcount64
+#define	popcount64(x)		__builtin_popcountll(x)
+#endif
+
 /*
  * Minimum, maximum and rounding macros.
  */

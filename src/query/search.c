@@ -29,6 +29,7 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 	tokenset_t *tokens;
 	token_t *token;
 	uint64_t limit;
+	unsigned tflags;
 	int err = -1;
 
 	nxs_clear_error(idx->nxs);
@@ -38,9 +39,11 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 	 */
 	limit = NXS_DEFAULT_RESULTS_LIMIT;
 	algo = idx->algo;
+	tflags = 0;
 
 	if (params) {
 		const char *algo_name;
+		bool fl;
 
 		if (nxs_params_get_uint(params, "limit", &limit) == 0 &&
 		    (limit == 0 || limit > UINT_MAX)) {
@@ -53,6 +56,9 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 			nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
 			    "invalid algorithm", NULL);
 			return NULL;
+		}
+		if (nxs_params_get_bool(params, "fuzzymatch", &fl) == 0 && fl) {
+			tflags |= TOKENSET_FUZZYMATCH;
 		}
 	}
 
@@ -80,7 +86,7 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 		    "the query is empty or has no meaningful tokens", NULL);
 		goto out;
 	}
-	tokenset_resolve(tokens, idx, false);
+	tokenset_resolve(tokens, idx, tflags);
 
 	/*
 	 * Lookup the documents given the terms.

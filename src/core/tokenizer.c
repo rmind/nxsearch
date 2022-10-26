@@ -126,29 +126,40 @@ tokenset_moveback(tokenset_t *tset, token_t *token)
 
 /*
  * tokenset_resolve: lookup the in-memory term object for each token.
- * If found, associate it with the token; otherwise, move the token to
- * a separate staging list if the 'stage' flag is true.
+ * If found, then associate it with the token.
+ *
+ * => If the TOKENSET_FUZZYMATCH flag is set and no term is found for
+ *    the given token, then attempt to fuzzy search for a matching term.
+ *
+ * => If the TOKENSET_STAGE flag is set and no term is found, then move
+ *    the given token to a separate staging list.
  */
 void
-tokenset_resolve(tokenset_t *tset, nxs_index_t *idx, bool stage)
+tokenset_resolve(tokenset_t *tset, nxs_index_t *idx, unsigned flags)
 {
+	const bool stage = (flags & TOKENSET_STAGE) != 0;
+	const bool fuzzymatch = (flags & TOKENSET_FUZZYMATCH) != 0;
 	token_t *token;
 
 	token = TAILQ_FIRST(&tset->list);
 	while (token) {
 		token_t *next_token = TAILQ_NEXT(token, entry);
-		const strbuf_t *sbuf = &token->buffer;
+		const char *value = token->buffer.value;
+		const size_t len = token->buffer.length;
 		idxterm_t *term;
 
-		term = idxterm_lookup(idx, sbuf->value, sbuf->length);
+		term = idxterm_lookup(idx, value, len);
+		if (!term && fuzzymatch) {
+			term = idxterm_fuzzysearch(idx, value, len);
+		}
 		if (!term && stage) {
 			TAILQ_REMOVE(&tset->list, token, entry);
 			TAILQ_INSERT_TAIL(&tset->staging, token, entry);
 			tset->staged++;
-			app_dbgx("staging %p [%s]", token, sbuf->value);
+			app_dbgx("staging %p [%s]", token, value);
 		}
 		if (term) {
-			app_dbgx("[%s] => %u", sbuf->value, term->id);
+			app_dbgx("[%s] => %u", value, term->id);
 		}
 		token->idxterm = term;
 		token = next_token;

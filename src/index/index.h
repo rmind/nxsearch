@@ -17,8 +17,13 @@
 #include "nxs.h"
 #include "tokenizer.h"
 #include "rhashmap.h"
+#include "deque.h"
+#include "levdist.h"
+#include "bktree.h"
 
 #define	IDX_SIZE_STEP		(32UL * 1024)	// 32 KB
+
+#define	LEVDIST_TOLERANCE	(2)
 
 typedef uint32_t nxs_term_id_t;
 
@@ -33,6 +38,7 @@ typedef struct idxterm {
 	uint32_t		offset;
 	TAILQ_ENTRY(idxterm)	entry;
 	roaring_bitmap_t *	doc_bitmap;
+	uint16_t		value_len;
 	char			value[];
 } idxterm_t;
 
@@ -58,8 +64,10 @@ struct nxs_index {
 	nxs_term_id_t		terms_last_id;
 
 	rhashmap_t *		term_map;
+	bktree_t *		term_bkt;
 	TAILQ_HEAD(, idxterm)	term_list;
 	size_t			term_count;
+	levdist_t *		term_levctx;
 
 	/*
 	 * Document-term index.
@@ -77,7 +85,7 @@ struct nxs_index {
 	filter_pipeline_t *	fp;
 	ranking_algo_t		algo;
 
-	/* Instance backpointer, params, index name, list entry. */
+	/* Instance back-pointer, params, index name, list entry. */
 	nxs_t *			nxs;
 	nxs_params_t *		params;
 	char *			name;
@@ -104,10 +112,12 @@ void		idxterm_destroy(nxs_index_t *, idxterm_t *);
 void		idxterm_assign(nxs_index_t *, idxterm_t *, nxs_term_id_t);
 idxterm_t *	idxterm_lookup(nxs_index_t *, const char *, size_t);
 idxterm_t *	idxterm_lookup_by_id(nxs_index_t *, nxs_term_id_t);
+idxterm_t *	idxterm_fuzzysearch(nxs_index_t *, const char *, size_t);
 int		idxterm_add_doc(idxterm_t *, nxs_doc_id_t);
 int		idxterm_del_doc(idxterm_t *, nxs_doc_id_t);
 void		idxterm_incr_total(nxs_index_t *, const idxterm_t *, unsigned);
 void		idxterm_decr_total(nxs_index_t *, const idxterm_t *, unsigned);
+uint64_t	idxterm_get_total(nxs_index_t *, const idxterm_t *);
 
 /*
  * Document (in-memory) interface.

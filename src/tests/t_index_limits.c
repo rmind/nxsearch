@@ -1,5 +1,5 @@
 /*
- * Unit test: index limits.
+ * Unit tests: index limits.
  * This code is in the public domain.
  */
 
@@ -59,7 +59,7 @@ generate_terms_doc(nxs_index_t *idx)
 	int ret;
 
 	tokens = generate_tokens(TERM_TARGET);
-	tokenset_resolve(tokens, idx, true);
+	tokenset_resolve(tokens, idx, TOKENSET_STAGE);
 
 	ret = idx_terms_add(idx, tokens);
 	assert(ret == 0);
@@ -146,7 +146,7 @@ add_large_term(nxs_index_t *idx)
 	/* Maximum length token. */
 	token = token_create(val, UINT16_MAX);
 	tokenset_add(tokens, token);
-	tokenset_resolve(tokens, idx, true);
+	tokenset_resolve(tokens, idx, TOKENSET_STAGE);
 
 	ret = idx_terms_add(idx, tokens);
 	assert(ret == 0);
@@ -157,7 +157,7 @@ add_large_term(nxs_index_t *idx)
 	/* Too large token. */
 	token = token_create(val, UINT16_MAX + 1);
 	tokenset_add(tokens, token);
-	tokenset_resolve(tokens, idx, true);
+	tokenset_resolve(tokens, idx, TOKENSET_STAGE);
 
 	ret = idx_terms_add(idx, tokens);
 	assert(ret == -1);

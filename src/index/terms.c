@@ -117,11 +117,9 @@ idx_terms_open(nxs_index_t *idx, const char *path)
 	/*
 	 * Setup the in-memory structures.
 	 */
-	idx->term_map = rhashmap_create(0, RHM_NOCOPY | RHM_NONCRYPTO);
-	if (idx->term_map == NULL) {
+	if (idxterm_sysinit(idx) == -1) {
 		goto err;
 	}
-	TAILQ_INIT(&idx->term_list);
 	idx->terms_consumed = 0;
 	idx->terms_last_id = 0;
 	flock(fd, LOCK_UN);
@@ -140,14 +138,8 @@ void
 idx_terms_close(nxs_index_t *idx)
 {
 	idxmap_t *idxmap = &idx->terms_memmap;
-	idxterm_t *term;
 
-	while ((term = TAILQ_FIRST(&idx->term_list)) != NULL) {
-		idxterm_destroy(idx, term);
-	}
-	if (idx->term_map) {
-		rhashmap_destroy(idx->term_map);
-	}
+	idxterm_sysfini(idx);
 	idx_db_release(idxmap);
 }
 
