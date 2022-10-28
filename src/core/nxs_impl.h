@@ -67,6 +67,7 @@ nxs_params_t *	nxs_params_unserialize(nxs_t *, const char *);
 const char **	nxs_params_get_strlist(nxs_params_t *, const char *, size_t *);
 const char *	nxs_params_get_str(nxs_params_t *, const char *);
 int		nxs_params_get_uint(nxs_params_t *, const char *, uint64_t *);
+int		nxs_params_get_bool(nxs_params_t *, const char *, bool *);
 
 nxs_resp_t *	nxs_resp_create(size_t);
 int		nxs_resp_addresult(nxs_resp_t *, const idxdoc_t *, float);

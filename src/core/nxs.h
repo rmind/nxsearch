@@ -59,6 +59,7 @@ int		nxs_params_set_strlist(nxs_params_t *, const char *,
 		    const char **, size_t);
 int		nxs_params_set_str(nxs_params_t *, const char *, const char *);
 int		nxs_params_set_uint(nxs_params_t *, const char *, uint64_t);
+int		nxs_params_set_bool(nxs_params_t *, const char *, bool);
 
 char *		nxs_params_tojson(const nxs_params_t *, size_t *);
 void		nxs_params_release(nxs_params_t *);

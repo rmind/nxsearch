@@ -424,9 +424,6 @@ nxs_index_open(nxs_t *nxs, const char *name)
 	/*
 	 * Open the terms index.
 	 */
-	if (idxterm_sysinit(idx) == -1) {
-		goto err;
-	}
 	if (asprintf(&path, "%s/data/%s/%s",
 	    nxs->basedir, name, "nxsterms") == -1) {
 		goto err;
@@ -484,7 +481,6 @@ nxs_index_close(nxs_index_t *idx)
 	}
 	idx_dtmap_close(idx);
 	idx_terms_close(idx);
-	idxterm_sysfini(idx);
 	free(idx);
 }
 
@@ -524,7 +520,7 @@ nxs_index_add(nxs_index_t *idx, nxs_doc_id_t doc_id,
 		    "the text is empty or no meaningful tokens found", NULL);
 		goto out;
 	}
-	tokenset_resolve(tokens, idx, true);
+	tokenset_resolve(tokens, idx, TOKENSET_STAGE);
 
 	/*
 	 * Add new terms (if any).

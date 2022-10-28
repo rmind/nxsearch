@@ -35,22 +35,69 @@
 #include "index.h"
 #include "utils.h"
 
+static int	idxterm_levdist(void *, const void *, const void *);
+
 int
 idxterm_sysinit(nxs_index_t *idx)
 {
+	TAILQ_INIT(&idx->term_list);
+
+	idx->term_map = rhashmap_create(0, RHM_NOCOPY | RHM_NONCRYPTO);
+	if (idx->term_map == NULL) {
+		goto err;
+	}
+
 	idx->td_map = rhashmap_create(0, RHM_NOCOPY | RHM_NONCRYPTO);
 	if (idx->td_map == NULL) {
-		return -1;
+		goto err;
+	}
+
+	idx->term_levctx = levdist_create();
+	if (idx->term_levctx == NULL) {
+		goto err;
+	}
+
+	idx->term_bkt = bktree_create(idxterm_levdist, idx);
+	if (idx->term_bkt == NULL) {
+		goto err;
 	}
 	return 0;
+err:
+	idxterm_sysfini(idx);
+	return -1;
 }
 
 void
 idxterm_sysfini(nxs_index_t *idx)
 {
+	idxterm_t *term;
+
+	while ((term = TAILQ_FIRST(&idx->term_list)) != NULL) {
+		idxterm_destroy(idx, term);
+	}
+	if (idx->term_map) {
+		rhashmap_destroy(idx->term_map);
+	}
 	if (idx->td_map) {
 		rhashmap_destroy(idx->td_map);
 	}
+	if (idx->term_bkt) {
+		bktree_destroy(idx->term_bkt);
+	}
+	if (idx->term_levctx) {
+		levdist_destroy(idx->term_levctx);
+	}
+}
+
+static int
+idxterm_levdist(void *ctx, const void *a, const void *b)
+{
+	const idxterm_t *term_a = a;
+	const idxterm_t *term_b = b;
+	nxs_index_t *idx = ctx;
+
+	return levdist(idx->term_levctx, term_a->value, term_a->value_len,
+	    term_b->value, term_b->value_len);
 }
 
 idxterm_t *
@@ -74,11 +121,19 @@ idxterm_create(nxs_index_t *idx, const char *token,
 	memcpy(term->value, token, len);
 	term->value[len] = '\0';
 
+	ASSERT(len <= UINT16_MAX);
+	term->value_len = len;
+
 	/*
 	 * Map the term/token value to the object.
 	 */
 	if (rhashmap_put(idx->term_map, term->value, len, term) != term) {
 		/* Error: the index contains a duplicate. */
+		free(term);
+		return NULL;
+	}
+	if (bktree_insert(idx->term_bkt, term) == -1) {
+		rhashmap_del(idx->term_map, term->value, term->value_len);
 		free(term);
 		return NULL;
 	}
@@ -92,15 +147,21 @@ idxterm_create(nxs_index_t *idx, const char *token,
 void
 idxterm_destroy(nxs_index_t *idx, idxterm_t *term)
 {
-	const size_t term_len = strlen(term->value);
-
 	TAILQ_REMOVE(&idx->term_list, term, entry);
 	idx->term_count--;
+
+	/*
+	 * XXX: bktree_delete
+	 *
+	 * Currently, idxterm_destroy() is called only when closing the
+	 * index and there are no individual deletions.   Nevertheless,
+	 * the API should not leave the stray pointers in the tree.
+	 */
 
 	if (term->id) {
 		rhashmap_del(idx->td_map, &term->id, sizeof(nxs_term_id_t));
 	}
-	rhashmap_del(idx->term_map, term->value, term_len);
+	rhashmap_del(idx->term_map, term->value, term->value_len);
 	roaring_bitmap_free(term->doc_bitmap);
 	free(term);
 }
@@ -126,12 +187,67 @@ idxterm_lookup(nxs_index_t *idx, const char *value, size_t len)
 }
 
 /*
- * idxterm_lookup: find the term object given the term ID.
+ * idxterm_lookup_by_id: find the term object given the term ID.
  */
 idxterm_t *
 idxterm_lookup_by_id(nxs_index_t *idx, nxs_term_id_t term_id)
 {
 	return rhashmap_get(idx->td_map, &term_id, sizeof(nxs_term_id_t));
+}
+
+/*
+ * idxterm_fuzzysearch: perform a fuzzy match search.
+ */
+idxterm_t *
+idxterm_fuzzysearch(nxs_index_t *idx, const char *value, size_t len)
+{
+	idxterm_t *search_token, *term = NULL, *iterm;
+	deque_t *results = NULL;
+	uint64_t term_total = 0;
+	unsigned total_len;
+
+	/* XXX: inefficient */
+	total_len = offsetof(idxterm_t, value[(unsigned)len + 1]);
+	if ((search_token = malloc(total_len)) == NULL) {
+		return NULL;
+	}
+	memcpy(search_token->value, value, len);
+	search_token->value[len] = '\0';
+	search_token->value_len = len;
+
+	if ((results = deque_create(64)) == NULL) {
+		goto out;
+	}
+	if (bktree_search(idx->term_bkt, LEVDIST_TOLERANCE,
+	    search_token, results) == -1) {
+		goto out;
+	}
+
+	/*
+	 * Select the most popular term.
+	 */
+	while ((iterm = deque_pop_back(results)) != NULL) {
+		if (idxterm_get_total(idx, iterm) > term_total) {
+			term = iterm;
+		}
+	}
+out:
+	if (results) {
+		deque_destroy(results);
+	}
+	free(search_token);
+	return term;
+}
+
+uint64_t
+idxterm_get_total(nxs_index_t *idx, const idxterm_t *term)
+{
+	const idxmap_t *idxmap = &idx->terms_memmap;
+	const idxterms_hdr_t *hdr = idxmap->baseptr;
+	uint64_t *tc = MAP_GET_OFF(hdr, term->offset);
+
+	ASSERT(ALIGNED_POINTER(tc, uint64_t));
+	return be64toh(atomic_load_relaxed(tc));
 }
 
 /*
@@ -170,7 +286,7 @@ idxterm_decr_total(nxs_index_t *idx, const idxterm_t *term, unsigned count)
 	do {
 		uint64_t old_tc_val;
 
-		old_tc = *tc;
+		old_tc = atomic_load_relaxed(tc);
 		old_tc_val = be64toh(old_tc);
 		if (old_tc_val < count) {
 			/*

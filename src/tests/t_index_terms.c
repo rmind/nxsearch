@@ -1,5 +1,5 @@
 /*
- * Unit test: terms index structures.
+ * Unit tests: terms index structures.
  * This code is in the public domain.
  */
 
@@ -62,9 +62,6 @@ run_idxterm_test(void)
 	int ret;
 
 	memset(&idx, 0, sizeof(idx));
-	ret = idxterm_sysinit(&idx);
-	assert(ret == 0);
-
 	ret = idx_terms_open(&idx, testdb_path);
 	assert(ret == 0);
 
@@ -77,7 +74,6 @@ run_idxterm_test(void)
 	idxterm_destroy(&idx, term);
 
 	idx_terms_close(&idx);
-	idxterm_sysfini(&idx);
 }
 
 static void
@@ -89,7 +85,6 @@ run_terms_test(void)
 	int ret;
 
 	memset(&idx, 0, sizeof(idx));
-	ret = idxterm_sysinit(&idx);
 
 	/*
 	 * Add some terms to the index.
@@ -131,7 +126,6 @@ run_terms_test(void)
 	check_terms(&idx);
 
 	idx_terms_close(&idx);
-	idxterm_sysfini(&idx);
 }
 
 int
