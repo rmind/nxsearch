@@ -2,3 +2,7 @@
 *.lo
 *.a
 *.so
+
+.DS_Store
+
+compose/openapi.json

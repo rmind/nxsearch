@@ -31,7 +31,19 @@ RUN make distclean && make -j $(getconf _NPROCESSORS_ONLN) lua-lib
 RUN luajit ./tests/test.lua
 
 ##############################################################################
+FROM python:3.10-alpine AS doc-gen
+#
+# nxsearch-svc swagger doc generation
+#
 
+COPY ./svc-src/nxsearch_svc.lua .
+COPY tools/docs_parser.py .
+RUN pip install pyyaml
+RUN python docs_parser.py \
+    --input nxsearch_svc.lua \
+    --output openapi.json
+
+##############################################################################
 #
 # nxsearch-svc image
 #
@@ -84,6 +96,9 @@ WORKDIR /app
 COPY --from=nxsearch /build/nxsearch.so /usr/local/openresty/lualib/
 COPY ./svc-src/nxsearch_svc.lua /usr/local/openresty/lualib/
 COPY ./svc-src/nxsearch_storage.lua /usr/local/openresty/lualib/
+COPY compose/docs.html /app/public_html/docs.html
+COPY --from=doc-gen /openapi.json /app/public_html/openapi.json
+
 
 #
 # Run the service.

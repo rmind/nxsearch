@@ -92,7 +92,20 @@ end
 
 -------------------------------------------------------------------------
 
+-------------------------------------------------------------------------
+
 routes:post("@/:string", function(self, name)
+  --[[
+      description: "Create index."
+      responses:
+        "201":
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/error_response"
+  --]]
+
   local params = nil
   local payload = get_http_body(false)
 
@@ -113,6 +126,17 @@ routes:post("@/:string", function(self, name)
 end)
 
 routes:delete("@/:string", function(self, name)
+  --[[
+      description: "Delete an index."
+      responses:
+        "200":
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/error_response"
+  --]]
+
   -- Destroy the reference first.
   nxs_index_map:delete(name)
   collectgarbage() -- ensure index gets closed
@@ -127,6 +151,18 @@ routes:delete("@/:string", function(self, name)
 end)
 
 routes:post("@/:string/add/:number", function(self, name, doc_id)
+  --[[
+      description: "Add a document."
+      bodyContentType: "text/plain"
+      responses:
+        "201":
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/error_response"
+  --]]
+
   local index = get_nxs_index(name)
   local query_string = ngx.req.get_uri_args()
   local params = query_string_to_params(query_string)
@@ -149,6 +185,17 @@ routes:post("@/:string/add/:number", function(self, name, doc_id)
 end)
 
 routes:delete("@/:string/remove/:number", function(self, name, doc_id)
+  --[[
+      description: "Delete a document."
+      responses:
+        "200":
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/error_response"
+  --]]
+
   local index = get_nxs_index(name)
   local id, err = index:remove(doc_id, get_http_body(true))
   if not id then
@@ -158,11 +205,27 @@ routes:delete("@/:string/remove/:number", function(self, name, doc_id)
 end)
 
 routes:post("@/:string/search", function(self, name)
+  --[[
+      bodyContentType: "text/plain"
+      description: "Search."
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/search_response"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/error_response"
+  --]]
+
   local index = get_nxs_index(name)
   local query_string = ngx.req.get_uri_args()
   local params = query_string_to_params(query_string)
 
-  local resp, err = index:search(get_http_body(true), params)
+  local resp, err = index:search(get_http_bodyc(true), params)
   if not resp then
     return set_http_error(err)
   end
@@ -177,3 +240,34 @@ routes:post("@/:string/search", function(self, name)
 end)
 
 return routes
+
+
+--[[
+  components:
+    error_response:
+      type: object
+      properties:
+        error:
+            type: object
+            properties:
+              msg:
+                type: string
+              code:
+                type: integer
+    search_response:
+      type: object
+      properties:
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              doc_id:
+                type: number
+                format: int64
+              score:
+                type: number
+                format: float
+--]]
