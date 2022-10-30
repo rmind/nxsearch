@@ -171,17 +171,72 @@ dtmap_termblock_cmp(const void * restrict b1, const void * restrict b2)
 	return 0;
 }
 
+static void *
+dtmap_build_block(nxs_index_t *idx, nxs_doc_id_t doc_id, tokenset_t *tokens)
+{
+	void *data, *term_blocks;
+	token_t *token = NULL;
+	size_t block_len;
+	mmrw_t mm;
+
+	block_len = IDXDT_META_LEN(tokens->count);
+	if ((data = malloc(block_len)) == NULL) {
+		return NULL;
+	}
+	mmrw_init(&mm, data, block_len);
+
+	/* Fill the document metadata. */
+	mmrw_store64(&mm, doc_id);
+	mmrw_store32(&mm, tokens->seen);
+	mmrw_store32(&mm, tokens->count);
+
+	/*
+	 * Fill the terms seen in the document.
+	 */
+	term_blocks = MAP_GET_OFF(data, 8 + 4 + 4);
+	TAILQ_FOREACH(token, &tokens->list, entry) {
+		idxterm_t *idxterm = token->idxterm;
+
+		/* The term must be resolved. */
+		ASSERT(idxterm != NULL);
+		ASSERT(idxterm->id > 0);
+
+		mmrw_store32(&mm, idxterm->id);
+		mmrw_store32(&mm, token->count);
+
+		if (idxterm_add_doc(idxterm, doc_id) == -1) {
+			token_t *it;
+
+			/* Revert the increments. */
+			TAILQ_FOREACH(it, &tokens->list, entry) {
+				if (it == token) {
+					break;
+				}
+				idxterm_decr_total(idx, it->idxterm, it->count);
+			}
+			nxs_decl_err(idx->nxs, NXS_ERR_FATAL,
+			    "idxterm_add_doc failed", NULL);
+			return NULL;
+		}
+		idxterm_incr_total(idx, idxterm, token->count);
+	}
+
+	/* Sort them by term IDs. */
+	qsort(term_blocks, tokens->count,
+	    sizeof(uint32_t) * 2, dtmap_termblock_cmp);
+
+	return data;
+}
+
 int
 idx_dtmap_add(nxs_index_t *idx, nxs_doc_id_t doc_id, tokenset_t *tokens)
 {
 	idxmap_t *idxmap = &idx->dt_memmap;
 	size_t append_len, data_len, target_len, offset;
+	void *dataptr, *block = NULL;
 	idxdoc_t *doc = NULL;
-	token_t *token = NULL;
 	idxdt_hdr_t *hdr;
-	void *termblocks;
-	void *dataptr;
-	mmrw_t mm;
+	int ret = -1;
 
 	ASSERT(doc_id > 0);
 	ASSERT(!TAILQ_EMPTY(&tokens->list));
@@ -191,9 +246,17 @@ idx_dtmap_add(nxs_index_t *idx, nxs_doc_id_t doc_id, tokenset_t *tokens)
 	ASSERT(tokens->count > 0);
 
 	/*
-	 * Lock the file and remap/extend if necessary.
+	 * Build the document-term block.
 	 */
-	if (flock(idxmap->fd, LOCK_EX) == -1) {
+	if ((block = dtmap_build_block(idx, doc_id, tokens)) == NULL) {
+		return -1;
+	}
+
+	/*
+	 * Lock the file, sync and remap if necessary.
+	 */
+	if (idx_dtmap_sync(idx) == -1 || flock(idxmap->fd, LOCK_EX) == -1) {
+		free(block);
 		return -1;
 	}
 again:
@@ -202,16 +265,15 @@ again:
 	data_len = be64toh(atomic_load_acquire(&hdr->data_len));
 	if (idx->dt_consumed < data_len) {
 		if (idx_dtmap_sync(idx) == -1) {
-			flock(idxmap->fd, LOCK_UN);
-			return -1;
+			goto err;
 		}
 		goto again;
 	}
 	if (idxdoc_lookup(idx, doc_id)) {
-		flock(idxmap->fd, LOCK_UN);
+		/* Race condition: document ID is indexed already. */
 		nxs_decl_errx(idx->nxs, NXS_ERR_EXISTS,
 		    "document %"PRIu64" is already indexed", doc_id);
-		return -1;
+		goto err;
 	}
 
 	/*
@@ -225,13 +287,10 @@ again:
 		goto err;
 	}
 
-	dataptr = IDXDT_DATA_PTR(hdr, data_len);
-	mmrw_init(&mm, dataptr, append_len);
-
 	/*
 	 * Add the document to the in-memory map.
 	 */
-	offset = (uintptr_t)mm.curptr - (uintptr_t)hdr;
+	offset = sizeof(idxdt_hdr_t) + data_len;
 	if ((doc = idxdoc_create(idx, doc_id, offset)) == NULL) {
 		nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
 		    "idxdoc_create failed", NULL);
@@ -240,44 +299,10 @@ again:
 	ASSERT(ALIGNED_POINTER(offset, nxs_doc_id_t));
 
 	/*
-	 * Fill the document metadata.
+	 * Produce the document-term block.
 	 */
-	if (mmrw_store64(&mm, doc_id) == -1 ||
-	    mmrw_store32(&mm, tokens->seen) == -1 ||
-	    mmrw_store32(&mm, tokens->count) == -1) {
-		nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
-		    "dtmap I/O error", NULL);
-		goto err;
-	}
-
-	/*
-	 * Fill the terms seen in the document.
-	 */
-	termblocks = mm.curptr;
-	TAILQ_FOREACH(token, &tokens->list, entry) {
-		idxterm_t *idxterm = token->idxterm;
-
-		/* The term must be resolved. */
-		ASSERT(idxterm != NULL);
-		ASSERT(idxterm->id > 0);
-
-		if (mmrw_store32(&mm, idxterm->id) == -1 ||
-		    mmrw_store32(&mm, token->count) == -1) {
-			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
-			    "dtmap I/O error", NULL);
-			goto err;
-		}
-		if (idxterm_add_doc(idxterm, doc_id) == -1) {
-			nxs_decl_err(idx->nxs, NXS_ERR_FATAL,
-			    "idxterm_add_doc failed", NULL);
-			goto err;
-		}
-		idxterm_incr_total(idx, idxterm, token->count);
-	}
-
-	/* Sort them by term IDs. */
-	qsort(termblocks, tokens->count,
-	    sizeof(uint32_t) * 2, dtmap_termblock_cmp);
+	dataptr = IDXDT_DATA_PTR(hdr, data_len);
+	memcpy(dataptr, block, append_len);
 
 	/*
 	 * Increment the document totals and publish the new data length.
@@ -292,25 +317,16 @@ again:
 	if (idxmap->sync) {
 		msync(hdr, target_len, MS_ASYNC);
 	}
-	flock(idxmap->fd, LOCK_UN);
 
-	return 0;
+	doc = NULL;
+	ret = 0;
 err:
 	flock(idxmap->fd, LOCK_UN);
 	if (doc) {
 		idxdoc_destroy(idx, doc);
 	}
-	if (token) {
-		token_t *ptoken;
-
-		TAILQ_FOREACH(ptoken, &tokens->list, entry) {
-			if (ptoken == token) {
-				break;
-			}
-			idxterm_decr_total(idx, ptoken->idxterm, ptoken->count);
-		}
-	}
-	return -1;
+	free(block);
+	return ret;
 }
 
 static bool
