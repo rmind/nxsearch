@@ -14,6 +14,47 @@
 #include "index.h"
 #include "utils.h"
 
+typedef struct {
+	uint64_t		limit;
+	ranking_algo_t		algo;
+	unsigned		tflags;
+} search_params_t;
+
+static int
+get_search_params(nxs_index_t *idx, nxs_params_t *params, search_params_t *sp)
+{
+	const char *s;
+	bool fl;
+
+	/*
+	 * Set some defaults.
+	 */
+	memset(sp, 0, sizeof(search_params_t));
+	sp->limit = NXS_DEFAULT_RESULTS_LIMIT;
+	sp->algo = idx->algo;
+
+	if (!params) {
+		return 0;
+	}
+
+	if (nxs_params_get_uint(params, "limit", &sp->limit) == 0 &&
+	    (sp->limit == 0 || sp->limit > UINT_MAX)) {
+		nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
+		    "invalid limit", NULL);
+		return -1;
+	}
+	if ((s = nxs_params_get_str(params, "algo")) != NULL &&
+	    (sp->algo = get_ranking_func_id(s)) == INVALID_ALGO) {
+		nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
+		    "invalid algorithm", NULL);
+		return -1;
+	}
+	if (nxs_params_get_bool(params, "fuzzymatch", &fl) == 0 && fl) {
+		sp->tflags |= TOKENSET_FUZZYMATCH;
+	}
+	return 0;
+}
+
 /*
  * nxs_index_search: perform  a search query on the given index.
  *
@@ -24,46 +65,20 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
     const char *query, size_t len)
 {
 	nxs_resp_t *resp = NULL;
-	ranking_algo_t algo;
+	search_params_t sp;
 	ranking_func_t rank;
 	tokenset_t *tokens;
 	token_t *token;
-	uint64_t limit;
-	unsigned tflags;
 	int err = -1;
 
 	nxs_clear_error(idx->nxs);
 
-	/*
-	 * Check the parameters and set some defaults.
-	 */
-	limit = NXS_DEFAULT_RESULTS_LIMIT;
-	algo = idx->algo;
-	tflags = 0;
-
-	if (params) {
-		const char *algo_name;
-		bool fl;
-
-		if (nxs_params_get_uint(params, "limit", &limit) == 0 &&
-		    (limit == 0 || limit > UINT_MAX)) {
-			nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
-			    "invalid limit", NULL);
-			return NULL;
-		}
-		if ((algo_name = nxs_params_get_str(params, "algo")) != NULL &&
-		    (algo = get_ranking_func_id(algo_name)) == INVALID_ALGO) {
-			nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
-			    "invalid algorithm", NULL);
-			return NULL;
-		}
-		if (nxs_params_get_bool(params, "fuzzymatch", &fl) == 0 && fl) {
-			tflags |= TOKENSET_FUZZYMATCH;
-		}
+	if (get_search_params(idx, params, &sp) == -1) {
+		return NULL;
 	}
 
 	/* Determine the ranking algorithm. */
-	rank = get_ranking_func(algo);
+	rank = get_ranking_func(sp.algo);
 	ASSERT(rank != NULL);
 
 	/*
@@ -86,12 +101,12 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 		    "the query is empty or has no meaningful tokens", NULL);
 		goto out;
 	}
-	tokenset_resolve(tokens, idx, tflags);
+	tokenset_resolve(tokens, idx, sp.tflags);
 
 	/*
 	 * Lookup the documents given the terms.
 	 */
-	if ((resp = nxs_resp_create(limit)) == NULL) {
+	if ((resp = nxs_resp_create(sp.limit)) == NULL) {
 		goto out;
 	}
 	TAILQ_FOREACH(token, &tokens->list, entry) {

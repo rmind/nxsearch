@@ -23,15 +23,15 @@ struct deque {
 };
 
 deque_t *
-deque_create(unsigned step)
+deque_create(unsigned size, unsigned step)
 {
 	deque_t *dq;
 
 	if ((dq = calloc(1, sizeof(deque_t))) == NULL) {
 		return NULL;
 	}
-	dq->grow_step = MIN(step, 64);
-	dq->size = dq->grow_step;
+	dq->grow_step = step ? step : 64;
+	dq->size = size ? size : 32;
 
 	dq->elements = calloc(dq->grow_step, sizeof(void *));
 	if (!dq->elements) {

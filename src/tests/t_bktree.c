@@ -43,7 +43,7 @@ run_tests(void)
 		assert(ret == 0);
 	}
 
-	dq = deque_create(64);
+	dq = deque_create(0, 0);
 	assert(dq);
 
 	for (unsigned i = 0; i < __arraycount(test_words); i++) {

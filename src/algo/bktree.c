@@ -229,7 +229,7 @@ bktree_search(bktree_t *bkt, unsigned tolerance,
 	}
 
 	/* Accumulator deque for the nodes to process. */
-	if ((dq = deque_create(64)) == NULL) {
+	if ((dq = deque_create(0, 0)) == NULL) {
 		return -1;
 	}
 	deque_push(dq, node);
@@ -298,7 +298,7 @@ bktree_destroy(bktree_t *bkt)
 		return;
 	}
 
-	dq = deque_create(64);
+	dq = deque_create(0, 0);
 	deque_push(dq, node);
 
 	while ((node = deque_pop_front(dq)) != NULL) {

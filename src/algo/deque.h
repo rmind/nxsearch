@@ -10,7 +10,7 @@
 
 typedef struct deque deque_t;
 
-deque_t *	deque_create(unsigned);
+deque_t *	deque_create(unsigned, unsigned);
 void		deque_destroy(deque_t *);
 
 int		deque_push(deque_t *, void *);

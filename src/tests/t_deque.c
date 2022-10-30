@@ -15,7 +15,7 @@ run_tests(void)
 	uintptr_t pval;
 	int ret;
 
-	dq = deque_create(4);
+	dq = deque_create(4, 4);
 	assert(dq);
 
 	for (unsigned i = 1; i <= 4; i++) {

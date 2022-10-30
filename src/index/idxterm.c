@@ -215,7 +215,7 @@ idxterm_fuzzysearch(nxs_index_t *idx, const char *value, size_t len)
 	search_token->value[len] = '\0';
 	search_token->value_len = len;
 
-	if ((results = deque_create(64)) == NULL) {
+	if ((results = deque_create(0, 0)) == NULL) {
 		goto out;
 	}
 	if (bktree_search(idx->term_bkt, LEVDIST_TOLERANCE,
