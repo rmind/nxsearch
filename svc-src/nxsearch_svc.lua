@@ -96,14 +96,22 @@ end
 
 routes:post("@/:string", function(self, name)
   --[[
+      @api [post] /{index_name}
       description: "Create index."
+      parameters:
+        - name: "index_name"
+          in: "path"
+          type: "string"
       responses:
         "201":
+          content:
+            schema:
+              type: String
         "400":
           content:
             application/json:
               schema:
-                $ref: "#/components/error_response"
+                $ref: "#/components/schemas/error_response"
   --]]
 
   local params = nil
@@ -127,14 +135,22 @@ end)
 
 routes:delete("@/:string", function(self, name)
   --[[
+      @api [delete] /{index_name}
       description: "Delete an index."
+      parameters:
+        - name: "index_name"
+          in: "path"
+          type: "string"
       responses:
         "200":
+          content:
+            schema:
+              type: String
         "400":
           content:
             application/json:
               schema:
-                $ref: "#/components/error_response"
+                $ref: "#/components/schemas/error_response"
   --]]
 
   -- Destroy the reference first.
@@ -152,15 +168,27 @@ end)
 
 routes:post("@/:string/add/:number", function(self, name, doc_id)
   --[[
+      @api [post] /{index_name}/add/{doc_id}
       description: "Add a document."
       bodyContentType: "text/plain"
+      parameters:
+        - name: "index_name"
+          in: "path"
+          type: "string"
+        - name: "doc_id"
+          in: "path"
+          type: "integer"
+          format: "int64"
       responses:
         "201":
+          content:
+            schema:
+              type: String
         "400":
           content:
             application/json:
               schema:
-                $ref: "#/components/error_response"
+                $ref: "#/components/schemas/error_response"
   --]]
 
   local index = get_nxs_index(name)
@@ -186,14 +214,26 @@ end)
 
 routes:delete("@/:string/remove/:number", function(self, name, doc_id)
   --[[
+      @api [delete] /{index_name}/remove/{doc_id}
       description: "Delete a document."
+      parameters:
+        - name: "index_name"
+          in: "path"
+          type: "string"
+        - name: "doc_id"
+          in: "path"
+          type: "integer"
+          format: "int64"
       responses:
         "200":
+          content:
+            schema:
+              type: String
         "400":
           content:
             application/json:
               schema:
-                $ref: "#/components/error_response"
+                $ref: "#/components/schemas/error_response"
   --]]
 
   local index = get_nxs_index(name)
@@ -206,26 +246,31 @@ end)
 
 routes:post("@/:string/search", function(self, name)
   --[[
+      @api [post] /{index_name}/search
       bodyContentType: "text/plain"
       description: "Search."
+      parameters:
+        - name: "index_name"
+          in: "path"
+          type: "string"
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/search_response"
+                $ref: "#/components/schemas/search_response"
         "400":
           content:
             application/json:
               schema:
-                $ref: "#/components/error_response"
+                $ref: "#/components/schemas/error_response"
   --]]
 
   local index = get_nxs_index(name)
   local query_string = ngx.req.get_uri_args()
   local params = query_string_to_params(query_string)
 
-  local resp, err = index:search(get_http_bodyc(true), params)
+  local resp, err = index:search(get_http_body(true), params)
   if not resp then
     return set_http_error(err)
   end
@@ -243,18 +288,20 @@ return routes
 
 
 --[[
-  components:
-    error_response:
-      type: object
-      properties:
-        error:
-            type: object
-            properties:
-              msg:
-                type: string
-              code:
-                type: integer
-    search_response:
+  @schema error_response
+  type: object
+  properties:
+    error:
+        type: object
+        properties:
+          msg:
+            type: string
+          code:
+            type: integer
+--]]
+
+--[[
+  @schema search_response
       type: object
       properties:
         count:
