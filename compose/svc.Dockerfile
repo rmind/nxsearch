@@ -31,7 +31,20 @@ RUN make distclean && make -j $(getconf _NPROCESSORS_ONLN) lua-lib
 RUN luajit ./tests/test.lua
 
 ##############################################################################
+FROM node:14-alpine as doc-gen
+#
+# nxsearch-svc swagger doc generation
+#
 
+WORKDIR /app
+
+COPY ./svc-src/gen_doc_api.sh ./
+COPY ./svc-src/nxsearch_svc.lua ./
+
+RUN npm install swagger-inline --save-dev &&\
+    sh gen_doc_api.sh > openapi.json
+
+##############################################################################
 #
 # nxsearch-svc image
 #
@@ -84,6 +97,9 @@ WORKDIR /app
 COPY --from=nxsearch /build/nxsearch.so /usr/local/openresty/lualib/
 COPY ./svc-src/nxsearch_svc.lua /usr/local/openresty/lualib/
 COPY ./svc-src/nxsearch_storage.lua /usr/local/openresty/lualib/
+COPY compose/docs.html /app/public_html/docs.html
+COPY --from=doc-gen /app/openapi.json /app/public_html/openapi.json
+
 
 #
 # Run the service.
