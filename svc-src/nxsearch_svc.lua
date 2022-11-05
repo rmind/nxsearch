@@ -30,6 +30,7 @@ local function get_http_body(raise_err)
 end
 
 local function set_http_error(err)
+  ngx.status = ngx.HTTP_BAD_REQUEST
   ngx.say(cjson.encode({["error"] = {
     ["code"] = err.code,
     ["msg"] = err.msg,
@@ -92,24 +93,96 @@ end
 
 -------------------------------------------------------------------------
 
+--[[
+  @schema index_params
+  type: object
+  properties:
+    "algo":
+      description: Ranking algorithm.
+      type: string
+      enum: ["BM25", "TF-IDF"]
+    "lang":
+      description: >
+        Language of the content in the index which should be two-letter
+        ISO 639-1 code.
+      type: string
+      default: "en"
+    "filters":
+      description: >
+        A list of filters (in the specified order) to apply when tokenizing.
+      type: array
+      uniqueItems: true
+      items:
+        type: string
+      default: ["normalizer", "stopwords", "stemmer"]
+--]]
+
+--[[
+  @schema search_response
+  type: object
+  properties:
+    count:
+      type: integer
+    results:
+      type: array
+      items:
+        type: object
+        properties:
+          doc_id:
+            type: number
+            format: int64
+          score:
+            type: number
+            format: float
+--]]
+
+--[[
+  @schema error_response
+  type: object
+  properties:
+    error:
+      type: object
+      properties:
+        "msg":
+          type: string
+        "code":
+          description: |
+            0 — success;
+            1 — unspecified fatal error;
+            2 — operating system error;
+            3 — invalid parameter or value;
+            4 — resource already exists;
+            5 — resource is missing;
+            6 — resource limit reached;
+          type: integer
+--]]
+
+-------------------------------------------------------------------------
+
 routes:post("@/:string", function(self, name)
   --[[
-      @api [post] /{index_name}
-      description: "Create index."
-      parameters:
-        - name: "index_name"
-          in: "path"
-          type: "string"
-      responses:
-        "201":
-          content:
-            schema:
-              type: String
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/error_response"
+  @api [post] /{index}
+  description: "Create an index."
+  tags:
+    - index
+  parameters:
+    - name: "index"
+      description: "Index name"
+      in: path
+      type: string
+  requestBody:
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/index_params'
+  responses:
+    201:
+      description: "Created"
+    400:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error_response"
   --]]
 
   local params = nil
@@ -133,22 +206,23 @@ end)
 
 routes:delete("@/:string", function(self, name)
   --[[
-      @api [delete] /{index_name}
-      description: "Delete an index."
-      parameters:
-        - name: "index_name"
-          in: "path"
-          type: "string"
-      responses:
-        "200":
-          content:
-            schema:
-              type: String
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/error_response"
+  @api [delete] /{index}
+  description: "Delete an index."
+  tags:
+    - index
+  parameters:
+    - name: "index"
+      description: "Index name"
+      in: "path"
+      type: "string"
+  responses:
+    200:
+      description: "OK"
+    400:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error_response"
   --]]
 
   -- Destroy the reference first.
@@ -166,27 +240,35 @@ end)
 
 routes:post("@/:string/add/:number", function(self, name, doc_id)
   --[[
-      @api [post] /{index_name}/add/{doc_id}
-      description: "Add a document."
-      bodyContentType: "text/plain"
-      parameters:
-        - name: "index_name"
-          in: "path"
-          type: "string"
-        - name: "doc_id"
-          in: "path"
-          type: "integer"
-          format: "int64"
-      responses:
-        "201":
-          content:
-            schema:
-              type: String
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/error_response"
+  @api [post] /{index}/add/{doc_id}
+  description: "Add a document."
+  tags:
+    - documents
+  parameters:
+    - name: "index"
+      description: "Index name"
+      in: "path"
+      type: "string"
+    - name: "doc_id"
+      description: "A unique document identifier"
+      in: "path"
+      type: "integer"
+      format: "int64"
+  requestBody:
+    required: true
+    content:
+      text/plain:
+        schema:
+          type: string
+        example: "The quick brown fox jumped over the lazy dog."
+  responses:
+    201:
+      description: "Created"
+    400:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error_response"
   --]]
 
   local index = get_nxs_index(name)
@@ -212,26 +294,28 @@ end)
 
 routes:delete("@/:string/remove/:number", function(self, name, doc_id)
   --[[
-      @api [delete] /{index_name}/remove/{doc_id}
-      description: "Delete a document."
-      parameters:
-        - name: "index_name"
-          in: "path"
-          type: "string"
-        - name: "doc_id"
-          in: "path"
-          type: "integer"
-          format: "int64"
-      responses:
-        "200":
-          content:
-            schema:
-              type: String
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/error_response"
+  @api [delete] /{index}/remove/{doc_id}
+  description: "Delete a document."
+  tags:
+    - documents
+  parameters:
+    - name: "index"
+      description: "Index name"
+      in: "path"
+      type: "string"
+    - name: "doc_id"
+      description: "Target document identifier"
+      in: "path"
+      type: "integer"
+      format: "int64"
+  responses:
+    200:
+      description: "OK"
+    400:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error_response"
   --]]
 
   local index = get_nxs_index(name)
@@ -244,24 +328,43 @@ end)
 
 routes:post("@/:string/search", function(self, name)
   --[[
-      @api [post] /{index_name}/search
-      bodyContentType: "text/plain"
-      description: "Search."
-      parameters:
-        - name: "index_name"
-          in: "path"
-          type: "string"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/search_response"
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/error_response"
+  @api [post] /{index}/search
+  tags:
+    - search
+  description: "Search the index for documents."
+  parameters:
+    - name: "index"
+      description: "Index name"
+      in: "path"
+      type: "string"
+    - name: "algo"
+      description: "Override the ranking algorithm (see index creation)"
+      in: query
+      schema:
+        type: string
+    - name: "limit"
+      description: "The cap for the results"
+      in: query
+      schema:
+        type: integer
+      default: 1000
+    - name: "fuzzymatch"
+      description: "Fuzzy-match the terms"
+      in: query
+      schema:
+        type: boolean
+      default: true
+  responses:
+    200:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/search_response"
+    400:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error_response"
   --]]
 
   local index = get_nxs_index(name)
@@ -283,36 +386,3 @@ routes:post("@/:string/search", function(self, name)
 end)
 
 return routes
-
-
---[[
-  @schema error_response
-  type: object
-  properties:
-    error:
-        type: object
-        properties:
-          msg:
-            type: string
-          code:
-            type: integer
---]]
-
---[[
-  @schema search_response
-      type: object
-      properties:
-        count:
-          type: integer
-        results:
-          type: array
-          items:
-            type: object
-            properties:
-              doc_id:
-                type: number
-                format: int64
-              score:
-                type: number
-                format: float
---]]
