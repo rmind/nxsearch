@@ -9,7 +9,7 @@ awk '/\[\[/,/\]\]/' nxsearch_svc.lua \
 cat <<EOT >> base.yml
 openapi: "3.0.2"
 info:
-    title: "Swagger nxsearch"
+    title: "nxsearch API"
     description: ""
 
 EOT
