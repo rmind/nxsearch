@@ -11,9 +11,10 @@
  * They are used to transform tokens such that they are more suitable
  * for searching.  This module implements an interface to register filters
  * and create pipelines which be invoked by the tokenizer.
+ *
+ * See description of filter_ops_t in the filters.h headers.
  */
 
-#include <sys/errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -30,7 +31,7 @@
 struct filter_entry {
 	const char *		name;
 	const filter_ops_t *	ops;
-	void *			context;
+	void *			ctx;
 	TAILQ_ENTRY(filter_entry) entry;
 };
 
@@ -67,7 +68,7 @@ filters_sysfini(nxs_t *nxs)
 		const filter_ops_t *ops = filtent->ops;
 
 		if (ops && ops->sysfini) {
-			ops->sysfini(filtent->context);
+			ops->sysfini(filtent->ctx);
 		}
 		TAILQ_REMOVE(&nxs->filter_list, filtent, entry);
 		free(filtent);
@@ -89,19 +90,24 @@ filter_lookup(nxs_t *nxs, const char *name)
 	return NULL;
 }
 
-__dso_public int
-nxs_filter_register(nxs_t *nxs, const char *name, const filter_ops_t *ops)
+int
+nxs_filter_register(nxs_t *nxs, const char *name,
+    const filter_ops_t *ops, void *arg)
 {
 	filter_entry_t *filtent;
 
 	if (filter_lookup(nxs, name)) {
-		errno = EEXIST;
+		nxs_decl_errx(nxs, NXS_ERR_INVALID,
+		    "filter `%s' already exists", name);
 		return -1;
 	}
 	if ((filtent = calloc(1, sizeof(filter_entry_t))) == NULL) {
+		nxs_decl_errx(nxs, NXS_ERR_SYSTEM, "OOM", NULL);
 		return -1;
 	}
-	if (ops->sysinit && (filtent->context = ops->sysinit(nxs)) == NULL) {
+	if (ops->sysinit && (filtent->ctx = ops->sysinit(nxs, arg)) == NULL) {
+		nxs_decl_err(nxs, NXS_ERR_SYSTEM,
+		    "filter `%s' failed to initialize", name);
 		free(filtent);
 		return -1;
 	}
@@ -146,6 +152,8 @@ filter_pipeline_create(nxs_t *nxs, nxs_params_t *params)
 		filter_entry_t *filtent;
 
 		if ((filtent = filter_lookup(nxs, name)) == NULL) {
+			nxs_decl_errx(nxs, NXS_ERR_INVALID,
+			    "filter `%s' not found", name);
 			goto err;
 		}
 
@@ -154,8 +162,10 @@ filter_pipeline_create(nxs_t *nxs, nxs_params_t *params)
 			continue;
 		}
 
-		filt->arg = filt->ops->create(params, filtent->context);
+		filt->arg = filt->ops->create(params, filtent->ctx);
 		if (filt->arg == NULL) {
+			nxs_decl_err(nxs, NXS_ERR_SYSTEM,
+			    "filter `%s' failed to create state", name);
 			goto err;
 		}
 	}
@@ -173,7 +183,7 @@ filter_pipeline_destroy(filter_pipeline_t *fp)
 	for (unsigned i = 0; i < fp->count; i++) {
 		filter_t *filt = &fp->filters[i];
 
-		if (filt->ops && filt->ops->destroy) {
+		if (filt->ops && filt->ops->destroy && filt->arg) {
 			filt->ops->destroy(filt->arg);
 		}
 	}

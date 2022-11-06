@@ -45,6 +45,28 @@ lua_nxs_push_error(lua_State *L)
 ///////////////////////////////////////////////////////////////////////////////
 
 static int
+lua_nxs_load_lua(lua_State *L)
+{
+	const char *name, *code;
+
+	name = lua_tostring(L, 1);
+	luaL_argcheck(L, name, 1, "non-empty `string' expected");
+
+	code = lua_tostring(L, 2);
+	luaL_argcheck(L, code, 2, "non-empty `string' expected");
+
+	if (nxs_luafilter_load(nxs, name, code) != 0) {
+		lua_pushboolean(L, false);
+		lua_nxs_push_error(L);
+		return 2;
+	}
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+static int
 lua_nxs_params_create(lua_State *L)
 {
 	nxs_params_t **p, *params;
@@ -387,6 +409,7 @@ luaopen_nxsearch(lua_State *L)
 		{ "create",	lua_nxs_index_create	},
 		{ "destroy",	lua_nxs_index_destroy	},
 		{ "newparams",	lua_nxs_params_create	},
+		{ "load_lua",	lua_nxs_load_lua	},
 		{ NULL,		NULL			},
 	};
 	static const struct luaL_Reg nxs_param_methods[] = {

@@ -159,6 +159,43 @@ end
 
 -------------------------------------------------------------------------
 
+routes:post("@/filters/:string/lua", function(self, name)
+  --[[
+  @api [post] /filters/{name}/lua
+  tags:
+    - filters
+  description: "Create a Lua-based filter."
+  parameters:
+    - name: "name"
+      description: "Filter name"
+      in: "path"
+      type: "string"
+  requestBody:
+    required: true
+    content:
+      application/x-lua:
+        schema:
+          type: string
+  responses:
+    201:
+      description: "Created"
+    400:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error_response"
+  --]]
+
+  local payload = get_http_body(true)
+  local ok, err = nxs.load_lua(name, payload)
+  if not ok then
+    return set_http_error(err)
+  end
+  return ngx.exit(ngx.HTTP_CREATED)
+end)
+
+-------------------------------------------------------------------------
+
 routes:post("@/:string", function(self, name)
   --[[
   @api [post] /{index}
@@ -237,6 +274,8 @@ routes:delete("@/:string", function(self, name)
 
   return ngx.exit(ngx.HTTP_OK)
 end)
+
+-------------------------------------------------------------------------
 
 routes:post("@/:string/add/:number", function(self, name, doc_id)
   --[[
@@ -325,6 +364,8 @@ routes:delete("@/:string/remove/:number", function(self, name, doc_id)
   end
   return ngx.exit(ngx.HTTP_OK)
 end)
+
+-------------------------------------------------------------------------
 
 routes:post("@/:string/search", function(self, name)
   --[[

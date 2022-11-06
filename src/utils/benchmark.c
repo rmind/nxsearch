@@ -5,17 +5,11 @@
  * Use is subject to license terms, as specified in the LICENSE file.
  */
 
-#include <sys/types.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <dirent.h>
 #include <getopt.h>
-#include <fcntl.h>
 #include <time.h>
 #include <err.h>
 
@@ -75,40 +69,15 @@ benchmark_end(const char *operation)
 	printf("%s: %"PRIi64" ms\n", operation, elapsed);
 }
 
-static void *
-read_file(const char *path, size_t *len)
-{
-	struct stat st;
-	ssize_t ret;
-	char *text;
-	int fd;
-
-	if ((fd = open(path, O_RDONLY)) == -1) {
-		err(EXIT_FAILURE, "open");
-	}
-	if (fstat(fd, &st) == -1) {
-		err(EXIT_FAILURE, "fstat");
-	}
-	if ((text = malloc(st.st_size + 1)) == NULL) {
-		err(EXIT_FAILURE, "malloc");
-	}
-	if ((ret = fs_read(fd, text, st.st_size)) == -1) {
-		err(EXIT_FAILURE, "fs_read");
-	}
-	text[ret] = '\0';
-	close(fd);
-
-	*len = (size_t)st.st_size;
-	return text;
-}
-
 static void
 index_file(nxs_t *nxs, nxs_index_t *idx, nxs_doc_id_t doc_id, const char *path)
 {
 	size_t len;
 	char *text;
 
-	text = read_file(path, &len);
+	if ((text = fs_read_file(path, &len)) == NULL) {
+		err(EXIT_FAILURE, "fs_read_file() failed");
+	}
 	if (nxs_index_add(idx, doc_id, text, len) == -1) {
 		const char *e = NULL;
 		nxs_get_error(nxs, &e);

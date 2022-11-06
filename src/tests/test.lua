@@ -1,3 +1,7 @@
+--
+-- This code is in the public domain.
+--
+
 local nxs = require "nxsearch"
 local cjson = require "cjson"
 

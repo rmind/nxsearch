@@ -66,7 +66,6 @@ endif
 
 ifeq ($(SYSNAME),Linux)
 CFLAGS+=	-D_GNU_SOURCE -D_DEFAULT_SOURCE
-#LDFLAGS+=	-ljemalloc
 endif
 
 #
@@ -82,10 +81,15 @@ LDFLAGS+=	$(shell pkg-config --libs --cflags icu-uc icu-io)
 LDFLAGS+=	-lstemmer
 
 #
-# Lua module
+# Lua
 #
-LUA_CFLAGS?=	-fPIC $(shell pkg-config --cflags luajit)
-LUA_LDFLAGS?=	-fPIC $(shell pkg-config --cflags --libs luajit)
+
+USE_LUA?=	1
+
+ifeq ($(USE_LUA),1)
+CFLAGS+=	-fPIC $(shell pkg-config --cflags luajit)
+LDFLAGS+=	-fPIC $(shell pkg-config --cflags --libs luajit)
+endif
 
 LUA_OBJS+=	core/lua.o
 
@@ -97,6 +101,7 @@ OBJS+=		core/nxs.o
 OBJS+=		core/tokenizer.o
 OBJS+=		core/filters.o
 OBJS+=		core/filters_builtin.o
+OBJS+=		core/filters_lua.o
 OBJS+=		core/params.o
 OBJS+=		core/results.o
 
@@ -162,7 +167,6 @@ BENCHMARK_BIN=	nxsearch_test
 ALL_OBJS:=	$(shell echo $(OBJS) $(EXT_AOBJ))
 
 $(LIB).la:	LDFLAGS+=	-rpath $(LIBDIR)
-$(LUALIB).so:	CFLAGS+=	$(LUA_CFLAGS)
 
 install/%.la:	ILIBDIR=	$(DESTDIR)/$(LIBDIR)
 install:	IBINDIR=	$(DESTDIR)/$(BINDIR)
@@ -182,7 +186,7 @@ lua-lib: $(LUALIB).so
 	libtool --mode=link --tag CC $(CC) $(LDFLAGS) -o $@ $(notdir $^) $(EXT_AOBJ)
 
 %.so: $(ALL_OBJS) $(LUA_OBJS)
-	$(CC) -fPIC -shared -o $@ $^ $(LDFLAGS) $(LUA_LDFLAGS)
+	$(CC) -fPIC -shared -o $@ $^ $(LDFLAGS)
 
 libs/CRoaring/build/src/libroaring.a:
 	@ echo Building libroaring
