@@ -26,6 +26,8 @@ typedef struct nxs nxs_t;
 nxs_t *		nxs_open(const char *);
 void		nxs_close(nxs_t *);
 
+int		nxs_luafilter_load(nxs_t *, const char *, const char *);
+
 /*
  * Errors.
  */

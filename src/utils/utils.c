@@ -8,8 +8,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <stdlib.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <fcntl.h>
 #include <errno.h>
 
 #include "utils.h"
@@ -53,6 +55,36 @@ fs_read(int fd, void *buf, size_t target)
 		toread -= ret;
 	}
 	return target - toread;
+}
+
+void *
+fs_read_file(const char *path, size_t *len)
+{
+	char *text = NULL;
+	struct stat st;
+	ssize_t ret;
+	int fd;
+
+	if ((fd = open(path, O_RDONLY)) == -1) {
+		return NULL;
+	}
+	if (fstat(fd, &st) == -1) {
+		goto out;
+	}
+	if ((text = malloc(st.st_size + 1)) == NULL) {
+		goto out;
+	}
+	if ((ret = fs_read(fd, text, st.st_size)) == -1) {
+		free(text);
+		goto out;
+	}
+	text[ret] = '\0';
+	if (len) {
+		*len = (size_t)st.st_size;
+	}
+out:
+	close(fd);
+	return text;
 }
 
 bool

@@ -20,11 +20,27 @@ typedef enum {
 } filter_action_t;
 
 typedef struct filter_ops {
-	void *		(*sysinit)(nxs_t *);
+	/*
+	 * sysinit/sysfini handlers are called on nxsearch instantiation
+	 * and may be used to setup long-term context / resources, e.g.
+	 * load the dictionaries.
+	 */
+	void *		(*sysinit)(nxs_t *, void *);
 	void		(*sysfini)(void *);
 
+	/*
+	 * create/destroy handlers are called upon the filter pipeline
+	 * creation/destruction, when opening a particular index, and
+	 * may be used to obtain index parameters (such as the language)
+	 * and setup index-specific resources.
+	 */
 	void *		(*create)(nxs_params_t *, void *);
 	void		(*destroy)(void *);
+
+	/*
+	 * The main filter handler: takes the string buffer and either
+	 * mutates, drops it or indicates and error.
+	 */
 	filter_action_t	(*filter)(void *, strbuf_t *);
 } filter_ops_t;
 

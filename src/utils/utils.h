@@ -177,6 +177,7 @@ void	_app_log(int, const char *, int, const char *, const char *, ...);
 
 int	str_isalnumdu(const char *);
 ssize_t	fs_read(int, void *, size_t);
+void *	fs_read_file(const char *, size_t *);
 bool	fs_is_dir(const char *);
 
 #endif

@@ -40,7 +40,7 @@ struct nxs {
 #define	NXS_DEFAULT_RANKING_ALGO	"BM25"
 #define	NXS_DEFAULT_LANGUAGE		"en"
 
-int	nxs_filter_register(nxs_t *, const char *, const filter_ops_t *);
+int	nxs_filter_register(nxs_t *, const char *, const filter_ops_t *, void *);
 
 void	nxs_clear_error(nxs_t *);
 void	nxs_error_checkpoint(nxs_t *);

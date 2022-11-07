@@ -126,7 +126,7 @@ stopwords_load(nxs_t *nxs, rhashmap_t *swdicts, const char *lang)
 }
 
 static void *
-stopwords_sysinit(nxs_t *nxs)
+stopwords_sysinit(nxs_t *nxs, void *arg __unused)
 {
 	rhashmap_t *swdicts;
 
@@ -251,8 +251,8 @@ static const filter_ops_t stemmer_ops = {
 int
 filters_builtin_sysinit(nxs_t *nxs)
 {
-	nxs_filter_register(nxs, "normalizer", &normalizer_ops);
-	nxs_filter_register(nxs, "stopwords", &stopwords_ops);
-	nxs_filter_register(nxs, "stemmer", &stemmer_ops);
+	nxs_filter_register(nxs, "normalizer", &normalizer_ops, NULL);
+	nxs_filter_register(nxs, "stopwords", &stopwords_ops, NULL);
+	nxs_filter_register(nxs, "stemmer", &stemmer_ops, NULL);
 	return 0;
 }
