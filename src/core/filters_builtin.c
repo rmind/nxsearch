@@ -186,7 +186,7 @@ stopwords_filter(void *arg, strbuf_t *buf)
 
 	if (lang_map != DUMMY_PTR &&
 	    rhashmap_get(lang_map, buf->value, buf->length)) {
-		return FILT_DROP;
+		return FILT_DISCARD;
 	}
 	return FILT_MUTATION;  // pass-through
 }

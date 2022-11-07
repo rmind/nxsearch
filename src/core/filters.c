@@ -206,7 +206,7 @@ filter_pipeline_run(filter_pipeline_t *fp, strbuf_t *buf)
 
 		action = ops->filter(filt->arg, buf);
 		if (__predict_false(buf->length == 0)) {
-			return FILT_DROP;
+			return FILT_DISCARD;
 		}
 		ASSERT(buf->value[buf->length] == '\0');
 		app_dbgx("[%s] filter %u action %d", buf->value, i, action);

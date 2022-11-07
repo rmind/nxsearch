@@ -11,6 +11,8 @@ local routes = require "resty.route".new()
 local lrucache = require "resty.lrucache"
 local cjson = require "cjson"
 
+local NXS_BASEDIR = os.getenv("NXS_BASEDIR")
+
 local nxs_index_ttl = 86400
 local nxs_index_map = lrucache.new(32)
 
@@ -36,6 +38,10 @@ local function set_http_error(err)
     ["msg"] = err.msg,
   }}))
   return ngx.exit(ngx.HTTP_BAD_REQUEST)
+end
+
+local function set_http_sys_error(msg)
+  return set_http_error({["code"] = nxs.ERR_SYSTEM, ["msg"] = msg})
 end
 
 local function get_nxs_index(name)
@@ -167,15 +173,24 @@ routes:post("@/filters/:string/lua", function(self, name)
   description: "Create a Lua-based filter."
   parameters:
     - name: "name"
-      description: "Filter name"
+      description: "Filter name (alphanumeric only)"
       in: "path"
       type: "string"
+    - name: "store"
+      description: >
+        Store the filter persistently.
+        Service restart will be needed.
+      in: query
+      schema:
+        type: boolean
+      default: false
   requestBody:
     required: true
     content:
       application/x-lua:
         schema:
           type: string
+          description: Lua source code
   responses:
     201:
       description: "Created"
@@ -187,10 +202,24 @@ routes:post("@/filters/:string/lua", function(self, name)
   --]]
 
   local payload = get_http_body(true)
+  local query_string = ngx.req.get_uri_args()
+
+  if name:match("%W") then
+    return set_http_error("filter name must be alphanumeric")
+  end
+
   local ok, err = nxs.load_lua(name, payload)
   if not ok then
     return set_http_error(err)
   end
+
+  if query_string["store"] then
+    local ok, errmsg = nxs_fs.store_filter(name, payload)
+    if not ok then
+      return set_http_sys_error(errmsg)
+    end
+  end
+
   return ngx.exit(ngx.HTTP_CREATED)
 end)
 
@@ -204,7 +233,7 @@ routes:post("@/:string", function(self, name)
     - index
   parameters:
     - name: "index"
-      description: "Index name"
+      description: "Index name (must be alphanumeric)"
       in: path
       type: string
   requestBody:
@@ -319,7 +348,7 @@ routes:post("@/:string/add/:number", function(self, name, doc_id)
     doc_id = tonumber(doc_id)
     local ok, err = nxs_fs.store_file(name, doc_id, payload)
     if not ok then
-      return set_http_error(err)
+      return set_http_sys_error(err)
     end
   end
 

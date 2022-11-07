@@ -233,7 +233,7 @@ tokenize(filter_pipeline_t *fp, nxs_params_t *params,
 		}
 		action = filter_pipeline_run(fp, &token->buffer);
 		if (__predict_false(action != FILT_MUTATION)) {
-			ASSERT(action == FILT_DROP || action == FILT_ERROR);
+			ASSERT(action == FILT_DISCARD || action == FILT_ERROR);
 			token_destroy(token);
 			if (action == FILT_ERROR) {
 				goto err;

@@ -196,12 +196,8 @@ _nxs_decl_err(nxs_t *nxs, int level, const char *file, int line,
 	free(nxs->errmsg);
 	nxs->errmsg = msg;
 	nxs->errcode = code;
-#if 0
-	va_copy or add another primitive?
-	_app_log(level, file, line, func, fmt, ap);
-#else
-	(void)file; (void)line; (void)func;
-#endif
+
+	_app_log(level, file, line, func, "%s", msg);
 }
 
 __dso_public nxs_err_t

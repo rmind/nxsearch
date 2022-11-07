@@ -18,4 +18,8 @@ return {
     assert(ctx.lang == "en")
     return string.lower(value)
   end,
+
+  cleanup = function()
+    -- module level cleanup
+  end,
 }

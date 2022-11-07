@@ -16,7 +16,7 @@ typedef struct filter_pipeline filter_pipeline_t;
 typedef enum {
 	FILT_ERROR	= -1,
 	FILT_MUTATION	= 0,
-	FILT_DROP	= 1,
+	FILT_DISCARD	= 1,
 } filter_action_t;
 
 typedef struct filter_ops {
@@ -39,7 +39,7 @@ typedef struct filter_ops {
 
 	/*
 	 * The main filter handler: takes the string buffer and either
-	 * mutates, drops it or indicates and error.
+	 * mutates it, discards it or indicates and error.
 	 */
 	filter_action_t	(*filter)(void *, strbuf_t *);
 } filter_ops_t;
