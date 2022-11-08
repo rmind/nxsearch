@@ -28,6 +28,7 @@ typedef enum {
 	LF_CREATE = 0,
 	LF_DESTROY,
 	LF_FILTER,
+	LF_CLEANUP,
 	LF_COUNT
 } lua_filtcall_t;
 
@@ -77,6 +78,7 @@ luafilt_sysinit(nxs_t *nxs, void *arg)
 		[LF_CREATE]	= "create",
 		[LF_DESTROY]	= "destroy",
 		[LF_FILTER]	= "filter",
+		[LF_CLEANUP]	= "cleanup",
 	};
 	lua_filtctx_t *lctx = arg;
 	lua_State *L;
@@ -125,18 +127,28 @@ luafilt_sysfini(void *arg)
 	lua_filtctx_t *lctx = arg;
 	lua_State *L;
 
-	if ((L = lctx->L) != NULL) {
-		ASSERT(lua_gettop(L) == 0);
-
-		for (unsigned i = LF_CREATE; i < LF_COUNT; i++) {
-			const int func_ref = lctx->handlers[i];
-
-			if (func_ref != LUA_REFNIL) {
-				luaL_unref(L, LUA_REGISTRYINDEX, func_ref);
-			}
-		}
-		lua_close(L);
+	if ((L = lctx->L) == NULL) {
+		goto out;
 	}
+	ASSERT(lua_gettop(L) == 0);
+
+	if (lctx->handlers[LF_CLEANUP] != LUA_REFNIL) {
+		lua_rawgeti(L, LUA_REGISTRYINDEX, lctx->handlers[LF_CLEANUP]);
+		if (lua_pcall(L, 0, 0, 0) != 0) {
+			app_dbgx("Lua error: %s", lua_tostring(L, -1));
+			lua_pop(L, 1);
+		}
+	}
+
+	for (unsigned i = LF_CREATE; i < LF_COUNT; i++) {
+		const int func_ref = lctx->handlers[i];
+
+		if (func_ref != LUA_REFNIL) {
+			luaL_unref(L, LUA_REGISTRYINDEX, func_ref);
+		}
+	}
+	lua_close(L);
+out:
 	free(lctx);
 }
 
@@ -169,11 +181,19 @@ luafilt_create(nxs_params_t *params, void *arg)
 		lua_pushnil(L); // +1
 	}
 
-	if (lua_pcall(L, 1, 1, 0) != 0) {
+	if (lua_pcall(L, 1, 2, 0) != 0) {
 		app_dbgx("Lua error: %s", lua_tostring(L, -1));
 		lua_pop(L, 1);
 		return NULL;
 	}
+
+	if (lua_isnil(L, -2)) {
+		app_dbgx("Lua error: %s", lua_tostring(L, -1));
+		lua_pop(L, 2);
+		return NULL;
+	}
+	lua_pop(L, 1); // -1
+
 	xref->arg_ref = luaL_ref(L, LUA_REGISTRYINDEX); // -1
 	ASSERT(lua_gettop(L) == 0);
 	return xref;
@@ -207,7 +227,7 @@ luafilt_filter(void *arg, strbuf_t *buf)
 	lua_argref_t *xref = arg;
 	lua_filtctx_t *lctx = xref->ctx;
 	lua_State *L = lctx->L;
-	const char *val;
+	const char *val, *err;
 	size_t len;
 
 	ASSERT(lua_gettop(L) == 0);
@@ -215,20 +235,32 @@ luafilt_filter(void *arg, strbuf_t *buf)
 	lua_rawgeti(L, LUA_REGISTRYINDEX, xref->arg_ref); // +1
 	lua_pushlstring(L, buf->value, buf->length); // +1
 
-	if (lua_pcall(L, 2, 1, 0) != 0) {
+	if (lua_pcall(L, 2, 2, 0) != 0) {
 		app_dbgx("Lua error: %s", lua_tostring(L, -1));
 		lua_pop(L, 1);
 		return FILT_ERROR;
 	}
-	val = lua_tolstring(L, -1, &len);
-	if (val && strbuf_acquire(buf, val, len) == -1) {
-		lua_pop(L, 1);
+	val = lua_tolstring(L, -2, &len);
+	err = lua_tostring(L, -1);
+	if (val == NULL) {
+		if (err) {
+			// XXX: return the error message
+			app_dbgx("Lua filter() error: %s", err);
+			lua_pop(L, 2);
+			return FILT_ERROR;
+		}
+		lua_pop(L, 2);
+		return FILT_DISCARD;
+	}
+	if (strbuf_acquire(buf, val, len) == -1) {
+		app_dbg("strbuf_acquire failed", NULL);
+		lua_pop(L, 2);
 		return FILT_ERROR;
 	}
-	lua_pop(L, 1);
+	lua_pop(L, 2);
 	ASSERT(lua_gettop(L) == 0);
 
-	return val ? FILT_MUTATION: FILT_DROP;
+	return FILT_MUTATION;
 }
 
 __dso_public int

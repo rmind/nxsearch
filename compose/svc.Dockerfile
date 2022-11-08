@@ -81,8 +81,7 @@ ENV NXS_BASEDIR=/nxsearch
 RUN \
     useradd -m svc && \
     chown -R svc:svc /var/run/openresty/ /usr/local/openresty/nginx/ && \
-    chown -R root:root /usr/local/openresty/nginx/sbin/ && \
-    chown svc:svc "$NXS_BASEDIR"
+    chown -R root:root /usr/local/openresty/nginx/sbin/
 
 #
 # Application
@@ -93,6 +92,7 @@ COPY --from=nxsearch-lib /nxsearch/filters "${NXS_BASEDIR}/filters"
 COPY --from=nxsearch-lib /build/nxsearch.so /usr/local/openresty/lualib/
 COPY ./svc-src/*.lua /usr/local/openresty/lualib/
 COPY compose/docs.html /app/public_html/docs.html
+RUN chown -R svc:svc "$NXS_BASEDIR"
 
 #
 # Run the service.

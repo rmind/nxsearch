@@ -45,6 +45,23 @@ end
 
 local _M = {}
 
+function _M.store_filter(name, content)
+  local fpath = string.format("%s/filters/%s.lua",
+    lua_path.fullpath(NXS_BASEDIR), name)
+  if lua_path.exists(fpath) then
+    return false, "Lua filter source file already exists"
+  end
+
+  local file, err = io.open(fpath, "w")
+  if not file then
+    return false, err
+  end
+
+  file:write(content)
+  file:close()
+  return true
+end
+
 function _M.store_file(index_name, doc_id, content)
   local doc_path = prepare_doc_location(index_name, doc_id)
 
@@ -55,7 +72,6 @@ function _M.store_file(index_name, doc_id, content)
 
   file:write(content)
   file:close()
-
   return true
 end
 

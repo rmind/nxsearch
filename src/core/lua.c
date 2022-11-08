@@ -5,6 +5,10 @@
  * Use is subject to license terms, as specified in the LICENSE file.
  */
 
+/*
+ * nxsearch Lua module API.
+ */
+
 #include <stdlib.h>
 #include <inttypes.h>
 
