@@ -1,7 +1,7 @@
 #
 # nxsearch library image
 #
-FROM debian:11.5-slim AS lib
+FROM debian:11.5-slim AS nxsearch-lib
 
 #
 # Install dependencies.
@@ -33,7 +33,7 @@ RUN luajit ./tests/test.lua
 #
 # nxsearch-svc swagger doc generation
 #
-FROM node:14-alpine as doc-gen
+FROM node:14-alpine AS doc-gen
 
 WORKDIR /app
 
@@ -88,9 +88,9 @@ RUN \
 # Application
 #
 WORKDIR /app
-COPY --from=lib /build/nxsearch.so /usr/local/openresty/lualib/
 COPY --from=doc-gen /app/openapi.json /app/public_html/openapi.json
-COPY --from=lib /nxsearch/filters "$NXS_BASEDIR"/filters
+COPY --from=nxsearch-lib /nxsearch/filters "${NXS_BASEDIR}/filters"
+COPY --from=nxsearch-lib /build/nxsearch.so /usr/local/openresty/lualib/
 COPY ./svc-src/*.lua /usr/local/openresty/lualib/
 COPY compose/docs.html /app/public_html/docs.html
 
