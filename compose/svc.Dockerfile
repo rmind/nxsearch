@@ -1,8 +1,7 @@
 #
 # nxsearch library image
 #
-
-FROM debian:11.5-slim AS nxsearch
+FROM debian:11.5-slim AS nxsearch-lib
 
 #
 # Install dependencies.
@@ -31,39 +30,38 @@ RUN make distclean && make -j $(getconf _NPROCESSORS_ONLN) lua-lib
 RUN luajit ./tests/test.lua
 
 ##############################################################################
-FROM node:14-alpine as doc-gen
 #
 # nxsearch-svc swagger doc generation
 #
+FROM node:14-alpine AS doc-gen
 
 WORKDIR /app
 
 COPY ./svc-src/gen_doc_api.sh ./
 COPY ./svc-src/nxsearch_svc.lua ./
 
-RUN npm install swagger-inline --save-dev &&\
+RUN npm install swagger-inline --save-dev && \
     sh gen_doc_api.sh > openapi.json
 
 ##############################################################################
 #
 # nxsearch-svc image
 #
-
 # OpenResty on Debian (11.x -- Bullseye)
 FROM openresty/openresty:bullseye AS nxsearch-svc
 
-RUN apt-get update
-RUN apt-get install -y vim less procps net-tools
-RUN apt-get install -y curl git unzip libxml2-utils
-RUN apt-get install -y libicu67 libstemmer0d
-
-#
-# Install dependencies.
-#
-RUN apt-get install -y luarocks
-RUN luarocks install resty-route 0.1-2
-RUN luarocks install luafilesystem 1.8.0-1
-RUN luarocks install lua-path 0.3.1-2
+RUN \
+    apt-get update && \
+    apt-get install -y \
+        git \
+        libicu67 libstemmer0d luarocks && \
+    luarocks install resty-route 0.1-2 && \
+    luarocks install luafilesystem 1.8.0-1 && \
+    luarocks install lua-path 0.3.1-2 &&  \
+    apt-get remove -y git && \
+    apt-get clean autoclean && \
+    apt-get autoremove --yes && \
+    rm -rf /var/lib/{apt,dpkg,cache,log}/
 
 #
 # Install Nginx/Openresty configuration.
@@ -72,34 +70,29 @@ COPY compose/nginx.conf /etc/nginx/nginx.conf
 RUN ln -sf /etc/nginx/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
 #
-# Setup unprivileged user.
-#
-RUN useradd -m svc
-RUN chown -R svc:svc /var/run/openresty/ /usr/local/openresty/nginx/
-RUN chown -R root:root /usr/local/openresty/nginx/sbin/
-
-#
 # Data directory.
 #
 WORKDIR /nxsearch
-RUN chown svc:svc /nxsearch
 ENV NXS_BASEDIR=/nxsearch
 
-WORKDIR /build
-COPY tools/fetch_ext_data.sh ./
-RUN ./fetch_ext_data.sh "$NXS_BASEDIR"
+#
+# Setup unprivileged user.
+#
+RUN \
+    useradd -m svc && \
+    chown -R svc:svc /var/run/openresty/ /usr/local/openresty/nginx/ && \
+    chown -R root:root /usr/local/openresty/nginx/sbin/ && \
+    chown svc:svc "$NXS_BASEDIR"
 
 #
 # Application
 #
-
 WORKDIR /app
-COPY --from=nxsearch /build/nxsearch.so /usr/local/openresty/lualib/
-COPY ./svc-src/nxsearch_svc.lua /usr/local/openresty/lualib/
-COPY ./svc-src/nxsearch_storage.lua /usr/local/openresty/lualib/
-COPY compose/docs.html /app/public_html/docs.html
 COPY --from=doc-gen /app/openapi.json /app/public_html/openapi.json
-
+COPY --from=nxsearch-lib /nxsearch/filters "${NXS_BASEDIR}/filters"
+COPY --from=nxsearch-lib /build/nxsearch.so /usr/local/openresty/lualib/
+COPY ./svc-src/*.lua /usr/local/openresty/lualib/
+COPY compose/docs.html /app/public_html/docs.html
 
 #
 # Run the service.
