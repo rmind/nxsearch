@@ -101,8 +101,7 @@ idxterm_levdist(void *ctx, const void *a, const void *b)
 }
 
 idxterm_t *
-idxterm_create(nxs_index_t *idx, const char *token,
-    const size_t len, const size_t offset)
+idxterm_create(const char *token, const size_t len, const size_t offset)
 {
 	idxterm_t *term;
 	size_t total_len;
@@ -124,22 +123,6 @@ idxterm_create(nxs_index_t *idx, const char *token,
 	ASSERT(len <= UINT16_MAX);
 	term->value_len = len;
 
-	/*
-	 * Map the term/token value to the object.
-	 */
-	if (rhashmap_put(idx->term_map, term->value, len, term) != term) {
-		/* Error: the index contains a duplicate. */
-		free(term);
-		return NULL;
-	}
-	if (bktree_insert(idx->term_bkt, term) == -1) {
-		rhashmap_del(idx->term_map, term->value, term->value_len);
-		free(term);
-		return NULL;
-	}
-	TAILQ_INSERT_TAIL(&idx->term_list, term, entry);
-	idx->term_count++;
-
 	app_dbgx("term %p [%s]", term, term->value);
 	return term;
 }
@@ -147,34 +130,60 @@ idxterm_create(nxs_index_t *idx, const char *token,
 void
 idxterm_destroy(nxs_index_t *idx, idxterm_t *term)
 {
-	TAILQ_REMOVE(&idx->term_list, term, entry);
-	idx->term_count--;
-
-	/*
-	 * XXX: bktree_delete
-	 *
-	 * Currently, idxterm_destroy() is called only when closing the
-	 * index and there are no individual deletions.   Nevertheless,
-	 * the API should not leave the stray pointers in the tree.
-	 */
-
 	if (term->id) {
+		/*
+		 * XXX: bktree_delete
+		 *
+		 * Currently, idxterm_destroy() is called only when
+		 * closing the index and there are no individual deletions.
+		 * Nevertheless, the API should not leave the stray pointers
+		 * in the tree.
+		 */
 		rhashmap_del(idx->td_map, &term->id, sizeof(nxs_term_id_t));
+		rhashmap_del(idx->term_map, term->value, term->value_len);
+		TAILQ_REMOVE(&idx->term_list, term, entry);
+		idx->term_count--;
 	}
-	rhashmap_del(idx->term_map, term->value, term->value_len);
 	roaring_bitmap_free(term->doc_bitmap);
 	free(term);
 }
 
 /*
- * idxterm_assign: assign the term ID and map the ID to the term object.
+ * idxterm_insert: map the term to the value and term ID to the object.
+ *
+ * => Returns the inserted term on success.
+ * => Returns already existing term, if it exists.
+ * => Returns NULL on failure.
  */
-void
-idxterm_assign(nxs_index_t *idx, idxterm_t *term, nxs_term_id_t term_id)
+idxterm_t *
+idxterm_insert(nxs_index_t *idx, idxterm_t *term, nxs_term_id_t term_id)
 {
+	const size_t len = term->value_len;
+	idxterm_t *result_term;
+
+	/*
+	 * Map the term/token value to the object.
+	 */
+	result_term = rhashmap_put(idx->term_map, term->value, len, term);
+	if (result_term != term) {
+		/* Error: the index contains a duplicate. */
+		app_dbgx("duplicate term [%s] in the map", term->value);
+		return result_term;
+	}
+	if (bktree_insert(idx->term_bkt, term) == -1) {
+		rhashmap_del(idx->term_map, term->value, len);
+		return NULL;
+	}
+	TAILQ_INSERT_TAIL(&idx->term_list, term, entry);
+	idx->term_count++;
+
+	/*
+	 * Assign the term ID and map the ID to the term object.
+	 */
 	term->id = term_id;
 	rhashmap_put(idx->td_map, &term->id, sizeof(nxs_term_id_t), term);
 	app_dbgx("term %p [%s] => %u", term, term->value, term->id);
+	return term;
 }
 
 /*

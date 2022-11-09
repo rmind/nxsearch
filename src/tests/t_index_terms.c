@@ -65,8 +65,11 @@ run_idxterm_test(void)
 	ret = idx_terms_open(&idx, testdb_path);
 	assert(ret == 0);
 
-	tp = idxterm_create(&idx, tval, sizeof(tval) - 1, 1001);
+	tp = idxterm_create(tval, sizeof(tval) - 1, 1001);
 	assert(tp != NULL);
+
+	term = idxterm_insert(&idx, tp, 1);
+	assert(term == tp);
 
 	term = idxterm_lookup(&idx, tval, sizeof(tval) - 1);
 	assert(term == tp && term->offset == 1001);

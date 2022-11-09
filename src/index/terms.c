@@ -218,7 +218,7 @@ again:
 	while ((token = TAILQ_FIRST(&tokens->staging)) != NULL) {
 		const char *val = token->buffer.value;
 		const size_t len = token->buffer.length;
-		idxterm_t *term;
+		idxterm_t *term, *result_term;
 		nxs_term_id_t id;
 		size_t offset;
 
@@ -266,14 +266,28 @@ again:
 		 * Create the term, assign the ID and also associate
 		 * the token with it.
 		 */
-		term = idxterm_create(idx, val, len, offset);
-		if (term == NULL) {
+		if ((term = idxterm_create(val, len, offset)) == NULL) {
 			nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
 			    "idxterm_create failed", NULL);
 			goto err;
 		}
 		id = ++idx->terms_last_id;
-		idxterm_assign(idx, term, id);
+
+		result_term = idxterm_insert(idx, term, id);
+		if (__predict_false(result_term != term)) {
+			if (result_term == NULL) {
+				goto err;
+			}
+
+			/*
+			 * Race condition: the term was inserted concurrently,
+			 * therefore just using the existing term.
+			 */
+			idxterm_destroy(idx, term);
+			token->idxterm = result_term;
+			tokenset_moveback(tokens, token);
+			continue;
+		}
 		token->idxterm = term;
 
 		/* Token resolved: put it back to the list and iterate. */
@@ -380,14 +394,13 @@ idx_terms_sync(nxs_index_t *idx)
 			    "corrupted terms index", NULL);
 			goto err;
 		}
-		term = idxterm_create(idx, val, len, offset);
-		if (term == NULL) {
+		if ((term = idxterm_create(val, len, offset)) == NULL) {
 			nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
 			    "idxterm_create failed", NULL);
 			goto err;
 		}
 		id = ++idx->terms_last_id;
-		idxterm_assign(idx, term, id);
+		idxterm_insert(idx, term, id);
 		consumed_len += IDXTERMS_BLK_LEN(len);
 	}
 	ASSERT(consumed_len == target_len);
