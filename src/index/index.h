@@ -105,11 +105,10 @@ void		idx_db_release(idxmap_t *);
 int		idxterm_sysinit(nxs_index_t *);
 void		idxterm_sysfini(nxs_index_t *);
 
-idxterm_t *	idxterm_create(nxs_index_t *, const char *,
-		    const size_t, const size_t);
+idxterm_t *	idxterm_create(const char *, const size_t, const size_t);
 void		idxterm_destroy(nxs_index_t *, idxterm_t *);
 
-void		idxterm_assign(nxs_index_t *, idxterm_t *, nxs_term_id_t);
+idxterm_t *	idxterm_insert(nxs_index_t *, idxterm_t *, nxs_term_id_t);
 idxterm_t *	idxterm_lookup(nxs_index_t *, const char *, size_t);
 idxterm_t *	idxterm_lookup_by_id(nxs_index_t *, nxs_term_id_t);
 idxterm_t *	idxterm_fuzzysearch(nxs_index_t *, const char *, size_t);
