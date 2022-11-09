@@ -198,6 +198,7 @@ main(int argc, char **argv)
 
 	if (query) {
 		nxs_resp_t *resp;
+		char *json;
 
 		benchmark_start();
 		resp = nxs_index_search(idx, NULL, query, strlen(query));
@@ -206,8 +207,11 @@ main(int argc, char **argv)
 			errx(EXIT_FAILURE, "search error: %s", e);
 		}
 		benchmark_end("search");
-		puts(nxs_resp_tojson(resp, NULL));
+
+		json = nxs_resp_tojson(resp, NULL);
 		nxs_resp_release(resp);
+		puts(json);
+		free(json);
 	}
 
 	if (drop) {
