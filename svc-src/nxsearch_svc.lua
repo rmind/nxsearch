@@ -26,14 +26,7 @@ local function nxs_svc_init()
 
   for i = 1, #filters do
     local name = filters[i]
-    local fpath = string.format("%s/filters/%s.lua",
-      lua_path.fullpath(NXS_BASEDIR), name)
-
-    local file, err = io.open(fpath, "r")
-    if not file then error(err) end
-    local content = file:read("*all")
-    file:close()
-
+    local content = nxs_fs.get_filter_code(name)
     local ok, err = nxs.load_lua(name, content)
     if not ok then error(err) end
   end

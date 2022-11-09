@@ -45,6 +45,18 @@ end
 
 local _M = {}
 
+function _M.get_filter_code(name)
+  local fpath = string.format("%s/filters/%s.lua",
+    lua_path.fullpath(NXS_BASEDIR), name)
+
+  local file, err = io.open(fpath, "r")
+  if not file then error(err) end
+  local content = file:read("*all")
+  file:close()
+
+  return content
+end
+
 function _M.get_filters()
   local fpath = string.format("%s/filters", lua_path.fullpath(NXS_BASEDIR))
   local filters = {}
