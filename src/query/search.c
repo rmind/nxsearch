@@ -31,6 +31,7 @@ get_search_params(nxs_index_t *idx, nxs_params_t *params, search_params_t *sp)
 	 */
 	memset(sp, 0, sizeof(search_params_t));
 	sp->limit = NXS_DEFAULT_RESULTS_LIMIT;
+	sp->tflags = TOKENSET_FUZZYMATCH;
 	sp->algo = idx->algo;
 
 	if (!params) {
@@ -49,8 +50,8 @@ get_search_params(nxs_index_t *idx, nxs_params_t *params, search_params_t *sp)
 		    "invalid algorithm", NULL);
 		return -1;
 	}
-	if (nxs_params_get_bool(params, "fuzzymatch", &fl) == 0 && fl) {
-		sp->tflags |= TOKENSET_FUZZYMATCH;
+	if (nxs_params_get_bool(params, "fuzzymatch", &fl) == 0 && !fl) {
+		sp->tflags &= ~TOKENSET_FUZZYMATCH;
 	}
 	return 0;
 }

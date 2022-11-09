@@ -118,11 +118,10 @@ It is the user's responsibility to release them after use.
   Custom search parameters may be specified in `params` or it may be set
   to `NULL` for defaults.  Returns `NULL` on failure or the response object
   on success.  The response object must be released using `nxs_resp_release()`.
-  Currently, the following
-  parameters are supported:
+  Currently, the following parameters are supported:
     * `algo`: override ranking algorithm (see `nxs_index_create()` description).
     * `limit`: the cap for the results (default: 1000).
-    * `fuzzymatch`: fuzzy-match the terms (default: false).
+    * `fuzzymatch`: fuzzy-match the terms (default: true).
 
 * `char *nxs_resp_tojson(nxs_resp_t *resp, size_t *len)`
   * Return the response as a JSON string representation.  If the `len` is not
