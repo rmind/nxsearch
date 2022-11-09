@@ -45,6 +45,20 @@ end
 
 local _M = {}
 
+function _M.get_filters()
+  local fpath = string.format("%s/filters", lua_path.fullpath(NXS_BASEDIR))
+  local filters = {}
+
+  lua_path.each(fpath .. "/*.lua", function(p)
+    local name, _ = lua_path.splitext(p)
+    table.insert(filters, name)
+  end, {
+    param = "n"
+  })
+
+  return filters
+end
+
 function _M.store_filter(name, content)
   local fpath = string.format("%s/filters/%s.lua",
     lua_path.fullpath(NXS_BASEDIR), name)

@@ -20,6 +20,27 @@ local PARAMS_NUMFIELDS = {"limit"}
 
 -------------------------------------------------------------------------
 
+local function nxs_svc_init()
+  local filters = nxs_fs.get_filters()
+  local i
+
+  for i = 1, #filters do
+    local name = filters[i]
+    local fpath = string.format("%s/filters/%s.lua",
+      lua_path.fullpath(NXS_BASEDIR), name)
+
+    local file, err = io.open(fpath, "r")
+    if not file then error(err) end
+    local content = file:read("*all")
+    file:close()
+
+    local ok, err = nxs.load_lua(name, content)
+    if not ok then error(err) end
+  end
+end
+
+-------------------------------------------------------------------------
+
 local function get_http_body(raise_err)
   ngx.req.read_body() -- fetch the body data
   local data = ngx.req.get_body_data()
@@ -454,5 +475,9 @@ routes:post("@/:string/search", function(self, name)
 
   return ngx.exit(ngx.HTTP_OK)
 end)
+
+-------------------------------------------------------------------------
+
+nxs_svc_init() -- initialize nxsearch service
 
 return routes
