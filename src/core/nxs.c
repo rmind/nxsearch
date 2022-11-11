@@ -186,6 +186,8 @@ _nxs_decl_err(nxs_t *nxs, int level, const char *file, int line,
 	(void)vasprintf(&s, fmt, ap);
 	va_end(ap);
 
+	_app_log(level, file, line, func, "%s", s);
+
 	if (level & LOG_EMSG) {
 		(void)asprintf(&msg, "%s: %s", s, strerror(error));
 		free(s);
@@ -196,8 +198,6 @@ _nxs_decl_err(nxs_t *nxs, int level, const char *file, int line,
 	free(nxs->errmsg);
 	nxs->errmsg = msg;
 	nxs->errcode = code;
-
-	_app_log(level, file, line, func, "%s", msg);
 }
 
 __dso_public nxs_err_t

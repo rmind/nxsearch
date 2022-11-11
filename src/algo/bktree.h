@@ -8,7 +8,7 @@
 #ifndef _BKTREE_H_
 #define	_BKTREE_H_
 
-#define	BKT_DIST_LIMIT		(CHAR_BIT * sizeof(uint64_t))
+#define	BKT_DIST_LIMIT		((CHAR_BIT * sizeof(uint64_t)) - 1)
 
 typedef struct bktree bktree_t;
 

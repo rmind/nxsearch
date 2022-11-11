@@ -171,6 +171,7 @@ idxterm_insert(nxs_index_t *idx, idxterm_t *term, nxs_term_id_t term_id)
 		return result_term;
 	}
 	if (bktree_insert(idx->term_bkt, term) == -1) {
+		app_dbgx("bktree_insert on term [%s] failed", term->value);
 		rhashmap_del(idx->term_map, term->value, len);
 		return NULL;
 	}

@@ -23,7 +23,7 @@ levdist_test(const char *s1, const char *s2, int expected)
 	assert(ctx != NULL);
 
 	if ((d = levdist(ctx, s1, s1_len, s2, s2_len)) != expected) {
-		errx(EXIT_FAILURE, "%s ~ %s => %u\n", s1, s2, d);
+		errx(EXIT_FAILURE, "%s ~ %s => %u", s1, s2, d);
 	}
 	levdist_destroy(ctx);
 }
@@ -42,6 +42,8 @@ run_tests(void)
 	levdist_test("", "a", 1);
 	levdist_test("a", "", 1);
 	levdist_test("a", "b", 1);
+	levdist_test("aba", "a", 2);
+	levdist_test("aabcc", "bccdd", 4);
 
 	levdist_test("ab", "ac", 1);
 	levdist_test("ac", "bc", 1);

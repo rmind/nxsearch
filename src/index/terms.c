@@ -275,6 +275,7 @@ again:
 
 		result_term = idxterm_insert(idx, term, id);
 		if (__predict_false(result_term != term)) {
+			idxterm_destroy(idx, term);
 			if (result_term == NULL) {
 				goto err;
 			}
@@ -283,7 +284,6 @@ again:
 			 * Race condition: the term was inserted concurrently,
 			 * therefore just using the existing term.
 			 */
-			idxterm_destroy(idx, term);
 			token->idxterm = result_term;
 			tokenset_moveback(tokens, token);
 			continue;
