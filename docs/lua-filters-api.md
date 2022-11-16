@@ -8,10 +8,13 @@ loading (registering) of the filters, the source files shall be placed in the
 name of the file represents the filter name, e.g. `lowercase.lua` will
 register a filter called `lowercase`.
 
-Alternatively, nxsearch service has `/filters/{name}/lua` endpoint where the
-filter can be registered by HTTP POST-ing the source code.  The `store` flag
-may be used to save the filter persistently (but it will require the service
-restart so that the filter would be picked up by all workers).
+Alternatively, if `NXS_ENABLE_LUA_POST` environment variable is set to 1,
+then nxsearch service has `/filters/{name}/lua` endpoint where the filter
+can be registered by HTTP POST-ing the source code.  The `store` flag may
+be used to save the filter persistently (but it will require the service
+restart so that the filter would be picked up by all workers).  Caution:
+this feature is disabled by default since it also allows posting malicious
+Lua code, therefore enable with cautious.
 
 ## API
 

@@ -23,9 +23,13 @@ and [TF-IDF](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) algorithms.
 
 To try as a web service:
 ```shell
+# git submodule update --init --recursive  # ensure you have submodules
 docker-compose up app  # spin up the service
 open http://127.0.0.1:8000/docs  # documentation page
 ```
+
+The `NXS_BASEDIR` environment variable specifies the base directory where
+the indexed documents as well as the application data files are stored.
 
 ### Shell
 
@@ -34,12 +38,12 @@ open http://127.0.0.1:8000/docs  # documentation page
 curl -XPOST http://127.0.0.1:8000/test-idx
 
 # Index some test documents:
-curl -XPOST --data "cat dog cow" http://127.0.0.1:8000/test-idx/add/1
-curl -XPOST --data "dog cow" http://127.0.0.1:8000/test-idx/add/2
-curl -XPOST --data "cat cat cat" http://127.0.0.1:8000/test-idx/add/3
+curl -d "cat dog cow" http://127.0.0.1:8000/test-idx/add/1
+curl -d "dog cow" http://127.0.0.1:8000/test-idx/add/2
+curl -d "cat cat cat" http://127.0.0.1:8000/test-idx/add/3
 
 # Run a query:
-curl -s -XPOST --data "cat" http://127.0.0.1:8000/test-idx/search | jq
+curl -s -d "cat" http://127.0.0.1:8000/test-idx/search | jq
 ```
 
 ## Documentation
@@ -49,6 +53,3 @@ curl -s -XPOST --data "cat" http://127.0.0.1:8000/test-idx/search | jq
 - The Lua filters API can be found [HERE](docs/lua-filters-api.md).
 
 - The C API documentation can be found [HERE](docs/c-api.md).
-
-The `NXS_BASEDIR` environment variable specifies the base directory where
-the indexed data and any metadata (e.g. filter data) is stored.
