@@ -10,11 +10,11 @@ if [ "$code" != "400" ]; then
 	exit 1
 fi
 
-curl -s -XPOST --data "cat dog cow" http://127.0.0.1:8000/$index/add/1
-curl -s -XPOST --data "dog cow" http://127.0.0.1:8000/$index/add/2
-curl -s -XPOST --data "cat cat cat" http://127.0.0.1:8000/$index/add/3
+curl -s -d "cat dog cow" http://127.0.0.1:8000/$index/add/1
+curl -s -d "dog cow" http://127.0.0.1:8000/$index/add/2
+curl -s -d "cat cat cat" http://127.0.0.1:8000/$index/add/3
 
-results="$(curl -s -XPOST --data "cat" http://127.0.0.1:8000/$index/search)"
+results="$(curl -s -d "cat" http://127.0.0.1:8000/$index/search)"
 doc_ids="$(echo "$results" | jq '.results[].doc_id' | xargs)"
 
 curl -s -XDELETE http://127.0.0.1:8000/$index

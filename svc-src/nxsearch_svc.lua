@@ -12,6 +12,7 @@ local lrucache = require "resty.lrucache"
 local cjson = require "cjson"
 
 local NXS_BASEDIR = os.getenv("NXS_BASEDIR")
+local NXS_ENABLE_LUA_POST = os.getenv("NXS_ENABLE_LUA_POST")
 
 local nxs_index_ttl = 86400
 local nxs_index_map = lrucache.new(32)
@@ -184,7 +185,9 @@ routes:post("@/filters/:string/lua", function(self, name)
   @api [post] /filters/{name}/lua
   tags:
     - filters
-  description: "Create a Lua-based filter."
+  description: |
+    Create a Lua-based filter.
+    Only if `NXS_ENABLE_LUA_POST` environment variable is set to non-empty value.
   parameters:
     - name: "name"
       description: "Filter name (alphanumeric only)"
@@ -215,11 +218,15 @@ routes:post("@/filters/:string/lua", function(self, name)
             $ref: "#/components/schemas/error_response"
   --]]
 
+  if not NXS_ENABLE_LUA_POST then
+    return set_http_sys_error("Lua code posting is not enabled")
+  end
+
   local payload = get_http_body(true)
   local query_string = ngx.req.get_uri_args()
 
   if name:match("%W") then
-    return set_http_error("filter name must be alphanumeric")
+    return set_http_sys_error("filter name must be alphanumeric")
   end
 
   local ok, err = nxs.load_lua(name, payload)
