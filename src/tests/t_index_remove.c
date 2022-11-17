@@ -19,7 +19,7 @@ add_docs(nxs_index_t *idx)
 	int ret;
 
 	for (unsigned i = 1; i <= 3; i++) {
-		ret = nxs_index_add(idx, i, text, strlen(text));
+		ret = nxs_index_add(idx, NULL, i, text, strlen(text));
 		assert(ret == 0);
 	}
 }

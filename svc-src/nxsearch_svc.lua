@@ -373,7 +373,7 @@ routes:post("@/:string/add/:number", function(self, name, doc_id)
     end
   end
 
-  local id, err = index:add(doc_id, payload)
+  local id, err = index:add(doc_id, payload, params)
   if not id then
     return set_http_error(err)
   end

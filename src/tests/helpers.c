@@ -220,7 +220,7 @@ test_index_search(const test_score_case_t *test_case)
 		const char *text = test_case->docs[i].text;
 		int ret;
 
-		ret = nxs_index_add(idx, doc_id, text, strlen(text));
+		ret = nxs_index_add(idx, NULL, doc_id, text, strlen(text));
 		assert(ret == 0);
 	}
 

@@ -233,6 +233,7 @@ static int
 lua_nxs_index_add(lua_State *L)
 {
 	nxs_index_t *idx = lua_nxs_index_getctx(L);
+	nxs_params_t *params;
 	uint64_t doc_id;
 	const char *text;
 	size_t len;
@@ -243,7 +244,9 @@ lua_nxs_index_add(lua_State *L)
 	text = lua_tolstring(L, 3, &len);
 	luaL_argcheck(L, text && len, 3, "non-empty `string' expected");
 
-	if (nxs_index_add(idx, doc_id, text, len) == -1) {
+	params = lua_isnoneornil(L, 4) ? NULL : lua_nxs_params_getctx(L, 4);
+
+	if (nxs_index_add(idx, params, doc_id, text, len) == -1) {
 		lua_pushnil(L);
 		lua_nxs_push_error(L);
 		return 2;

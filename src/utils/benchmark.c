@@ -78,7 +78,7 @@ index_file(nxs_t *nxs, nxs_index_t *idx, nxs_doc_id_t doc_id, const char *path)
 	if ((text = fs_read_file(path, &len)) == NULL) {
 		err(EXIT_FAILURE, "fs_read_file() failed");
 	}
-	if (nxs_index_add(idx, doc_id, text, len) == -1) {
+	if (nxs_index_add(idx, NULL, doc_id, text, len) == -1) {
 		const char *e = NULL;
 		nxs_get_error(nxs, &e);
 		errx(EXIT_FAILURE, "could not index %s: %s", path, e);
