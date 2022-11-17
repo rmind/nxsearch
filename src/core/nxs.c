@@ -481,8 +481,8 @@ nxs_index_close(nxs_index_t *idx)
 }
 
 __dso_public int
-nxs_index_add(nxs_index_t *idx, nxs_doc_id_t doc_id,
-    const char *text, size_t len)
+nxs_index_add(nxs_index_t *idx, nxs_params_t *params __unused,
+    nxs_doc_id_t doc_id, const char *text, size_t len)
 {
 	tokenset_t *tokens;
 	int ret = -1;

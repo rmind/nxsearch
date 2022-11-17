@@ -97,11 +97,14 @@ The `nxs_index_t *` is an active reference to an index.
 
 ## Add/remove documents
 
-* `int nxs_index_add(nxs_index_t *idx, nxs_doc_id_t id, const char *text, size_t len)`
+* `int nxs_index_add(nxs_index_t *idx, nxs_params_t *params,
+  nxs_doc_id_t id, const char *text, size_t len)`
   * Index the given document.  The caller must provide a unique document ID,
   specified by `id` which must be a non-zero 64-bit integer.  The document
   content is provided by `text` (with its length by `len` in bytes) which may
-  be in UTF-8.  Returns 0 on success or non-zero on failure.
+  be in UTF-8.  Returns 0 on success or non-zero on failure.  Currently, no
+  parameters are supported and the `params` value should be NULL, but this
+  may change in the future.
 
 * `int nxs_index_remove(nxs_index_t *idx, nxs_doc_id_t id)`
   * Remove the document from the index.  Returns 0 on success or non-zero
