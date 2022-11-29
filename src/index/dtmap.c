@@ -37,7 +37,6 @@
 #include <inttypes.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h>
 
 #define	__NXSLIB_PRIVATE
 #include "nxs_impl.h"
@@ -125,14 +124,14 @@ idx_dtmap_open(nxs_index_t *idx, const char *path)
 	}
 	TAILQ_INIT(&idx->dt_list);
 	idx->dt_consumed = 0;
-	flock(fd, LOCK_UN);
+	f_lock_exit(fd);
 
 	/*
 	 * Finally, load the map.
 	 */
 	return idx_dtmap_sync(idx);
 err:
-	flock(fd, LOCK_UN);
+	f_lock_exit(fd);
 	idx_db_release(&idx->dt_memmap);
 	return -1;
 }
@@ -255,7 +254,8 @@ idx_dtmap_add(nxs_index_t *idx, nxs_doc_id_t doc_id, tokenset_t *tokens)
 	/*
 	 * Lock the file, sync and remap if necessary.
 	 */
-	if (idx_dtmap_sync(idx) == -1 || flock(idxmap->fd, LOCK_EX) == -1) {
+	if (idx_dtmap_sync(idx) == -1 ||
+	    f_lock_enter(idxmap->fd, LOCK_EX) == -1) {
 		free(block);
 		return -1;
 	}
@@ -321,7 +321,7 @@ again:
 	doc = NULL;
 	ret = 0;
 err:
-	flock(idxmap->fd, LOCK_UN);
+	f_lock_exit(idxmap->fd);
 	if (doc) {
 		idxdoc_destroy(idx, doc);
 	}
@@ -383,6 +383,7 @@ idx_dtmap_sync(nxs_index_t *idx)
 		app_dbgx("nothing to consume", NULL);
 		return 0;
 	}
+	ASSERT(idx->dt_consumed < seen_data_len);
 
 	/*
 	 * Ensure mapping: verify that it does not exceed the mapping
@@ -468,7 +469,7 @@ idx_dtmap_sync(nxs_index_t *idx)
 	ASSERT(consumed_len == target_len);
 	ret = 0;
 err:
-	idx->dt_consumed = consumed_len;
+	idx->dt_consumed += consumed_len;
 	app_dbgx("consumed = %zu", consumed_len);
 	return ret;
 }
@@ -489,7 +490,7 @@ idx_dtmap_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
 	/*
 	 * Lock the index and ensure it is synced.
 	 */
-	if (flock(idxmap->fd, LOCK_EX) == -1) {
+	if (f_lock_enter(idxmap->fd, LOCK_EX) == -1) {
 		return -1;
 	}
 	if (idx_dtmap_sync(idx) == -1) {
@@ -575,7 +576,7 @@ idx_dtmap_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
 	atomic_store_release(&hdr->data_len, htobe64(idx->dt_consumed));
 	ret = 0;
 out:
-	flock(idxmap->fd, LOCK_UN);
+	f_lock_exit(idxmap->fd);
 	return ret;
 }
 

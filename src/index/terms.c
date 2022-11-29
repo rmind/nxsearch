@@ -122,14 +122,14 @@ idx_terms_open(nxs_index_t *idx, const char *path)
 	}
 	idx->terms_consumed = 0;
 	idx->terms_last_id = 0;
-	flock(fd, LOCK_UN);
+	f_lock_exit(fd);
 
 	/*
 	 * Finally, load the terms.
 	 */
 	return idx_terms_sync(idx);
 err:
-	flock(fd, LOCK_UN);
+	f_lock_exit(fd);
 	idx_db_release(&idx->terms_memmap);
 	return -1;
 }
@@ -175,7 +175,7 @@ idx_terms_add(nxs_index_t *idx, tokenset_t *tokens)
 	/*
 	 * Lock the file and check whether we need to sync.
 	 */
-	if (flock(idxmap->fd, LOCK_EX) == -1) {
+	if (f_lock_enter(idxmap->fd, LOCK_EX) == -1) {
 		return -1;
 	}
 again:
@@ -189,9 +189,10 @@ again:
 		 * might have changed.
 		 */
 		if (idx_terms_sync(idx) == -1) {
-			flock(idxmap->fd, LOCK_UN);
+			f_lock_exit(idxmap->fd);
 			return -1;
 		}
+		ASSERT(!sync_ran);
 		sync_ran = true;
 		goto again;
 	}
@@ -205,7 +206,7 @@ again:
 	if ((hdr = idx_db_map(idxmap, target_len, true)) == NULL) {
 		nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
 		    "terms mapping failed", NULL);
-		flock(idxmap->fd, LOCK_UN);
+		f_lock_exit(idxmap->fd);
 		return -1;
 	}
 
@@ -306,7 +307,7 @@ err:
 	if (idxmap->sync) {
 		msync(hdr, target_len, MS_ASYNC);
 	}
-	flock(idxmap->fd, LOCK_UN);
+	f_lock_exit(idxmap->fd);
 	app_dbgx("produced %u bytes", append_len);
 
 	return ret;
@@ -341,6 +342,7 @@ idx_terms_sync(nxs_index_t *idx)
 		app_dbgx("nothing to consume", NULL);
 		return 0;
 	}
+	ASSERT(idx->terms_consumed < seen_data_len);
 
 	/*
 	 * Ensure mapping: verify that it does not exceed the mapping
@@ -406,7 +408,7 @@ idx_terms_sync(nxs_index_t *idx)
 	ASSERT(consumed_len == target_len);
 	ret = 0;
 err:
-	idx->terms_consumed = consumed_len;
+	idx->terms_consumed += consumed_len;
 	app_dbgx("consumed %zu", consumed_len);
 	return ret;
 }

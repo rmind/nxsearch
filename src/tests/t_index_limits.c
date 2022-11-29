@@ -18,18 +18,6 @@
 #define	TERM_TARGET	UINT16_MAX
 #define	DOC_ID		1001
 
-static char
-rot(unsigned i, unsigned pos)
-{
-	const unsigned range = 'z' - 'a' + 1;
-	unsigned d = 1;
-
-	for (unsigned e = 0; e < pos; e++) {
-		d *= range;
-	}
-	return 'a' + (i / d) % range;
-}
-
 static tokenset_t *
 generate_tokens(unsigned n)
 {
@@ -40,11 +28,9 @@ generate_tokens(unsigned n)
 
 	for (unsigned i = 0; i < n; i++) {
 		token_t *token;
-		char val[4 + 1];
+		char val[8 + 1];
 
-		snprintf(val, sizeof(val), "%c%c%c%c",
-		    rot(i, 3), rot(i, 2), rot(i, 1), rot(i, 0));
-
+		get_rot_string(i, val, sizeof(val));
 		token = token_create(val, strlen(val));
 		assert(token);
 		tokenset_add(tokens, token);
@@ -82,12 +68,11 @@ verify_terms_doc(nxs_index_t *idx)
 	for (unsigned i = 0; i < TERM_TARGET; i++) {
 		nxs_term_id_t term_id = i + 1;
 		idxterm_t *term;
-		char val[4 + 1];
+		char val[8 + 1];
 		unsigned len;
 		int c;
 
-		len = (unsigned)snprintf(val, sizeof(val), "%c%c%c%c",
-		    rot(i, 3), rot(i, 2), rot(i, 1), rot(i, 0));
+		len = (unsigned)get_rot_string(i, val, sizeof(val));
 
 		// Check the term ID and value
 		term = idxterm_lookup(idx, val, len);

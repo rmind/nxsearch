@@ -7,6 +7,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -96,4 +97,37 @@ fs_is_dir(const char *path)
 		return true;
 	}
 	return false;
+}
+
+/*
+ * flock_owned: check that the file-lock is owned.
+ *
+ * WARNING: May only be used to check whether the current process owns the
+ * lock for diagnostic purposes and must not be used for locking decisions.
+ */
+bool
+f_lock_owned(int fd __unused)
+{
+	return true;  // XXX: TODO
+}
+
+int
+f_lock_enter(int fd, int operation)
+{
+	int ret;
+
+	while ((ret = flock(fd, operation)) == -1 && errno == EINTR) {
+		// retry
+	}
+	return ret;
+}
+
+void
+f_lock_exit(int fd)
+{
+	ASSERT(f_lock_owned(fd));
+
+	while (flock(fd, LOCK_UN) == -1 && errno == EINTR) {
+		// retry
+	}
 }
