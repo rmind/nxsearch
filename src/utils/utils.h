@@ -180,4 +180,8 @@ ssize_t	fs_read(int, void *, size_t);
 void *	fs_read_file(const char *, size_t *);
 bool	fs_is_dir(const char *);
 
+int	f_lock_enter(int, int);
+void	f_lock_exit(int);
+bool	f_lock_owned(int);
+
 #endif

@@ -72,7 +72,7 @@ again:
 			/* Concurrent creation: try again. */
 			goto again;
 		}
-		if (flock(fd, LOCK_EX) == -1) {
+		if (f_lock_enter(fd, LOCK_EX) == -1) {
 			goto err;
 		}
 		if (ftruncate(fd, IDX_SIZE_STEP) == -1) {
@@ -81,7 +81,7 @@ again:
 		*created = true;
 	} else {
 		/* Acquire shared lock. */
-		if (flock(fd, LOCK_SH) == -1) {
+		if (f_lock_enter(fd, LOCK_SH) == -1) {
 			goto err;
 		}
 		*created = false;
@@ -95,7 +95,7 @@ again:
 		 * opened this file while it is still being created.
 		 * Drop the shared lock and just try again.
 		 */
-		flock(fd, LOCK_UN);
+		f_lock_exit(fd);
 		if (--retry == 0) {
 			/* If it's a stray zero-length file, then bail out. */
 			errno = EIO;
@@ -122,6 +122,8 @@ idx_db_map(idxmap_t *idxmap, size_t target_len, bool extend)
 	const size_t file_len = roundup2(target_len, IDX_SIZE_STEP);
 	void *addr, *current_baseptr = idxmap->baseptr;
 	struct stat st;
+
+	ASSERT(!extend || f_lock_owned(idxmap->fd));
 
 	/*
 	 * If the current mapping is sufficient, then nothing to do.
@@ -154,7 +156,6 @@ idx_db_map(idxmap_t *idxmap, size_t target_len, bool extend)
 		if (ftruncate(idxmap->fd, file_len) == -1) {
 			return NULL;
 		}
-		flock(idxmap->fd, LOCK_UN);
 	}
 
 	app_dbgx("fd %u length %zu", idxmap->fd, file_len);

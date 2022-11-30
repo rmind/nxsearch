@@ -99,6 +99,26 @@ mmap_cmp_file(const char *path, const unsigned char *buf, size_t len)
 	return ret;
 }
 
+static char
+rot(unsigned i, unsigned pos)
+{
+	const unsigned range = 'z' - 'a' + 1;
+	unsigned d = 1;
+
+	for (unsigned e = 0; e < pos; e++) {
+		d *= range;
+	}
+	return 'a' + (i / d) % range;
+}
+
+ssize_t
+get_rot_string(unsigned i, char *buf, size_t len)
+{
+	return snprintf(buf, len, "%c%c%c%c%c%c%c%c",
+	    rot(i, 7), rot(i, 6), rot(i, 5), rot(i, 4),
+	    rot(i, 3), rot(i, 2), rot(i, 1), rot(i, 0));
+}
+
 tokenset_t *
 get_test_tokenset(const char *values[], size_t count, bool stage)
 {
