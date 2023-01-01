@@ -219,7 +219,7 @@ distclean: clean
 # Tests
 #
 
-t_stress: $(ALL_OBJS) $(TEST_OBJS)
+t_stress_%: $(ALL_OBJS) $(TEST_OBJS)
 	$(CC) $(CFLAGS) $^ tests/$@.c -o $@ $(LDFLAGS) -lpthread
 
 t_%: $(ALL_OBJS) $(TEST_OBJS)

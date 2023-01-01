@@ -1,5 +1,5 @@
 /*
- * Stress test: index structure concurrency.
+ * Stress test: dtmap index concurrency.
  * This code is in the public domain.
  */
 
@@ -19,14 +19,30 @@
 #include "helpers.h"
 #include "utils.h"
 
-#define	COUNT			(10 * 1000)
+#define	COUNT			(50 * 1000)
+
+static const char *		terms[] = { "test" };
 
 static pthread_barrier_t	barrier;
 static unsigned			nworkers;
-static char *			testdb_path;
+static char *			terms_testdb_path;
+static char *			dtmap_testdb_path;
+
+static void
+terms_init(nxs_index_t *idx)
+{
+	tokenset_t *tokens;
+	int ret;
+
+	tokens = get_test_tokenset(terms, __arraycount(terms), true);
+	assert(tokens != NULL);
+	ret = idx_terms_add(idx, tokens);
+	assert(ret == 0);
+	tokenset_destroy(tokens);
+}
 
 static void *
-conc_term_add(void *arg)
+conc_doc_add(void *arg)
 {
 	const unsigned id = (uintptr_t)arg;
 	uint64_t i = (UINT32_MAX / nworkers) * id;
@@ -36,51 +52,48 @@ conc_term_add(void *arg)
 	int ret;
 
 	memset(&idx, 0, sizeof(idx));
-	ret = idx_terms_open(&idx, testdb_path);
+
+	ret = idx_terms_open(&idx, terms_testdb_path);
 	assert(ret == 0);
+
+	ret = idx_dtmap_open(&idx, dtmap_testdb_path);
+	assert(ret == 0);
+
+	tokens = get_test_tokenset(terms, __arraycount(terms), false);
+	assert(tokens != NULL);
+	tokenset_resolve(tokens, &idx, 0);
 
 	pthread_barrier_wait(&barrier);
 	while (n--) {
-		char val[8 + 1];
-		const char *vals[] = { val };
-
-		get_rot_string(i++, val, sizeof(val));
-		tokens = get_test_tokenset(vals, 1, true);
-		assert(tokens != NULL);
-
-		ret = idx_terms_add(&idx, tokens);
+		ret = idx_dtmap_add(&idx, 1U + i++, tokens);
 		assert(ret == 0);
-		tokenset_destroy(tokens);
 	}
+	idx_dtmap_close(&idx);
 	idx_terms_close(&idx);
+	tokenset_destroy(tokens);
 	pthread_exit(NULL);
 	return NULL;
 }
 
 static void
-term_verify(void)
+docs_verify(nxs_index_t *idx)
 {
-	nxs_index_t idx;
-	int ret;
-
-	memset(&idx, 0, sizeof(idx));
-	ret = idx_terms_open(&idx, testdb_path);
-	assert(ret == 0);
-
 	for (unsigned id = 0; id < nworkers; id++) {
 		uint64_t i = (UINT32_MAX / nworkers) * id;
 		unsigned n = COUNT;
 
 		while (n--) {
-			char val[8 + 1];
-			idxterm_t *t;
+			nxs_doc_id_t doc_id = 1U + i++;
+			idxdoc_t *doc;
 
-			get_rot_string(i++, val, sizeof(val));
-			t = idxterm_lookup(&idx, val, sizeof(val) - 1);
-			assert(t != NULL);
+			doc = idxdoc_lookup(idx, doc_id);
+			assert(doc != NULL);
+
+			assert(idxdoc_get_doclen(idx, doc) == 1);
+			assert(idxdoc_get_termcount(idx, doc, 1) == 1);
 		}
 	}
-	idx_terms_close(&idx);
+	assert(idx_get_doc_count(idx) == nworkers * COUNT);
 }
 
 static void
@@ -90,29 +103,25 @@ run_test(int c)
 
 	nworkers = c ? c : (sysconf(_SC_NPROCESSORS_CONF) + 1);
 	thr = malloc(sizeof(pthread_t) * nworkers);
-	testdb_path = get_tmpfile(NULL);
+
+	terms_testdb_path = get_tmpfile(NULL);
+	dtmap_testdb_path = get_tmpfile(NULL);
+	run_with_index(terms_testdb_path, dtmap_testdb_path, true, terms_init);
 
 	/*
-	 * Concurrent term addition.  Note: even though nxsearch as a
-	 * whole is not considered multi-threading safe, many of its parts
-	 * are and, in this case, we can use threads to stress test the
-	 * index map structure.
+	 * NOTE: See the comments in t_strss_terms.c test.
 	 */
 	pthread_barrier_init(&barrier, NULL, nworkers);
 	for (unsigned i = 0; i < nworkers; i++) {
 		if ((errno = pthread_create(&thr[i], NULL,
-		    conc_term_add, (void *)(uintptr_t)i)) != 0) {
+		    conc_doc_add, (void *)(uintptr_t)i)) != 0) {
 			err(EXIT_FAILURE, "pthread_create");
 		}
 	}
 	for (unsigned i = 0; i < nworkers; i++) {
 		pthread_join(thr[i], NULL);
 	}
-
-	/*
-	 * Verify all terms.
-	 */
-	term_verify();
+	run_with_index(terms_testdb_path, dtmap_testdb_path, true, docs_verify);
 
 	pthread_barrier_destroy(&barrier);
 	free(thr);
