@@ -21,6 +21,8 @@ typedef struct {
 void		mmrw_init(mmrw_t *, void *, size_t);
 
 ssize_t		mmrw_advance(mmrw_t *, size_t);
+ssize_t		mmrw_seek(mmrw_t *, size_t);
+
 ssize_t		mmrw_fetch(mmrw_t *, void *, size_t);
 ssize_t		mmrw_store(mmrw_t *, const void *, size_t);
 

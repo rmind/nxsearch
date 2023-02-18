@@ -187,6 +187,11 @@ _nxs_decl_err(nxs_t *nxs, int level, const char *file, int line,
 	va_end(ap);
 
 	_app_log(level, file, line, func, "%s", s);
+	if (__predict_false(!nxs)) {
+		// Unit tests only.
+		free(s);
+		return;
+	}
 
 	if (level & LOG_EMSG) {
 		(void)asprintf(&msg, "%s: %s", s, strerror(error));
@@ -552,7 +557,7 @@ out:
 __dso_public int
 nxs_index_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
 {
-	if (idx_dtmap_sync(idx) == -1 || idx_dtmap_remove(idx, doc_id) == -1) {
+	if (idx_dtmap_remove(idx, doc_id) == -1) {
 		nxs_error_checkpoint(idx->nxs);
 		return -1;
 	}

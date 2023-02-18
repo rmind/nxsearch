@@ -123,7 +123,6 @@ idxterm_create(const char *token, const size_t len, const size_t offset)
 	ASSERT(len <= UINT16_MAX);
 	term->value_len = len;
 
-	app_dbgx("term %p [%s]", term, term->value);
 	return term;
 }
 
@@ -216,7 +215,7 @@ idxterm_fuzzysearch(nxs_index_t *idx, const char *value, size_t len)
 	uint64_t term_total = 0;
 	unsigned total_len;
 
-	/* XXX: inefficient */
+	/* XXX: inefficient (alloc + copy) */
 	total_len = offsetof(idxterm_t, value[(unsigned)len + 1]);
 	if ((search_token = malloc(total_len)) == NULL) {
 		return NULL;
@@ -321,10 +320,9 @@ idxterm_add_doc(idxterm_t *term, nxs_doc_id_t doc_id)
 	return 0;
 }
 
-int
+void
 idxterm_del_doc(idxterm_t *term, nxs_doc_id_t doc_id)
 {
 	roaring_bitmap_remove(term->doc_bitmap, doc_id);
 	app_dbgx("unlinking doc %"PRIu64" from term %u", doc_id, term->id);
-	return 0;
 }

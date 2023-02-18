@@ -134,7 +134,7 @@ run_dtmap_test(void)
 
 	check_term_counts(&idx, doc1_id, doc2_id);
 
-	ret = idx_dtmap_sync(&idx);
+	ret = idx_dtmap_sync(&idx, 0);
 	assert(ret == 0);
 	idx_dtmap_close(&idx);
 
@@ -149,7 +149,7 @@ run_dtmap_test(void)
 	ret = idx_dtmap_open(&idx, testdb_path);
 	assert(ret == 0);
 
-	ret = idx_dtmap_sync(&idx);
+	ret = idx_dtmap_sync(&idx, 0);
 	assert(ret == 0);
 
 	check_term_counts(&idx, doc1_id, doc2_id);
@@ -215,12 +215,73 @@ run_dtmap_term_order_test(void)
 	idx_terms_close(&idx);
 }
 
+static void
+run_dtmap_partial_sync_test(void)
+{
+	const char *payload;
+	char *basedir = get_tmpdir();
+	nxs_index_t *idx, *alt_idx;
+	nxs_t *nxs, *alt_nxs;
+	int ret;
+
+	nxs = nxs_open(basedir);
+	assert(nxs);
+
+	idx = nxs_index_create(nxs, "__test-idx-1", NULL);
+	assert(idx);
+
+	/* Add a document. */
+	payload = "first second";
+	ret = nxs_index_add(idx, NULL, 1001, payload, strlen(payload));
+	assert(ret == 0);
+
+	/*
+	 * Open another descriptor in parallel and add another document.
+	 */
+	alt_nxs = nxs_open(basedir);
+	assert(alt_nxs);
+	alt_idx = nxs_index_open(alt_nxs, "__test-idx-1");
+	assert(alt_idx);
+
+	payload = "third";
+	ret = nxs_index_add(alt_idx, NULL, 1002, payload, strlen(payload));
+	assert(ret == 0);
+
+	nxs_index_close(alt_idx);
+	nxs_close(alt_nxs);
+
+	/*
+	 * Checks:
+	 * - Syncing dtmap without the terms being synced should fail.
+	 * - Partial dtmap sync should succeed, but without doc ID 1002.
+	 * - Terms and dtmap sync should load doc ID 1002.
+	 */
+
+	ret = idx_dtmap_sync(idx, 0);
+	assert(ret == -1);
+
+	ret = idx_dtmap_sync(idx, DTMAP_PARTIAL_SYNC);
+	assert(ret == 0);
+	ASSERT(idxdoc_lookup(idx, 1002) == NULL);
+
+	ret = idx_terms_sync(idx);
+	assert(ret == 0);
+	ret = idx_dtmap_sync(idx, 0);
+	assert(ret == 0);
+	ASSERT(idxdoc_lookup(idx, 1002) != NULL);
+
+	// Cleanup
+	nxs_index_close(idx);
+	nxs_close(nxs);
+}
+
 int
 main(void)
 {
 	(void)get_tmpdir();
 	run_dtmap_test();
 	run_dtmap_term_order_test();
+	run_dtmap_partial_sync_test();
 	puts("OK");
 	return 0;
 }

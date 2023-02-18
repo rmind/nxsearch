@@ -91,6 +91,7 @@ static_assert(sizeof(idxterms_hdr_t) % 8 == 0, "alignment guard");
  *
  * => Invariant: document ID is always 64-bit aligned.
  * => Document ID is atomically set to zero on deletion.
+ * => A marker with document ID and zero length is used to notify deletion.
  *
  * CAUTION: All values must be converted to big-endian for storage.
  */

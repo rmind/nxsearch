@@ -16,6 +16,7 @@
 #include <sys/queue.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <errno.h>
 
 #define	__NXSLIB_PRIVATE
 #include "nxs_impl.h"
@@ -40,12 +41,13 @@ idxdoc_create(nxs_index_t *idx, nxs_doc_id_t id, uint64_t offset)
 	if (rhashmap_put(idx->dt_map, &doc->id,
 	    sizeof(nxs_doc_id_t), doc) != doc) {
 		free(doc);
+		errno = EEXIST;
 		return NULL;
 	}
 	TAILQ_INSERT_TAIL(&idx->dt_list, doc, entry);
 	idx->dt_count++;
 
-	app_dbgx("doc ID %"PRIu64" at %"PRIu64, id, offset);
+	app_dbgx("doc ID %"PRIu64" at %"PRIu64" => %p", id, offset, doc);
 	return doc;
 }
 
@@ -55,13 +57,17 @@ idxdoc_destroy(nxs_index_t *idx, idxdoc_t *doc)
 	rhashmap_del(idx->dt_map, &doc->id, sizeof(nxs_doc_id_t));
 	TAILQ_REMOVE(&idx->dt_list, doc, entry);
 	idx->dt_count--;
+	app_dbgx("doc ID %"PRIu64", %p, dt_count %lu", doc->id, doc, idx->dt_count);
 	free(doc);
 }
 
 idxdoc_t *
 idxdoc_lookup(nxs_index_t *idx, nxs_doc_id_t doc_id)
 {
-	return rhashmap_get(idx->dt_map, &doc_id, sizeof(nxs_doc_id_t));
+	idxdoc_t *doc = rhashmap_get(idx->dt_map, &doc_id, sizeof(nxs_doc_id_t));
+	app_dbgx("doc ID %"PRIu64" => %p (ID == %"PRIu64"; dt_count %lu)", doc_id, doc,
+	    doc ? doc->id : 0, idx->dt_count);
+	return doc;
 }
 
 /*

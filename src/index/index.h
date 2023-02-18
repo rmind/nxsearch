@@ -113,7 +113,7 @@ idxterm_t *	idxterm_lookup(nxs_index_t *, const char *, size_t);
 idxterm_t *	idxterm_lookup_by_id(nxs_index_t *, nxs_term_id_t);
 idxterm_t *	idxterm_fuzzysearch(nxs_index_t *, const char *, size_t);
 int		idxterm_add_doc(idxterm_t *, nxs_doc_id_t);
-int		idxterm_del_doc(idxterm_t *, nxs_doc_id_t);
+void		idxterm_del_doc(idxterm_t *, nxs_doc_id_t);
 void		idxterm_incr_total(nxs_index_t *, const idxterm_t *, unsigned);
 void		idxterm_decr_total(nxs_index_t *, const idxterm_t *, unsigned);
 uint64_t	idxterm_get_total(nxs_index_t *, const idxterm_t *);
@@ -140,10 +140,13 @@ void		idx_terms_close(nxs_index_t *);
 /*
  * Document-terms index interface.
  */
+
+#define	DTMAP_PARTIAL_SYNC	(0x01)
+
 int		idx_dtmap_open(nxs_index_t *, const char *);
 int		idx_dtmap_add(nxs_index_t *, nxs_doc_id_t, tokenset_t *);
 int		idx_dtmap_remove(nxs_index_t *, nxs_doc_id_t);
-int		idx_dtmap_sync(nxs_index_t *);
+int		idx_dtmap_sync(nxs_index_t *, unsigned);
 void		idx_dtmap_close(nxs_index_t *);
 
 uint64_t	idx_get_token_count(const nxs_index_t *);

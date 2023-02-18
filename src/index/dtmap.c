@@ -8,12 +8,22 @@
 /*
  * Document-term index.
  *
- * This module manages the document-term index which map.  It is generally
+ * This module manages the document-term index (dtmap).  It is generally
  * an append only structure which follows the general idxmap synchronization
  * logic.  The index contains the mappings of document IDs to the set of
  * term IDs and their occurrence counters.
  *
  * See the storage.h header for more details on the on-disk layout.
+ *
+ * Additional synchronization notes
+ *
+ *	On addition and removal of the document, the term index sync must
+ *	precede the document-term index sync.  The term index must be synced
+ *	with the dtmap lock held, because new terms and documents can be
+ *	added between the two syncs and the newly consumed documents would
+ *	reference them (therefore, dtmap_insert() would fail as it could not
+ *	find the references terms).  Acquiring the dtmap lock for both syncs
+ *	prevents this race condition.
  *
  * Document deletion
  *
@@ -129,7 +139,7 @@ idx_dtmap_open(nxs_index_t *idx, const char *path)
 	/*
 	 * Finally, load the map.
 	 */
-	return idx_dtmap_sync(idx);
+	return idx_dtmap_sync(idx, DTMAP_PARTIAL_SYNC);
 err:
 	f_lock_exit(fd);
 	idx_db_release(&idx->dt_memmap);
@@ -170,6 +180,19 @@ dtmap_termblock_cmp(const void * restrict b1, const void * restrict b2)
 	return 0;
 }
 
+static void
+dtmap_decr_totals(nxs_index_t *idx, tokenset_t *tokens, token_t *target)
+{
+	token_t *it;
+
+	TAILQ_FOREACH(it, &tokens->list, entry) {
+		if (it == target) {
+			break;
+		}
+		idxterm_decr_total(idx, it->idxterm, it->count);
+	}
+}
+
 static void *
 dtmap_build_block(nxs_index_t *idx, nxs_doc_id_t doc_id, tokenset_t *tokens)
 {
@@ -204,15 +227,8 @@ dtmap_build_block(nxs_index_t *idx, nxs_doc_id_t doc_id, tokenset_t *tokens)
 		mmrw_store32(&mm, token->count);
 
 		if (idxterm_add_doc(idxterm, doc_id) == -1) {
-			token_t *it;
-
 			/* Revert the increments. */
-			TAILQ_FOREACH(it, &tokens->list, entry) {
-				if (it == token) {
-					break;
-				}
-				idxterm_decr_total(idx, it->idxterm, it->count);
-			}
+			dtmap_decr_totals(idx, tokens, token);
 			nxs_decl_err(idx->nxs, NXS_ERR_FATAL,
 			    "idxterm_add_doc failed", NULL);
 			return NULL;
@@ -252,9 +268,10 @@ idx_dtmap_add(nxs_index_t *idx, nxs_doc_id_t doc_id, tokenset_t *tokens)
 	}
 
 	/*
-	 * Lock the file, sync and remap if necessary.
+	 * First, pre-sync without the lock as an optimization.
+	 * Lock the file, sync both indexes and remap if necessary.
 	 */
-	if (idx_dtmap_sync(idx) == -1 ||
+	if (idx_dtmap_sync(idx, DTMAP_PARTIAL_SYNC) == -1 ||
 	    f_lock_enter(idxmap->fd, LOCK_EX) == -1) {
 		free(block);
 		return -1;
@@ -264,7 +281,12 @@ again:
 	ASSERT(idxmap->fd > 0 && hdr != NULL);
 	data_len = be64toh(atomic_load_acquire(&hdr->data_len));
 	if (idx->dt_consumed < data_len) {
-		if (idx_dtmap_sync(idx) == -1) {
+		/*
+		 * Sync the term index and then the document-term index.
+		 * The dtmap lock must be held while syncing the terms.
+		 */
+		if (idx_terms_sync(idx) == -1 ||
+		    idx_dtmap_sync(idx, 0) == -1) {
 			goto err;
 		}
 		goto again;
@@ -325,6 +347,9 @@ err:
 	if (doc) {
 		idxdoc_destroy(idx, doc);
 	}
+	if (block && ret) {
+		dtmap_decr_totals(idx, tokens, NULL);
+	}
 	free(block);
 	return ret;
 }
@@ -358,11 +383,62 @@ dtmap_deletion(nxs_index_t *idx, nxs_doc_id_t doc_id, uint32_t doc_total_len)
 	return false;
 }
 
+static int
+dtmap_build_tdmap(nxs_index_t *idx, const nxs_doc_id_t doc_id,
+    mmrw_t *mm, const unsigned n)
+{
+	const uintptr_t tdmap_offset = MMRW_GET_OFFSET(mm);
+	nxs_term_id_t term_id;
+	idxterm_t *term;
+	uint32_t count;
+	unsigned i;
+
+	/*
+	 * Build the reverse term-document index.
+	 */
+	for (i = 0; i < n; i++) {
+		if (mmrw_fetch32(mm, &term_id) == -1 ||
+		    mmrw_fetch32(mm, &count) == -1) {
+			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+			    "corrupted dtmap index", NULL);
+			goto err;
+		}
+		if ((term = idxterm_lookup_by_id(idx, term_id)) == NULL) {
+			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+			    "idxterm_lookup_by_id on term %u failed", term_id);
+			goto err;
+		}
+		if (idxterm_add_doc(term, doc_id) == -1) {
+			nxs_decl_err(idx->nxs, NXS_ERR_FATAL,
+			    "idxterm_add_doc failed", NULL);
+			goto err;
+		}
+	}
+	return 0;
+err:
+	/*
+	 * Revert the index changes.
+	 */
+	mmrw_seek(mm, tdmap_offset);
+	while (i--) {
+		if (mmrw_fetch32(mm, &term_id) == -1 ||
+		    mmrw_fetch32(mm, &count) == -1) {
+			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+			    "corrupted dtmap index", NULL);
+			return -1;
+		}
+		term = idxterm_lookup_by_id(idx, term_id);
+		ASSERT(term != NULL);
+		idxterm_del_doc(term, doc_id);
+	}
+	return -1;
+}
+
 int
-idx_dtmap_sync(nxs_index_t *idx)
+idx_dtmap_sync(nxs_index_t *idx, unsigned flags)
 {
 	idxmap_t *idxmap = &idx->dt_memmap;
-	size_t seen_data_len, target_len, consumed_len = 0;;
+	size_t seen_data_len, target_len, consumed_len = 0;
 	idxdt_hdr_t *hdr;
 	void *dataptr;
 	mmrw_t mm;
@@ -409,6 +485,7 @@ idx_dtmap_sync(nxs_index_t *idx)
 		nxs_doc_id_t doc_id;
 		uint32_t n, doc_total_len;
 		uint64_t offset;
+		idxdoc_t *doc;
 
 		offset = (uintptr_t)mm.curptr - (uintptr_t)hdr;
 		ASSERT(ALIGNED_POINTER(offset, nxs_doc_id_t));
@@ -435,34 +512,23 @@ idx_dtmap_sync(nxs_index_t *idx)
 			continue;
 		}
 
-		if (!idxdoc_create(idx, doc_id, offset)) {
+		/*
+		 * Create the document and build the reverse
+		 * term-document index.
+		 */
+		if ((doc = idxdoc_create(idx, doc_id, offset)) == NULL) {
 			nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
 			    "idxdoc_create failed", NULL);
 			goto err;
 		}
-
-		/*
-		 * Build the reverse term-document index.
-		 */
-		for (unsigned i = 0; i < n; i++) {
-			idxterm_t *term;
-			nxs_term_id_t id;
-			uint32_t count;
-
-			if (mmrw_fetch32(&mm, &id) == -1 ||
-			    mmrw_fetch32(&mm, &count) == -1) {
-				nxs_decl_errx(idx->nxs,
-				    NXS_ERR_FATAL,
-				    "corrupted dtmap index", NULL);
-				goto err;  // XXX: revert additions
+		if (dtmap_build_tdmap(idx, doc_id, &mm, n) == -1) {
+			idxdoc_destroy(idx, doc);
+			if (flags & DTMAP_PARTIAL_SYNC) {
+				/* No error if partial sync is allowed. */
+				ret = 0;
+				goto err;
 			}
-			if ((term = idxterm_lookup_by_id(idx, id)) == NULL ||
-			    idxterm_add_doc(term, doc_id) == -1) {
-				nxs_decl_err(idx->nxs,
-				    NXS_ERR_FATAL,
-				    "idxterm_add_doc failed", NULL);
-				goto err;  // XXX: revert additions
-			}
+			goto err;
 		}
 		consumed_len += IDXDT_META_LEN(n);
 	}
@@ -488,12 +554,13 @@ idx_dtmap_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
 	mmrw_t mm;
 
 	/*
-	 * Lock the index and ensure it is synced.
+	 * Sync the term index and then the document-term index.
+	 * WARNING: The dtmap lock must be held while syncing the terms.
 	 */
 	if (f_lock_enter(idxmap->fd, LOCK_EX) == -1) {
 		return -1;
 	}
-	if (idx_dtmap_sync(idx) == -1) {
+	if (idx_terms_sync(idx) == -1 || idx_dtmap_sync(idx, 0) == -1) {
 		goto out;
 	}
 
@@ -506,6 +573,10 @@ idx_dtmap_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
 	hdr = idxmap->baseptr;
 	ASSERT(idxmap->fd > 0 && hdr != NULL);
 
+	/*
+	 * We will be adding a special marker (two 64-bit integers),
+	 * a document ID with a zero length, to indicate deletion.
+	 */
 	append_len = 8 + 8;
 	data_len = be64toh(atomic_load_acquire(&hdr->data_len));
 	target_len = sizeof(idxdt_hdr_t) + data_len + append_len;
