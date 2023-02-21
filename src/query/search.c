@@ -85,7 +85,8 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 	/*
 	 * Sync the latest updates to the index.
 	 */
-	if (idx_terms_sync(idx) == -1 || idx_dtmap_sync(idx) == -1) {
+	if (idx_terms_sync(idx) == -1 ||
+	    idx_dtmap_sync(idx, DTMAP_PARTIAL_SYNC) == -1) {
 		return NULL;
 	}
 

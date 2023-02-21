@@ -83,7 +83,7 @@ run_removal_test(void)
 	/*
 	 * Sync the other descriptor and verify there.
 	 */
-	ret = idx_dtmap_sync(alt_idx);
+	ret = idx_dtmap_sync(alt_idx, 0);
 	assert(ret == 0);
 	verify_docs(alt_idx);
 
@@ -96,7 +96,7 @@ run_removal_test(void)
 	idx = nxs_index_open(nxs, "__test-idx-1");
 	assert(idx);
 
-	assert(idx_terms_sync(idx) == 0 && idx_dtmap_sync(idx) == 0);
+	assert(idx_terms_sync(idx) == 0 && idx_dtmap_sync(idx, 0) == 0);
 	verify_docs(idx);
 
 	nxs_index_close(idx);

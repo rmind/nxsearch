@@ -166,7 +166,7 @@ run_with_index(const char *terms_testdb_path, const char *dtmap_testdb_path,
 		ret = idx_terms_sync(&idx);
 		assert(ret == 0);
 
-		ret = idx_dtmap_sync(&idx);
+		ret = idx_dtmap_sync(&idx, 0);
 		assert(ret == 0);
 	}
 

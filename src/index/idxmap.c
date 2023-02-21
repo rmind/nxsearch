@@ -58,7 +58,7 @@ int
 idx_db_open(idxmap_t *idxmap, const char *path, bool *created)
 {
 	struct stat st;
-	int fd, retry = 3;
+	int fd, retry = 10;
 again:
 	fd = open(path, O_RDWR | O_CLOEXEC);
 	if (__predict_false(fd == -1 && errno == ENOENT)) {

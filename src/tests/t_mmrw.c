@@ -72,11 +72,36 @@ run_integer_tests(void)
 	assert(mmrw_fetch64(&mm, &u64) == 8 && u64 == 0x200040010004018UL);
 }
 
+static void
+run_seek_tests(void)
+{
+	char v, buf[] = { 0, 1, 2, 3, 4, 5 };
+	size_t offset;
+	mmrw_t mm;
+
+	mmrw_init(&mm, buf, sizeof(buf));
+
+	assert(mmrw_advance(&mm, 3) == 3);
+	offset = MMRW_GET_OFFSET(&mm);
+
+	assert(mmrw_fetch(&mm, &v, sizeof(v)) == 1);
+	assert(v == 3);
+
+	assert(mmrw_advance(&mm, 1) == 1);
+	assert(mmrw_fetch(&mm, &v, sizeof(v)) == 1);
+	assert(v == 5);
+
+	assert(mmrw_seek(&mm, offset) == (ssize_t)offset);
+	assert(mmrw_fetch(&mm, &v, sizeof(v)) == 1);
+	assert(v == 3);
+}
+
 int
 main(void)
 {
 	run_basic_tests();
 	run_integer_tests();
+	run_seek_tests();
 	puts("OK");
 	return 0;
 }

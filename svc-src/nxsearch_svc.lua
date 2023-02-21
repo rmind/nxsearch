@@ -38,10 +38,16 @@ end
 local function get_http_body(raise_err)
   ngx.req.read_body() -- fetch the body data
   local data = ngx.req.get_body_data()
-  if not data and raise_err then
-    ngx.status = ngx.HTTP_BAD_REQUEST
-    ngx.say("no data")
-    ngx.exit(ngx.HTTP_BAD_REQUEST)
+  if not data then
+    -- TODO: local file_name = ngx.req.get_body_file()
+    if raise_err then
+      local err = "no data or the data is too large"
+      ngx.log(ngx.INFO, string.format("get_http_body: %s", err))
+
+      ngx.status = ngx.HTTP_BAD_REQUEST
+      ngx.say(errmsg)
+      ngx.exit(ngx.HTTP_BAD_REQUEST)
+    end
   end
   return data
 end
@@ -52,6 +58,9 @@ local function set_http_error(err)
     ["code"] = err.code,
     ["msg"] = err.msg,
   }}))
+  ngx.log(ngx.INFO, string.format(
+    "nxsearch error: %s (code %u)", err.msg, err.code
+  ))
   return ngx.exit(ngx.HTTP_BAD_REQUEST)
 end
 

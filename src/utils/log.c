@@ -8,11 +8,13 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <unistd.h>
 #include <errno.h>
 
 #include "utils.h"
 
-int	app_log_level = LOG_NOTICE;
+int		app_log_level = LOG_NOTICE;
+static pid_t	app_pid;
 
 int
 app_set_loglevel(const char *level)
@@ -28,6 +30,8 @@ app_set_loglevel(const char *level)
 		{ "INFO",	LOG_INFO	},
 		{ "DEBUG",	LOG_DEBUG	}
 	};
+
+	app_pid = getpid();
 
 	for (unsigned i = 0; i < __arraycount(log_levels); i++) {
 		if (strcasecmp(log_levels[i].name, level) == 0) {
@@ -50,7 +54,7 @@ _app_log(int level, const char *file, int line,
 	if (level & LOG_EMSG) {
 		err = errno;
 	}
-	snprintf(fileline, sizeof(fileline), "%s:%d", file, line);
+	snprintf(fileline, sizeof(fileline), "%u:%s:%d", app_pid, file, line);
 	ret = snprintf(p, size, "%-25s :: %s: ", fileline, func);
 	p += ret, size -= ret;
 

@@ -41,6 +41,17 @@ mmrw_advance(mmrw_t *mm, size_t len)
 }
 
 ssize_t
+mmrw_seek(mmrw_t *mm, size_t offset)
+{
+	if (offset >= mm->length) {
+		return -1;
+	}
+	mm->curptr = (uint8_t *)mm->baseptr + offset;
+	mm->remaining = mm->length - offset;
+	return offset;
+}
+
+ssize_t
 mmrw_fetch(mmrw_t *mm, void *buf, size_t len)
 {
 	const void *p = mm->curptr;

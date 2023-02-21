@@ -282,8 +282,8 @@ again:
 			}
 
 			/*
-			 * Race condition: the term was inserted concurrently,
-			 * therefore just using the existing term.
+			 * Race condition: another worker inserted the term
+			 * before we acquired the lock, so just use it.
 			 */
 			token->idxterm = result_term;
 			tokenset_moveback(tokens, token);
