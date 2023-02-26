@@ -130,3 +130,21 @@ deque_push(deque_t *dq, void *elm)
 
 	return 0;
 }
+
+void **
+deque_get_array(deque_t *dq)
+{
+	return &dq->elements[dq->start];
+}
+
+void *
+deque_get(deque_t *dq, unsigned i)
+{
+	return dq->elements[dq->start + i];
+}
+
+size_t
+deque_count(const deque_t *dq)
+{
+	return dq->count;
+}

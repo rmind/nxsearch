@@ -57,16 +57,18 @@ idxdoc_destroy(nxs_index_t *idx, idxdoc_t *doc)
 	rhashmap_del(idx->dt_map, &doc->id, sizeof(nxs_doc_id_t));
 	TAILQ_REMOVE(&idx->dt_list, doc, entry);
 	idx->dt_count--;
-	app_dbgx("doc ID %"PRIu64", %p, dt_count %lu", doc->id, doc, idx->dt_count);
+	app_dbgx("doc ID %"PRIu64" (%p), total %lu",
+	    doc->id, doc, idx->dt_count);
 	free(doc);
 }
 
 idxdoc_t *
 idxdoc_lookup(nxs_index_t *idx, nxs_doc_id_t doc_id)
 {
-	idxdoc_t *doc = rhashmap_get(idx->dt_map, &doc_id, sizeof(nxs_doc_id_t));
-	app_dbgx("doc ID %"PRIu64" => %p (ID == %"PRIu64"; dt_count %lu)", doc_id, doc,
-	    doc ? doc->id : 0, idx->dt_count);
+	idxdoc_t *doc;
+
+	doc = rhashmap_get(idx->dt_map, &doc_id, sizeof(nxs_doc_id_t));
+	app_dbgx("doc ID %"PRIu64" => %p", doc_id, doc);
 	return doc;
 }
 

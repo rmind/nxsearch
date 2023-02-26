@@ -128,7 +128,7 @@ nxs_resp_tojson(nxs_resp_t *resp, size_t *len)
 int
 nxs_resp_addresult(nxs_resp_t *resp, const idxdoc_t *doc, float score)
 {
-	result_entry_t*entry;
+	result_entry_t *entry;
 
 	entry = rhashmap_get(resp->doc_map, &doc->id, sizeof(nxs_doc_id_t));
 	if (entry) {

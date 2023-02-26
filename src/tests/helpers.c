@@ -208,6 +208,10 @@ check_doc_score(const char *query, const nxs_index_t *idx,
 		if (doc_id != target_doc_id) {
 			continue;
 		}
+		if (expected_score < 0) {
+			// Negative expected score means ignore the score.
+			return;
+		}
 		if (fabsf(score - expected_score) < 0.0001) {
 			return;
 		}
@@ -220,14 +224,13 @@ check_doc_score(const char *query, const nxs_index_t *idx,
 }
 
 void
-test_index_search(const test_score_case_t *test_case)
+test_index_search(const test_search_case_t *test_case)
 {
 	char *basedir = get_tmpdir();
 	const char *q = test_case->query;
 	nxs_index_t *idx;
 	nxs_resp_t *resp;
 	nxs_t *nxs;
-	unsigned i;
 
 	nxs = nxs_open(basedir);
 	assert(nxs);
@@ -235,7 +238,7 @@ test_index_search(const test_score_case_t *test_case)
 	idx = nxs_index_create(nxs, "__test-idx-1", NULL);
 	assert(idx);
 
-	for (i = 0; i < test_case->doc_count; i++) {
+	for (unsigned i = 0; i < test_case->doc_count; i++) {
 		const nxs_doc_id_t doc_id = test_case->docs[i].id;
 		const char *text = test_case->docs[i].text;
 		int ret;
@@ -245,10 +248,13 @@ test_index_search(const test_score_case_t *test_case)
 	}
 
 	for (ranking_algo_t algo = TF_IDF; algo <= BM25; algo++) {
+		unsigned i;
+
 		idx->algo = algo;
 		resp = nxs_index_search(idx, NULL, q, strlen(q));
 		assert(resp);
 
+		/* Validate each test case. */
 		for (i = 0; ; i++) {
 			const test_score_t *score = &test_case->scores[i];
 			if (score->id == 0) {
@@ -257,7 +263,11 @@ test_index_search(const test_score_case_t *test_case)
 			check_doc_score(q, idx, resp, score->id,
 			    score->value[idx->algo]);
 		}
-		assert(nxs_resp_resultcount(resp)  == i);
+		if (nxs_resp_resultcount(resp) != i) {
+			print_search_results(q, idx, resp);
+			errx(EXIT_FAILURE, "got different number of results "
+			    "than expected");
+		}
 		nxs_resp_release(resp);
 	}
 

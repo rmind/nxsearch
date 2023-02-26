@@ -8,9 +8,9 @@
 /*
  * Tokenizer
  *
- * - Processes the text splitting it into tokens separate by whitespace.
+ * - Processes the text splitting it into tokens separated by whitespace.
  * - Invokes the filter pipeline to process each token.
- * - Constructs a list of processed tokens.
+ * - Constructs a list of processed tokens, associated with terms.
  */
 
 #include <stdlib.h>
@@ -112,6 +112,21 @@ tokenset_add(tokenset_t *tset, token_t *token)
 	tset->seen++;
 }
 
+static void
+tokenset_remove(tokenset_t *tset, token_t *token)
+{
+	const strbuf_t *str = &token->buffer;
+
+	rhashmap_del(tset->map, str->value, str->length);
+	TAILQ_REMOVE(&tset->list, token, entry);
+
+	tset->data_len -= str->length;
+	tset->seen -= token->count;
+	tset->count--;
+
+	token_destroy(token);
+}
+
 /*
  * tokenset_moveback: move the staged token back to the list.
  */
@@ -133,13 +148,20 @@ tokenset_moveback(tokenset_t *tset, token_t *token)
  *
  * => If the TOKENSET_STAGE flag is set and no term is found, then move
  *    the given token to a separate staging list.
+ *
+ * => If the TOKENSET_TRIM flag is set and no term is found, then remove
+ *    the token from the list and destroy it.  This flag and TOKENSET_STAGE
+ *    are mutually exclusive.
  */
 void
 tokenset_resolve(tokenset_t *tset, nxs_index_t *idx, unsigned flags)
 {
 	const bool stage = (flags & TOKENSET_STAGE) != 0;
 	const bool fuzzymatch = (flags & TOKENSET_FUZZYMATCH) != 0;
+	const bool trim = (flags & TOKENSET_TRIM) != 0;
 	token_t *token;
+
+	ASSERT((stage | trim) == 0 || (stage ^ trim) != 0);
 
 	token = TAILQ_FIRST(&tset->list);
 	while (token) {
@@ -152,16 +174,22 @@ tokenset_resolve(tokenset_t *tset, nxs_index_t *idx, unsigned flags)
 		if (!term && fuzzymatch) {
 			term = idxterm_fuzzysearch(idx, value, len);
 		}
-		if (!term && stage) {
-			TAILQ_REMOVE(&tset->list, token, entry);
-			TAILQ_INSERT_TAIL(&tset->staging, token, entry);
-			tset->staged++;
-			app_dbgx("staging %p [%s]", token, value);
-		}
-		if (term) {
+		if (!term) {
+			if (stage) {
+				TAILQ_REMOVE(&tset->list, token, entry);
+				TAILQ_INSERT_TAIL(&tset->staging, token, entry);
+				tset->staged++;
+				app_dbgx("staging %p [%s]", token, value);
+			}
+			if (trim) {
+				app_dbgx("removing %p [%s]", token, value);
+				tokenset_remove(tset, token);
+				token = NULL;
+			}
+		} else {
 			app_dbgx("[%s] => %u", value, term->id);
+			token->idxterm = term;
 		}
-		token->idxterm = term;
 		token = next_token;
 	}
 }
