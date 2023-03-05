@@ -56,7 +56,7 @@ tf_idf(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	 *	N = len(D) - the number of documents
 	 *
 	 * There are different weighting schemes in literature, e.g. what
-	 * logarithm to apply on IDF, whether smoothen TF with square root
+	 * logarithm to apply on IDF, whether to smoothen TF with square root
 	 * or logarithm, etc.  We will use:
 	 *
 	 *	TF <- tf(t, d) = log(term_freq(t, d) + 1)
@@ -67,20 +67,21 @@ tf_idf(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	 */
 
 	int term_freq;
-	unsigned doc_freq, doc_count;
+	unsigned long doc_freq, doc_count;
 	float tf, idf;
 
 	term_freq = idxdoc_get_termcount(idx, doc, term->id);
 	doc_count = idx_get_doc_count(idx);
 	doc_freq = roaring_bitmap_get_cardinality(term->doc_bitmap);
+	ASSERT(doc_freq > 0);
 
 	/*
 	 * Verify: the index may be changed by concurrent requests.
 	 * This would not affect results in real-world situations,
 	 * but we must handle the document removal case.
 	 */
-	if (__predict_false(term_freq <= 0)) {
-		return nanf("");
+	if (__predict_false(term_freq <= 0 || doc_count == 0)) {
+		return -1;  // negative value indicates to skip this score
 	}
 
 	tf = log(term_freq + 1);
@@ -138,17 +139,27 @@ bm25(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	static const double b = 0.75f;
 
 	int term_freq;
-	double doc_freq, doc_count;
+	unsigned long doc_freq, doc_count;
 	double tf, dl, adl, tf_bm25, idf_bm25;
 
 	term_freq = idxdoc_get_termcount(idx, doc, term->id);
 	doc_count = idx_get_doc_count(idx);
 	doc_freq = roaring_bitmap_get_cardinality(term->doc_bitmap);
-	adl = idx_get_token_count(idx) / idx_get_doc_count(idx);
+	ASSERT(doc_freq > 0);
 
-	/* Verify in case of concurrent document removals. */
-	if (__predict_false(term_freq <= 0 || adl == 0)) {
-		return nanf("");
+	/*
+	 * Verify in case of concurrent document removals.
+	 */
+	if (__predict_false(term_freq <= 0 || doc_count == 0)) {
+		return -1;  // negative value indicates to skip this score
+	}
+
+	/*
+	 * Get the average document length, but also verify it.
+	 */
+	adl = idx_get_token_count(idx) / doc_count;
+	if (__predict_false(adl < 1)) {
+		return -1;
 	}
 
 	tf = log(term_freq + 1);
@@ -156,6 +167,7 @@ bm25(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	tf_bm25 = tf / (tf + k * (1 - b + b * dl / adl));
 
 	idf_bm25 = log(((doc_count - doc_freq + 0.5) / (doc_freq + 0.5)) + 1);
+	ASSERT(idf_bm25 >= 0);
 
 	return tf_bm25 * idf_bm25;
 }

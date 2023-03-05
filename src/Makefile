@@ -105,6 +105,7 @@ OBJS+=		core/filters_lua.o
 OBJS+=		core/params.o
 OBJS+=		core/results.o
 
+OBJS+=		query/expr.o
 OBJS+=		query/search.o
 
 OBJS+=		index/idxmap.o

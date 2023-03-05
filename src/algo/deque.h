@@ -17,4 +17,8 @@ int		deque_push(deque_t *, void *);
 void *		deque_pop_front(deque_t *);
 void *		deque_pop_back(deque_t *);
 
+void **		deque_get_array(deque_t *);
+void *		deque_get(deque_t *, unsigned);
+size_t		deque_count(const deque_t *);
+
 #endif

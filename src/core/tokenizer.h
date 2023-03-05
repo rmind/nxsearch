@@ -17,8 +17,9 @@
 #include "rhashmap.h"
 #include "filters.h"
 
-#define	TOKENSET_STAGE		(0x1)
-#define	TOKENSET_FUZZYMATCH	(0x2)
+#define	TOKENSET_STAGE		(0x01)
+#define	TOKENSET_TRIM		(0x02)
+#define	TOKENSET_FUZZYMATCH	(0x10)
 
 typedef struct token {
 	/*

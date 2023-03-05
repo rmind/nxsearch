@@ -22,14 +22,15 @@ typedef struct {
 	float		value[2];
 } test_score_t;
 
-#define	END_TEST_SCORE	{ 0, { 0, 0 } }
+#define	END_TEST_SCORE		{ 0, { 0, 0 } }
+#define	DOC_ID_ONLY(id)		{ (id), { -1, -1 } }
 
 typedef struct {
 	const test_doc_t *docs;
 	unsigned	doc_count;
 	const char *	query;
 	test_score_t	scores[];
-} test_score_case_t;
+} test_search_case_t;
 
 char *		get_tmpdir(void);
 char *		get_tmpfile(const char *);
@@ -40,6 +41,6 @@ tokenset_t *	get_test_tokenset(const char *[], size_t, bool);
 
 void		run_with_index(const char *, const char *, bool, test_func_t);
 
-void		test_index_search(const test_score_case_t *);
+void		test_index_search(const test_search_case_t *);
 
 #endif

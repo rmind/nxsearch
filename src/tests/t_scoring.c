@@ -32,7 +32,7 @@ static const test_doc_t docs_1[] = {
 static_assert(DOG_TFIDF_SCORE > FOX_TFIDF_SCORE, "logic guard");
 static_assert(DOG_BM25_SCORE > FOX_BM25_SCORE, "logic guard");
 
-static const test_score_case_t test_case_1 = {
+static const test_search_case_t test_case_1 = {
 	/*
 	 * Basic search: verify the expected score.
 	 */
@@ -43,7 +43,7 @@ static const test_score_case_t test_case_1 = {
 	}
 };
 
-static const test_score_case_t test_case_2 = {
+static const test_search_case_t test_case_2 = {
 	/*
 	 * Equal scores for each document.
 	 */
@@ -55,7 +55,7 @@ static const test_score_case_t test_case_2 = {
 	}
 };
 
-static const test_score_case_t test_case_3 = {
+static const test_search_case_t test_case_3 = {
 	/*
 	 * Scores for each term should be summed.
 	 */
@@ -77,7 +77,7 @@ static const test_doc_t docs_2[] = {
 	{ 2, "cat cat dog" },
 };
 
-static const test_score_case_t test_case_4 = {
+static const test_search_case_t test_case_4 = {
 	/*
 	 * TF: Documents matching more terms should have higher score.
 	 */
@@ -96,7 +96,7 @@ static const test_doc_t docs_3[] = {
 	{ 4, "cat dog rat bat" },
 };
 
-static const test_score_case_t test_case_5 = {
+static const test_search_case_t test_case_5 = {
 	/*
 	 * Documents matching more different terms (variety) should
 	 * have higher score.
@@ -117,7 +117,7 @@ static const test_doc_t docs_4[] = {
 	{ 3, "aa bb bb bb bb bb bb bb bb bb bb bb bb bb bb bb bb bb bb bb" },
 };
 
-static const test_score_case_t test_case_6 = {
+static const test_search_case_t test_case_6 = {
 	/*
 	 * TF bound for term saturation (BM25): many matches of the same
 	 * term in the given document should have a bound.  BM25 is expected
@@ -143,7 +143,7 @@ static const test_doc_t docs_5[] = {
 	{ 3, "cats cats dogs" },	// only 2x cats, same length
 };
 
-static const test_score_case_t test_case_7 = {
+static const test_search_case_t test_case_7 = {
 	/*
 	 * Document length (BM25): matches in shorter documents
 	 * should give higher score.  No difference for TF-IDF.
@@ -157,7 +157,7 @@ static const test_score_case_t test_case_7 = {
 	}
 };
 
-static const test_score_case_t *test_cases[] = {
+static const test_search_case_t *test_cases[] = {
 	&test_case_1, &test_case_2, &test_case_3, &test_case_4,
 	&test_case_5, &test_case_6, &test_case_7
 };

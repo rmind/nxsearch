@@ -1,8 +1,57 @@
 /*
- * Copyright (c) 2022 Mindaugas Rasiukevicius <rmind at noxt eu>
+ * Copyright (c) 2022-2023 Mindaugas Rasiukevicius <rmind at noxt eu>
  * All rights reserved.
  *
  * Use is subject to license terms, as specified in the LICENSE file.
+ */
+
+/*
+ * Searching.
+ *
+ * - Parses the query into the intermediate representation (IR);
+ * - Run the query logic processing the IR to find the matching documents;
+ * - Scores the documents.
+ *
+ * Consider the following query:
+ *
+ *     textbook AND (C OR C++ OR Python) AND
+ *     (Linux OR UNIX) AND NOT (C# OR Java)
+ *
+ * It will be represented as:
+ *
+ *     (ANDNOT
+ *       (AND
+ *         textbook
+ *         (OR C C++ Python)
+ *         (OR Linux Unix))
+ *       (OR C# Java))
+ *
+ * Each term translates to a bitmap of documents referred by T.doc_bitmap.
+ * We walk recursively to produce the final bitmap of matching documents.
+ * Pseudo-code:
+ *
+ *     doc_bitmap = roaring_bitmap_andnot([
+ *         roaring_bitmap_and_many([
+ *             T1.doc_bitmap,
+ *             roaring_bitmap_or_many([
+ *                 T2.doc_bitmap, T3.doc_bitmap, T4.doc_bitmap
+ *             ]),
+ *             roaring_bitmap_or_many([
+ *                 T5.doc_bitmap, T6.doc_bitmap
+ *             ]),
+ *         ]),
+ *         roaring_bitmap_or_many([T7.doc_bitmap, T8.doc_bitmap])
+ *     ])
+ *
+ * The scores get summed.  Pseudo-code:
+ *
+ *     doc_scores = {}
+ *     for doc_id in doc_bitmap:
+ *         for term_id in terms:
+ *             if doc_id not in term->doc_bitmap:
+ *                 continue
+ *             score = rank(term_id, doc_id)
+ *             doc_scores[doc_id] += score
  */
 
 #include <stdio.h>
@@ -12,7 +61,11 @@
 #define __NXSLIB_PRIVATE
 #include "nxs_impl.h"
 #include "index.h"
+#include "expr.h"
 #include "utils.h"
+
+/* Query nesting limit to prevent deep recursion. */
+#define	NXS_QUERY_RLIMIT	(100)
 
 typedef struct {
 	uint64_t		limit;
@@ -57,6 +110,192 @@ get_search_params(nxs_index_t *idx, nxs_params_t *params, search_params_t *sp)
 }
 
 /*
+ * get_expr_bitmap: recursive process AND/OR/NOT expressions and produce
+ * the resulting document bitmap.
+ */
+static roaring_bitmap_t *
+get_expr_bitmap(nxs_index_t *idx, expr_t *expr, unsigned r)
+{
+	roaring_bitmap_t *result;
+	expr_t *subexpr;
+	unsigned nitems;
+
+	ASSERT(expr != NULL);
+
+	if (r > NXS_QUERY_RLIMIT) {
+		nxs_decl_errx(idx->nxs, NXS_ERR_LIMIT,
+		    "query nesting limit reached (%u levels)",
+		    NXS_QUERY_RLIMIT, NULL);
+		return NULL;
+	}
+
+	if (expr->type == EXPR_VAL_TOKEN) {
+		const idxterm_t *term = expr->token->idxterm;
+		return roaring_bitmap_copy(term->doc_bitmap);
+	}
+
+	nitems = deque_count(expr->elements);
+	ASSERT(nitems > 0);
+
+	subexpr = deque_get(expr->elements, 0);
+	if ((result = get_expr_bitmap(idx, subexpr, r + 1)) == NULL) {
+		return NULL;
+	}
+
+	for (unsigned i = 1; i < nitems; i++) {
+		roaring_bitmap_t *elm;
+
+		subexpr = deque_get(expr->elements, i);
+		if ((elm = get_expr_bitmap(idx, subexpr, r + 1)) == NULL) {
+			roaring_bitmap_free(result);
+			return NULL;
+		}
+
+		switch (expr->type) {
+		case EXPR_OP_AND:
+			roaring_bitmap_and_inplace(result, elm);
+			break;
+		case EXPR_OP_OR:
+			roaring_bitmap_or_inplace(result, elm);
+			break;
+		case EXPR_OP_NOT:
+			roaring_bitmap_andnot_inplace(result, elm);
+			break;
+		default:
+			abort();
+		}
+		roaring_bitmap_free(elm);
+	}
+	return result;
+}
+
+/*
+ * construct_query: create a query which uses an OR expression over
+ * all given tokens.
+ */
+static query_t *
+construct_query(nxs_index_t *idx, const char *query, size_t len,
+    search_params_t *sp)
+{
+	tokenset_t *tokens = NULL;
+	token_t *token;
+	expr_t *expr;
+	query_t *q;
+
+	/*
+	 * Construct a query: is is an OR expression of all tokens.
+	 */
+	if ((q = query_create(idx)) == NULL) {
+		return NULL;
+	}
+	if ((expr = expr_create(q, EXPR_OP_OR)) == NULL) {
+		goto err;
+	}
+	q->root = expr;
+
+	/*
+	 * Tokenize and resolve tokens to terms.
+	 */
+	if ((tokens = tokenize(idx->fp, idx->params, query, len)) == NULL) {
+		nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+		    "tokenizer failed", NULL);
+		goto err;
+	}
+
+	/* Remap the tokenset (as we are not using the real parser). */
+	tokenset_destroy(q->tokens);
+	q->tokens = tokens;
+
+	/* Resolve tokens to terms, removing those not in use. */
+	tokenset_resolve(tokens, idx, TOKENSET_TRIM | sp->tflags);
+	if (tokens->count == 0) {
+		nxs_decl_errx(idx->nxs, NXS_ERR_MISSING,
+		    "the query is empty or has no meaningful tokens", NULL);
+		goto err;
+	}
+
+	/*
+	 * Iterate the tokens and create a value sub-expression for each.
+	 */
+	TAILQ_FOREACH(token, &tokens->list, entry) {
+		expr_t *token_expr;
+
+		token_expr = expr_create(q, EXPR_VAL_TOKEN);
+		if (!token_expr) {
+			/* Note: will free all sub-expressions. */
+			goto err;
+		}
+		token_expr->token = token;
+		expr_add_element(expr, token_expr);
+	}
+	return q;
+err:
+	query_destroy(q);
+	return NULL;
+}
+
+static int
+run_query_logic(query_t *query, ranking_func_t rank, nxs_resp_t *resp)
+{
+	nxs_index_t *idx = query->idx;
+	tokenset_t *tokens = query->tokens;
+	roaring_uint32_iterator_t *bm_iter;
+	roaring_bitmap_t *doc_bitmap;
+	int ret = -1;
+
+	/*
+	 * Process the expression logic and get the resulting bitmap.
+	 */
+	doc_bitmap = get_expr_bitmap(idx, query->root, 0);
+	if (!doc_bitmap) {
+		return -1;
+	}
+	bm_iter = roaring_create_iterator(doc_bitmap);
+	while (bm_iter->has_value) {
+		const nxs_doc_id_t doc_id = bm_iter->current_value;
+		token_t *token;
+
+		TAILQ_FOREACH(token, &tokens->list, entry) {
+			const idxterm_t *term = token->idxterm;
+			idxdoc_t *doc;
+			float score;
+
+			ASSERT(term != NULL);
+
+			/*
+			 * Skip if this term is not used in the document.
+			 */
+			if (!roaring_bitmap_contains(
+			    term->doc_bitmap, doc_id)) {
+				continue;
+			}
+
+			/*
+			 * Lookup the document and compute the score.
+			 */
+			if ((doc = idxdoc_lookup(idx, doc_id)) == NULL) {
+				goto out;
+			}
+			if ((score = rank(idx, term, doc)) < 0) {
+				/*
+				 * Negative value means no score to be given.
+				 */
+				continue;
+			}
+			if (nxs_resp_addresult(resp, doc, score) == -1) {
+				goto out;
+			}
+		}
+		roaring_advance_uint32_iterator(bm_iter);
+	}
+	ret = 0;
+out:
+	roaring_free_uint32_iterator(bm_iter);
+	roaring_bitmap_free(doc_bitmap);
+	return ret;
+}
+
+/*
  * nxs_index_search: perform  a search query on the given index.
  *
  * => Returns the response object (which must be released by the caller).
@@ -68,12 +307,12 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 	nxs_resp_t *resp = NULL;
 	search_params_t sp;
 	ranking_func_t rank;
-	tokenset_t *tokens;
-	token_t *token;
+	query_t *q = NULL;
 	int err = -1;
 
 	nxs_clear_error(idx->nxs);
 
+	/* Prepare the search parameters. */
 	if (get_search_params(idx, params, &sp) == -1) {
 		return NULL;
 	}
@@ -91,54 +330,21 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 	}
 
 	/*
-	 * Tokenize and resolve tokens to terms.
+	 * Parse and construct the query.
 	 */
-	if ((tokens = tokenize(idx->fp, idx->params, query, len)) == NULL) {
-		nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
-		    "tokenizer failed", NULL);
-		return NULL;
-	}
-	if (tokens->count == 0) {
-		nxs_decl_errx(idx->nxs, NXS_ERR_MISSING,
-		    "the query is empty or has no meaningful tokens", NULL);
+	if ((q = construct_query(idx, query, len, &sp)) == NULL) {
 		goto out;
 	}
-	tokenset_resolve(tokens, idx, sp.tflags);
 
 	/*
-	 * Lookup the documents given the terms.
+	 * Create the response object and run the query logic, which
+	 * performs the searching and scoring of the documents.
 	 */
 	if ((resp = nxs_resp_create(sp.limit)) == NULL) {
 		goto out;
 	}
-	TAILQ_FOREACH(token, &tokens->list, entry) {
-		roaring_uint32_iterator_t *bm_iter;
-		idxterm_t *term;
-
-		if ((term = token->idxterm) == NULL) {
-			/* The term is not in the index: just skip. */
-			continue;
-		}
-
-		bm_iter = roaring_create_iterator(term->doc_bitmap);
-		while (bm_iter->has_value) {
-			const nxs_doc_id_t doc_id = bm_iter->current_value;
-			idxdoc_t *doc;
-			float score;
-
-			/*
-			 * Lookup the document and compute its score.
-			 */
-			if ((doc = idxdoc_lookup(idx, doc_id)) == NULL) {
-				goto out;
-			}
-			score = rank(idx, term, doc);
-			if (nxs_resp_addresult(resp, doc, score) == -1) {
-				goto out;
-			}
-			roaring_advance_uint32_iterator(bm_iter);
-		}
-		roaring_free_uint32_iterator(bm_iter);
+	if (run_query_logic(q, rank, resp) == -1) {
+		goto out;
 	}
 	nxs_resp_build(resp);
 	err = 0;
@@ -147,6 +353,8 @@ out:
 		nxs_resp_release(resp);
 		resp = NULL;
 	}
-	tokenset_destroy(tokens);
+	if (q) {
+		query_destroy(q);
+	}
 	return resp;
 }
