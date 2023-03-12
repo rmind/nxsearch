@@ -3,6 +3,11 @@
 *.a
 *.so
 
+*/query/scan.c
+*/query/grammar.c
+*/query/grammar.h
+*/query/grammar.out
+
 .DS_Store
 
 compose/openapi.json

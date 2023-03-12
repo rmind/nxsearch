@@ -219,8 +219,8 @@ utf8_subs_diacritics(utf8_ctx_t *ctx, strbuf_t *buf)
 {
 	UErrorCode ec = U_ZERO_ERROR;
 	uint16_t *ubuf = NULL;
+	int32_t len = -1, max_len;
 	size_t ulen;
-	int32_t len, max_len;
 
 	/*
 	 * Convert from UTF-8 to UTF-16: see the comments in the

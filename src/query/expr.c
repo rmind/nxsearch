@@ -5,113 +5,59 @@
  * Use is subject to license terms, as specified in the LICENSE file.
  */
 
-#include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 
-#include "index.h"
-#include "tokenizer.h"
 #include "deque.h"
 #include "expr.h"
 #include "utils.h"
 
-////////////////////////////////////////////////////////////////////////////
-
-query_t *
-query_create(nxs_index_t *idx)
-{
-	query_t *q;
-
-	if ((q = calloc(1, sizeof(query_t))) == NULL) {
-		return NULL;
-	}
-	if ((q->tokens = tokenset_create()) == NULL) {
-		free(q);
-		return NULL;
-	}
-	q->idx = idx;
-	return q;
-}
-
-void
-query_destroy(query_t *q)
-{
-	if (q->root) {
-		expr_destroy(q->root);
-	}
-	tokenset_destroy(q->tokens);
-	free(q);
-}
-
-#if 0
-void
-query_prepare(query_t *q, unsigned flags)
-{
-	tokenset_resolve(q->tokens, q->idx, TOKENSET_TRIM | flags);
-}
-#endif
-
-////////////////////////////////////////////////////////////////////////////
-
 expr_t *
-expr_create(query_t *q, expr_type_t type)
+expr_create(expr_type_t type, unsigned n)
 {
+	const size_t len = offsetof(expr_t, elements[n]);
 	expr_t *expr;
 
-	expr = calloc(1, sizeof(expr_t));
-	if (!expr) {
+	ASSERT(n || type == EXPR_VAL_TOKEN);
+
+	if ((expr = calloc(1, len)) == NULL) {
 		return NULL;
 	}
 	expr->type = type;
-	expr->query = q;
-
-	if (expr->type != EXPR_VAL_TOKEN) {
-		expr->elements = deque_create(0, 0);
-		if (!expr->elements) {
-			free(expr);
-			return NULL;
-		}
-	}
+	expr->nitems = n;
 	return expr;
 }
 
-#if 0
-int
-expr_set_token(expr_t *expr, const char *value, size_t len)
+/*
+ * expr_create_token: create an expression with a given token value.
+ *
+ * => The given string will be consumed and released on expr_destroy().
+ */
+expr_t *
+expr_create_token(char *value)
 {
-	query_t *q = expr->query;
-	filter_action_t action;
-	token_t *token;
+	expr_t *expr;
 
-	ASSERT(expr->type == EXPR_VAL_TOKEN);
-
-	/*
-	 * Create a new token and run the filter pipeline.
-	 */
-	token = token_create(value, len);
-	if (__predict_false(token == NULL)) {
-		return -1;
+	if ((expr = expr_create(EXPR_VAL_TOKEN, 0)) == NULL) {
+		return NULL;
 	}
-
-	action = filter_pipeline_run(q->idx->fp, &token->buffer);
-	if (__predict_false(action != FILT_MUTATION)) {
-		ASSERT(action == FILT_DISCARD || action == FILT_ERROR);
-		token_destroy(token);
-		if (action == FILT_ERROR) {
-			return -1;
-		}
-		return 0;
-	}
-	expr->token = token;
-	return 0;
+	expr->value = value;
+	return expr;
 }
-#endif
 
-int
-expr_add_element(expr_t *expr, expr_t *elm)
+expr_t *
+expr_create_operator(expr_type_t type, expr_t *e1, expr_t *e2)
 {
-	ASSERT(expr->type != EXPR_VAL_TOKEN);
-	return deque_push(expr->elements, elm);
+	expr_t *expr;
+
+	if ((expr = expr_create(type, 2)) == NULL) {
+		return NULL;
+	}
+	ASSERT(EXPR_IS_OPERATOR(expr->type));
+	expr->elements[0] = e1;
+	expr->elements[1] = e2;
+	return expr;
 }
 
 void
@@ -129,20 +75,19 @@ expr_destroy(expr_t *expr)
 	 * Deep-walk and G/C all expressions.
 	 */
 	while ((expr = deque_pop_back(gc)) != NULL) {
-		unsigned nitems;
-
 		if (expr->type == EXPR_VAL_TOKEN) {
-			ASSERT(expr->token);
+			ASSERT(expr->nitems == 0);
+			free(expr->value);
 			free(expr);
 			continue;
 		}
+		for (unsigned i = 0; i < expr->nitems; i++) {
+			expr_t *subexpr = expr->elements[i];
 
-		nitems = deque_count(expr->elements);
-		for (unsigned i = 0; i < nitems; i++) {
-			expr_t *subexpr = deque_get(expr->elements, i);
-			deque_push(gc, subexpr);
+			if (subexpr) {
+				deque_push(gc, subexpr);
+			}
 		}
-		deque_destroy(expr->elements);
 		free(expr);
 	}
 	deque_destroy(gc);

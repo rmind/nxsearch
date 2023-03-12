@@ -54,14 +54,17 @@ typedef struct {
 	unsigned		seen;
 } tokenset_t;
 
+token_t *	token_create(const char *, size_t);
+void		token_destroy(token_t *);
+
 tokenset_t *	tokenset_create(void);
-void		tokenset_add(tokenset_t *, token_t *);
+token_t *	tokenset_add(tokenset_t *, token_t *);
 void		tokenset_moveback(tokenset_t *, token_t *);
 void		tokenset_resolve(tokenset_t *, nxs_index_t *, unsigned);
 void		tokenset_destroy(tokenset_t *);
 
-token_t *	token_create(const char *, size_t);
-void		token_destroy(token_t *);
+int		tokenize_value(filter_pipeline_t *, tokenset_t *,
+		    const char *, size_t, token_t **);
 tokenset_t *	tokenize(filter_pipeline_t *, nxs_params_t *,
 		    const char *, size_t);
 

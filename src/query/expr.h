@@ -8,40 +8,35 @@
 #ifndef _EXPR_H_
 #define _EXPR_H_
 
-typedef struct query query_t;
-typedef struct expr expr_t;
+struct token;
 
 typedef enum {
 	// Values:
 	EXPR_VAL_TOKEN,
-	// Operations:
+	// Operators:
 	EXPR_OP_AND,
 	EXPR_OP_OR,
 	EXPR_OP_NOT,
 } expr_type_t;
 
-struct query {
-	nxs_index_t *		idx;
-	tokenset_t *		tokens;
-	expr_t *		root;
-};
+#define	EXPR_IS_OPERATOR(t)	((t) != EXPR_VAL_TOKEN)
 
-struct expr {
+typedef struct expr {
 	expr_type_t		type;
-	query_t *		query;
-	union {
-		token_t *	token;
-		deque_t *	elements;
-	};
-};
 
-query_t *	query_create(nxs_index_t *);
-void		query_destroy(query_t *);
-void		query_prepare(query_t *, unsigned);
+	// EXPR_VAL_TOKEN:
+	char *			value;
+	struct token *		token;
 
-expr_t *	expr_create(query_t *, expr_type_t);
-int		expr_set_token(expr_t *, const char *, size_t);
-int		expr_add_element(expr_t *, expr_t *);
+	// EXPR_IS_OPERATOR:
+	unsigned		nitems;
+	struct expr *		elements[];
+} expr_t;
+
+expr_t *	expr_create(expr_type_t, unsigned);
 void		expr_destroy(expr_t *);
+
+expr_t *	expr_create_token(char *);
+expr_t *	expr_create_operator(expr_type_t, expr_t *, expr_t *);
 
 #endif

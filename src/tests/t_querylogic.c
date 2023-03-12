@@ -25,14 +25,8 @@ static const test_doc_t docs[] = {
 #if 0
 static const test_search_case_t test_case_1 = {
 	.docs = docs, .doc_count = __arraycount(docs),
-	.query = "textbook AND (Erlang OR Python OR Shell) AND "
-	         "(Linux OR Unix) AND NOT (Windows OR Java)",
-	.scores = {
-		DOC_ID_ONLY(1),
-		DOC_ID_ONLY(2),
-		DOC_ID_ONLY(6),
-		END_TEST_SCORE
-	}
+	.query = "non-existant-term",  // empty results if unused terms
+	.scores = { END_TEST_SCORE }
 };
 #endif
 
@@ -47,8 +41,23 @@ static const test_search_case_t test_case_2 = {
 	}
 };
 
+#if 0
+static const test_search_case_t test_case_3 = {
+	.docs = docs, .doc_count = __arraycount(docs),
+	.query = "textbook AND (Erlang OR Python OR Shell) AND "
+	         "(Linux OR Unix) AND NOT (Windows OR Java)",
+	.scores = {
+		DOC_ID_ONLY(1),
+		DOC_ID_ONLY(2),
+		DOC_ID_ONLY(6),
+		END_TEST_SCORE
+	}
+};
+#endif
+
 static const test_search_case_t *test_cases[] = {
-	/* &test_case_1, */ &test_case_2
+	//&test_case_1, &test_case_2, &test_case_3,
+	&test_case_2
 };
 
 int
