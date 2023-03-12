@@ -8,6 +8,7 @@
 
 #include "tokenizer.h"
 #include "index.h"
+#include "expr.h"
 
 typedef void (*test_func_t)(nxs_index_t *);
 

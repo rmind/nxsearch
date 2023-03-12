@@ -62,6 +62,8 @@
 #include "nxs_impl.h"
 #include "index.h"
 #include "expr.h"
+#define	__NXS_PARSER_PRIVATE
+#include "query.h"
 #include "utils.h"
 
 /* Query nesting limit to prevent deep recursion. */
@@ -118,7 +120,6 @@ get_expr_bitmap(nxs_index_t *idx, expr_t *expr, unsigned r)
 {
 	roaring_bitmap_t *result;
 	expr_t *subexpr;
-	unsigned nitems;
 
 	ASSERT(expr != NULL);
 
@@ -130,22 +131,25 @@ get_expr_bitmap(nxs_index_t *idx, expr_t *expr, unsigned r)
 	}
 
 	if (expr->type == EXPR_VAL_TOKEN) {
-		const idxterm_t *term = expr->token->idxterm;
-		return roaring_bitmap_copy(term->doc_bitmap);
+		const token_t *token = expr->token;
+
+		if (token) {
+			const idxterm_t *term = token->idxterm;
+			return roaring_bitmap_copy(term->doc_bitmap);
+		}
+		return roaring_bitmap_create();
 	}
+	ASSERT(expr->nitems > 0);
 
-	nitems = deque_count(expr->elements);
-	ASSERT(nitems > 0);
-
-	subexpr = deque_get(expr->elements, 0);
+	subexpr = expr->elements[0];
 	if ((result = get_expr_bitmap(idx, subexpr, r + 1)) == NULL) {
 		return NULL;
 	}
 
-	for (unsigned i = 1; i < nitems; i++) {
+	for (unsigned i = 1; i < expr->nitems; i++) {
 		roaring_bitmap_t *elm;
 
-		subexpr = deque_get(expr->elements, i);
+		subexpr = expr->elements[i];
 		if ((elm = get_expr_bitmap(idx, subexpr, r + 1)) == NULL) {
 			roaring_bitmap_free(result);
 			return NULL;
@@ -181,17 +185,11 @@ construct_query(nxs_index_t *idx, const char *query, size_t len,
 	token_t *token;
 	expr_t *expr;
 	query_t *q;
+	unsigned i;
 
-	/*
-	 * Construct a query: is is an OR expression of all tokens.
-	 */
 	if ((q = query_create(idx)) == NULL) {
 		return NULL;
 	}
-	if ((expr = expr_create(q, EXPR_OP_OR)) == NULL) {
-		goto err;
-	}
-	q->root = expr;
 
 	/*
 	 * Tokenize and resolve tokens to terms.
@@ -215,18 +213,27 @@ construct_query(nxs_index_t *idx, const char *query, size_t len,
 	}
 
 	/*
+	 * Query is is an OR expression of all tokens.
+	 */
+	if ((expr = expr_create(EXPR_OP_OR, tokens->count)) == NULL) {
+		goto err;
+	}
+	q->root = expr;
+
+	/*
 	 * Iterate the tokens and create a value sub-expression for each.
 	 */
+	i = 0;
 	TAILQ_FOREACH(token, &tokens->list, entry) {
 		expr_t *token_expr;
 
-		token_expr = expr_create(q, EXPR_VAL_TOKEN);
+		token_expr = expr_create(EXPR_VAL_TOKEN, 0);
 		if (!token_expr) {
 			/* Note: will free all sub-expressions. */
 			goto err;
 		}
 		token_expr->token = token;
-		expr_add_element(expr, token_expr);
+		expr->elements[i++] = token_expr;
 	}
 	return q;
 err:
@@ -242,6 +249,15 @@ run_query_logic(query_t *query, ranking_func_t rank, nxs_resp_t *resp)
 	roaring_uint32_iterator_t *bm_iter;
 	roaring_bitmap_t *doc_bitmap;
 	int ret = -1;
+
+	/*
+	 * If there are no expressions or meaningful tokens (terms in use),
+	 * then then just return without an error, since such search merely
+	 * produces an empty search results.
+	 */
+	if (!query->root || tokens->count == 0) {
+		return 0;
+	}
 
 	/*
 	 * Process the expression logic and get the resulting bitmap.
@@ -330,14 +346,14 @@ nxs_index_search(nxs_index_t *idx, nxs_params_t *params,
 	}
 
 	/*
-	 * Parse and construct the query.
+	 * Parse the query and construct the intermediate representation.
 	 */
 	if ((q = construct_query(idx, query, len, &sp)) == NULL) {
 		goto out;
 	}
 
 	/*
-	 * Create the response object and run the query logic, which
+	 * Create the response object and run the query logic which
 	 * performs the searching and scoring of the documents.
 	 */
 	if ((resp = nxs_resp_create(sp.limit)) == NULL) {

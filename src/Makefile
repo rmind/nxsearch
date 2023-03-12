@@ -23,7 +23,7 @@ endif
 CFLAGS+=	-std=gnu11 -O2 -g -Wall -Wextra -Werror
 CFLAGS+=	-D_POSIX_C_SOURCE=200809L
 
-CFLAGS+=	-I core/ -I index/ -I algo/ -I utils/
+CFLAGS+=	-I core/ -I index/ -I algo/ -I query/ -I utils/
 
 #
 # Extended warning flags.
@@ -44,6 +44,8 @@ ifeq ($(CC),gcc)
 CFLAGS+=	-Wa,--fatal-warnings -Wl,--fatal-warnings
 endif
 ifeq ($(CC),clang)
+# NOTE: Manually aligned pointers in the memory-mapped files.
+CFLAGS+=	-Wno-address-of-packed-member -Wno-atomic-alignment
 CFLAGS+=	-flto
 LDFLAGS+=	-flto
 endif
@@ -106,6 +108,7 @@ OBJS+=		core/params.o
 OBJS+=		core/results.o
 
 OBJS+=		query/expr.o
+OBJS+=		query/query.o
 OBJS+=		query/search.o
 
 OBJS+=		index/idxmap.o

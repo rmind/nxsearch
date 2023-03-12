@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Mindaugas Rasiukevicius <rmind at noxt eu>
+ * Copyright (c) 2022-2023 Mindaugas Rasiukevicius <rmind at noxt eu>
  * All rights reserved.
  *
  * Use is subject to license terms, as specified in the LICENSE file.
@@ -87,8 +87,11 @@ tokenset_destroy(tokenset_t *tset)
 /*
  * tokenset_add: add the token to the set or increment the counter on
  * how many times this token was seen if it is already in the set.
+ *
+ * => Returns the current token, if there is one in the list already.
+ * => Otherwise, returns the value of the 'token' parameter.
  */
-void
+token_t *
 tokenset_add(tokenset_t *tset, token_t *token)
 {
 	const strbuf_t *str = &token->buffer;
@@ -100,7 +103,7 @@ tokenset_add(tokenset_t *tset, token_t *token)
 		current_token->count++;
 		token_destroy(token);
 		tset->seen++;
-		return;
+		return current_token;
 	}
 
 	token->count = 1;
@@ -110,6 +113,7 @@ tokenset_add(tokenset_t *tset, token_t *token)
 	tset->data_len += str->length;
 	tset->count++;
 	tset->seen++;
+	return token;
 }
 
 static void
@@ -195,6 +199,34 @@ tokenset_resolve(tokenset_t *tset, nxs_index_t *idx, unsigned flags)
 }
 
 /*
+ * tokenize_value: create a token for the given value, run the filters
+ * and add it to the token list (unless it's already there).
+ */
+int
+tokenize_value(filter_pipeline_t *fp, tokenset_t *tokens,
+    const char *val, size_t len, token_t **tokenp)
+{
+	filter_action_t action;
+	token_t *token;
+
+	token = token_create(val, len);
+	if (__predict_false(token == NULL)) {
+		return -1;
+	}
+	action = filter_pipeline_run(fp, &token->buffer);
+	if (__predict_false(action != FILT_MUTATION)) {
+		ASSERT(action == FILT_DISCARD || action == FILT_ERROR);
+		token_destroy(token);
+		if (action == FILT_ERROR) {
+			return -1;
+		}
+		return 0;
+	}
+	*tokenp = tokenset_add(tokens, token);
+	return 0;
+}
+
+/*
  * tokenize: uses ICU segmentation UBRK_WORD.
  *
  * See: https://unicode.org/reports/tr29/
@@ -207,12 +239,12 @@ tokenize(filter_pipeline_t *fp, nxs_params_t *params,
 	UErrorCode ec = U_ZERO_ERROR;
 	UChar *utext = NULL;
 	int32_t end, start, ulen;
-	tokenset_t *tset;
+	tokenset_t *tokens;
 	strbuf_t buf;
 
 	strbuf_init(&buf);
 
-	if ((tset = tokenset_create()) == NULL) {
+	if ((tokens = tokenset_create()) == NULL) {
 		return NULL;
 	}
 
@@ -241,8 +273,7 @@ tokenize(filter_pipeline_t *fp, nxs_params_t *params,
 	start = ubrk_first(it_token);
 	for (end = ubrk_next(it_token); end != UBRK_DONE;
 	    start = end, end = ubrk_next(it_token)) {
-		filter_action_t action;
-		token_t *token;
+		token_t *token = NULL;
 
 		ASSERT(start < end);
 
@@ -255,20 +286,11 @@ tokenize(filter_pipeline_t *fp, nxs_params_t *params,
 			goto err;
 		}
 
-		token = token_create(buf.value, buf.length);
-		if (__predict_false(token == NULL)) {
+		if (tokenize_value(fp, tokens, buf.value, buf.length,
+		    &token) == -1) {
 			goto err;
 		}
-		action = filter_pipeline_run(fp, &token->buffer);
-		if (__predict_false(action != FILT_MUTATION)) {
-			ASSERT(action == FILT_DISCARD || action == FILT_ERROR);
-			token_destroy(token);
-			if (action == FILT_ERROR) {
-				goto err;
-			}
-			continue;
-		}
-		tokenset_add(tset, token);
+		ASSERT(token);
 	}
 err:
 	if (it_token) {
@@ -276,5 +298,5 @@ err:
 	}
 	strbuf_release(&buf);
 	free(utext);
-	return tset;
+	return tokens;
 }
