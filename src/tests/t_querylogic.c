@@ -22,13 +22,11 @@ static const test_doc_t docs[] = {
 	{ 6, "All keywords: Textbook Erlang Python Shell Linux Unix" },
 };
 
-#if 0
 static const test_search_case_t test_case_1 = {
 	.docs = docs, .doc_count = __arraycount(docs),
 	.query = "non-existant-term",  // empty results if unused terms
 	.scores = { END_TEST_SCORE }
 };
-#endif
 
 static const test_search_case_t test_case_2 = {
 	.docs = docs, .doc_count = __arraycount(docs),
@@ -41,7 +39,6 @@ static const test_search_case_t test_case_2 = {
 	}
 };
 
-#if 0
 static const test_search_case_t test_case_3 = {
 	.docs = docs, .doc_count = __arraycount(docs),
 	.query = "textbook AND (Erlang OR Python OR Shell) AND "
@@ -53,11 +50,9 @@ static const test_search_case_t test_case_3 = {
 		END_TEST_SCORE
 	}
 };
-#endif
 
 static const test_search_case_t *test_cases[] = {
-	//&test_case_1, &test_case_2, &test_case_3,
-	&test_case_2
+	&test_case_1, &test_case_2, &test_case_3
 };
 
 int

@@ -146,3 +146,20 @@ The results can also be iterated using the following API:
 
 * `unsigned nxs_resp_resultcount(const nxs_resp_t *resp)`
   * Return the number of items in the results.
+
+### Query syntax
+
+nxsearch supports logical operators, grouping and quoting in its query syntax.
+Use the `OR`, `AND` as well as `AND NOT` keywords for the logical operators.
+The regular brackets `(` and `)` are used to group the expressions.
+For example:
+```
+"textbook" AND (C OR Python) AND (Linux OR Unix) AND NOT (Windows OR Java)
+```
+The logical operator keywords are case insensitive.  Alternatively, `|` may
+be used for `OR`, `&` for `AND`, and `-` prefix for `AND NOT`.  If any of
+these symbols need to be part of the value, the term string can be put into
+`"` or `'` quotes.
+
+The precedence of operators is the same as in logics, from the highest to
+lowest: NOT, AND, OR.

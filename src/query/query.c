@@ -37,8 +37,39 @@ query_destroy(query_t *q)
 	if (q->root) {
 		expr_destroy(q->root);
 	}
+	if (q->errmsg) {
+		free(q->errmsg);
+	}
 	tokenset_destroy(q->tokens);
 	free(q);
+}
+
+void
+query_set_error(query_t *q)
+{
+	const lexer_t *ctx = &q->lexer;
+	unsigned offset = (uintptr_t)ctx->token - (uintptr_t)ctx->cur_line;
+
+	ASSERT(!q->error);
+	ASSERT(q->errmsg == NULL);
+
+	asprintf(&q->errmsg, "syntax error near %u:%u: \"%.50s ...\"",
+	    ctx->line, offset, ctx->token);
+	q->error = true;
+}
+
+const char *
+query_get_error(query_t *q)
+{
+	if (!q->error) {
+		// No error
+		return NULL;
+	}
+	if (!q->errmsg) {
+		// Error without a message
+		return "out of memory";
+	}
+	return q->errmsg;
 }
 
 int

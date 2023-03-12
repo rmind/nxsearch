@@ -109,6 +109,8 @@ OBJS+=		core/results.o
 
 OBJS+=		query/expr.o
 OBJS+=		query/query.o
+OBJS+=		query/scan.o
+OBJS+=		query/grammar.o
 OBJS+=		query/search.o
 
 OBJS+=		index/idxmap.o
@@ -192,6 +194,15 @@ lua-lib: $(LUALIB).so
 %.so: $(ALL_OBJS) $(LUA_OBJS)
 	$(CC) -fPIC -shared -o $@ $^ $(LDFLAGS)
 
+query/scan.c: query/grammar.c
+	re2c -W -8 query/scan.re -o $@
+
+query/grammar.o: CFLAGS+= -Wno-unused-parameter -Wno-unused-variable \
+    -Wno-missing-prototypes -Wno-missing-declarations
+
+query/grammar.c:
+	lemon -p query/grammar.y
+
 libs/CRoaring/build/src/libroaring.a:
 	@ echo Building libroaring
 	cd libs/CRoaring && mkdir -p build && cd build && \
@@ -213,6 +224,7 @@ install: $(addprefix install/,$(LIB).la)
 
 clean:
 	libtool --mode=clean rm
+	rm -f query/scan.c query/grammar.c query/grammar.h query/grammar.out
 	rm -rf .libs *.o *.so *.lo *.la utils/benchmark.o
 	rm -f $(BENCHMARK_BIN) $(OBJS) $(TEST_OBJS) $(TESTS)
 
