@@ -173,67 +173,33 @@ get_expr_bitmap(nxs_index_t *idx, expr_t *expr, unsigned r)
 	return result;
 }
 
-/*
- * construct_query: create a query which uses an OR expression over
- * all given tokens.
- */
 static query_t *
-construct_query(nxs_index_t *idx, const char *query, size_t len,
+construct_query(nxs_index_t *idx, const char *query, size_t len __unused,
     search_params_t *sp)
 {
-	tokenset_t *tokens = NULL;
-	token_t *token;
-	expr_t *expr;
 	query_t *q;
-	unsigned i;
 
 	if ((q = query_create(idx)) == NULL) {
 		return NULL;
 	}
 
-	/*
-	 * Tokenize and resolve tokens to terms.
-	 */
-	if ((tokens = tokenize(idx->fp, idx->params, query, len)) == NULL) {
+	/* Parse the query. */
+	if (query_parse(q, query) == -1) {
+		nxs_decl_err(idx->nxs, NXS_ERR_FATAL,
+		    "query_parse() failed", NULL);
+		goto err;
+	}
+	if (q->error) {
+		nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
+		    "query failed with %s", q->errmsg);
+		goto err;
+	}
+
+	/* Resolve the tokens to terms. */
+	if (query_prepare(q, sp->tflags) == -1) {
 		nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
-		    "tokenizer failed", NULL);
+		    "query_prepare() failed", NULL);
 		goto err;
-	}
-
-	/* Remap the tokenset (as we are not using the real parser). */
-	tokenset_destroy(q->tokens);
-	q->tokens = tokens;
-
-	/* Resolve tokens to terms, removing those not in use. */
-	tokenset_resolve(tokens, idx, TOKENSET_TRIM | sp->tflags);
-	if (tokens->count == 0) {
-		nxs_decl_errx(idx->nxs, NXS_ERR_MISSING,
-		    "the query is empty or has no meaningful tokens", NULL);
-		goto err;
-	}
-
-	/*
-	 * Query is is an OR expression of all tokens.
-	 */
-	if ((expr = expr_create(EXPR_OP_OR, tokens->count)) == NULL) {
-		goto err;
-	}
-	q->root = expr;
-
-	/*
-	 * Iterate the tokens and create a value sub-expression for each.
-	 */
-	i = 0;
-	TAILQ_FOREACH(token, &tokens->list, entry) {
-		expr_t *token_expr;
-
-		token_expr = expr_create(EXPR_VAL_TOKEN, 0);
-		if (!token_expr) {
-			/* Note: will free all sub-expressions. */
-			goto err;
-		}
-		token_expr->token = token;
-		expr->elements[i++] = token_expr;
 	}
 	return q;
 err:
