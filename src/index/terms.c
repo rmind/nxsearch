@@ -8,10 +8,10 @@
 /*
  * Terms index.
  *
- * This module manages the terms list.  It is generally an append only
+ * This module manages the terms list.  It is generally an append-only
  * structure which follows the general idxmap synchronization logic.
- * Term IDs are determined by the term's order in the index.  Terms in
- * the list are NIL-terminated for convenience.  Each term has an total
+ * The term IDs are determined by the term's order in the index.  Terms
+ * in the list are NUL-terminated for convenience.  Each term has a total
  * occurrence count (in the whole index i.e. all documents) which is
  * accessed directly via the memory-mapped file.
  *

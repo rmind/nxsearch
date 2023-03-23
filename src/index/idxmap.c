@@ -6,8 +6,8 @@
  */
 
 /*
- * Index file mapping: implements the file opening and mapping with the
- * synchronization around the initialization steps.
+ * Index file mapping: implements the file opening and memory-mapping
+ * with the synchronization around the initialization steps.
  *
  * Synchronization rules:
  *
@@ -25,12 +25,12 @@
  * globally visible.
  *
  * - The file may be grow only with the exclusive lock held.  To minimize
- * the lock contention and frequent remaps, the file is extended larger
+ * the lock contention and frequent remaps, the file is extended in larger
  * chunks defined by the IDX_SIZE_STEP constant.
  *
  * - Synchronization of the data readers and writers (e.g. data appending)
- * is implemented on top of this by the index structure module ("terms" or
- * "tdmap").
+ * is implemented on top of this by the index structure module (currently,
+ * we have "terms" and "tdmap").
  */
 
 #include <sys/types.h>

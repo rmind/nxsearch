@@ -17,6 +17,12 @@ ifeq ($(MAKECMDGOALS),debug)
 DEBUG=		1
 endif
 
+ifeq ($(MAKECMDGOALS),coverage)
+CFLAGS+=	--coverage
+LDFLAGS+=	--coverage
+DEBUG=		1
+endif
+
 #
 # Common C compiler flags.
 #
@@ -243,6 +249,14 @@ t_%: $(ALL_OBJS) $(TEST_OBJS)
 
 tests: $(TESTS)
 	@ set -e && for T in $(TESTS); do echo ./$$T; ./$$T; done
+
+gen-coverage:
+	gcovr -r . -e 'tests/' -e 'libs/*' \
+	    -e 'query/scan.c' -e 'query/grammar.c' -e '.*_lua.c' \
+	    -b --html --html-details -o ./index.html
+
+coverage: tests
+	$(MAKE) gen-coverage
 
 #
 # Debugging

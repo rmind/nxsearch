@@ -16,6 +16,7 @@ The engine is written in C11 and is distributed under the 2-clause BSD license.
 and [TF-IDF](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) algorithms.
 - Integrates with the [Snowball stemmer](https://snowballstem.org/).
 - Supports fuzzy matching (using the BK-tree with Levenshtein distance).
+- Supports query logic operators, grouping, nesting, etc.
 - Supports filters in Lua for easy extendibility.
 - Basic UTF-8 and internationalization support.
 

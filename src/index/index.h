@@ -33,10 +33,18 @@ typedef enum {
 	INVALID_ALGO	= -1,
 } ranking_algo_t;
 
+/*
+ * idxterm_t and idxdoc_t are the in-memory structures mapping their
+ * corresponding term and document IDs to the relevant offset in their
+ * memory-mapped index.
+ */
+
 typedef struct idxterm {
 	nxs_term_id_t		id;
 	uint32_t		offset;
 	TAILQ_ENTRY(idxterm)	entry;
+
+	/* Bitmap of the documents in which this term occurs. */
 	roaring_bitmap_t *	doc_bitmap;
 	uint16_t		value_len;
 	char			value[];

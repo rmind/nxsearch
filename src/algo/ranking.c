@@ -33,6 +33,9 @@
  *
  *	S E Robertson, S Walker, S Jones, M M Hancock-Beaulieu, M Gatford,
  *	1994, "Okapi at TREC-3"
+ *
+ *	C D Manning, P Raghavan and H Schutze, 2008, "Introduction to
+ *	Information Retrieval", Cambridge University Press
  */
 
 float
@@ -120,8 +123,8 @@ bm25(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	 *	log((N - doc_freq(t) + .5) / (doc_freq(t) + .5))
 	 *
 	 * This is tuned to speed up the score decline for the terms which
-	 * are used in many documents.  Note: Lucene adds 1 to the expression
-	 * in logarithm to avoid the negative scores.
+	 * are used in many documents.  Note: we add 1 to the expression in
+	 * logarithm to avoid the negative scores (as in Lucene).
 	 *
 	 * - Therefore:
 	 *
@@ -129,7 +132,7 @@ bm25(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	 *	BM25 = TF / (TF + k * (1 - b + b * dl / adl)) *
 	 *	       log((N - doc_freq(t) + .5) / (doc_freq(t) + .5) + 1)
 	 *
-	 * We will use the fine tuned k and b constants from Lucene:
+	 * We will use the fine tuned k and b constants (Manning et al, 2008):
 	 *
 	 *	k = 1.2
 	 *	b = 0.75
