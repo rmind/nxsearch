@@ -226,6 +226,10 @@ check_doc_score(const char *query, const nxs_index_t *idx,
 void
 test_index_search(const test_search_case_t *test_case)
 {
+	const char *algos[] = {
+		[TF_IDF] = "TF-IDF",
+		[BM25] = "BM25",
+	};
 	char *basedir = get_tmpdir();
 	const char *q = test_case->query;
 	nxs_index_t *idx;
@@ -248,11 +252,17 @@ test_index_search(const test_search_case_t *test_case)
 	}
 
 	for (ranking_algo_t algo = TF_IDF; algo <= BM25; algo++) {
+		nxs_params_t *params;
 		unsigned i;
 
-		idx->algo = algo;
-		resp = nxs_index_search(idx, NULL, q, strlen(q));
+		params = nxs_params_create();
+		assert(params);
+
+		nxs_params_set_str(params, "algo", algos[algo]);
+		resp = nxs_index_search(idx, params, q, strlen(q));
 		assert(resp);
+
+		nxs_params_release(params);
 
 		/* Validate each test case. */
 		for (i = 0; ; i++) {
@@ -261,7 +271,7 @@ test_index_search(const test_search_case_t *test_case)
 				break;
 			}
 			check_doc_score(q, idx, resp, score->id,
-			    score->value[idx->algo]);
+			    score->value[algo]);
 		}
 		if (nxs_resp_resultcount(resp) != i) {
 			print_search_results(q, idx, resp);

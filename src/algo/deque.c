@@ -131,6 +131,7 @@ deque_push(deque_t *dq, void *elm)
 	return 0;
 }
 
+#if 0
 void **
 deque_get_array(deque_t *dq)
 {
@@ -148,3 +149,4 @@ deque_count(const deque_t *dq)
 {
 	return dq->count;
 }
+#endif

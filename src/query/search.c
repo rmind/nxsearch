@@ -191,7 +191,7 @@ construct_query(nxs_index_t *idx, const char *query, size_t len __unused,
 	}
 	if (q->error) {
 		nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
-		    "query failed with %s", q->errmsg);
+		    "query failed with %s", query_get_error(q));
 		goto err;
 	}
 

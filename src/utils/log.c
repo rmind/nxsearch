@@ -24,7 +24,7 @@ app_set_loglevel(const char *level)
 		int		logopt;
 	} log_levels[] = {
 		{ "CRITICAL",	LOG_CRIT	},
-		{ "ERR",	LOG_ERR		},
+		{ "ERROR",	LOG_ERR		},
 		{ "WARNING",	LOG_WARNING	},
 		{ "NOTICE",	LOG_NOTICE	},
 		{ "INFO",	LOG_INFO	},
