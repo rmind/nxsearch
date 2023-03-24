@@ -108,9 +108,16 @@ static const test_case_t test_case_9 = {
 	},
 };
 
+static const test_case_t test_case_10 = {
+	.query = "A\nand\nB",
+	.repr = "(AND `A` `B`)",
+	.tokens = { TOKEN_FF_STRING, TOKEN_AND, TOKEN_FF_STRING, 0, },
+};
+
 static const test_case_t *test_cases[] = {
 	&test_case_1, &test_case_2, &test_case_3, &test_case_4, &test_case_5,
 	/*&test_case_6,*/ &test_case_7, &test_case_8, &test_case_9,
+	&test_case_10,
 };
 
 static void

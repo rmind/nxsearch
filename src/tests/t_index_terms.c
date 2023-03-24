@@ -4,12 +4,14 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
 #include "nxs.h"
 #include "strbuf.h"
 #include "index.h"
+#include "storage.h"
 #include "tokenizer.h"
 #include "helpers.h"
 #include "utils.h"
@@ -21,7 +23,7 @@ static const char *test_tokens[] = {
 static const uint8_t terms_db_exp[] = {
 	/*
 	 * This serves as a regression test for the ABI breakage.
-	 * Verify manually before updating.
+	 * WARNING: Verify manually before updating.
 	 */
 	0x4e, 0x58, 0x53, 0x5f, 0x54, 0x01, 0x00, 0x00, // header ..
 	0x00, 0x00, 0x00, 0x38, 0x00, 0x00, 0x00, 0x00, // data_len 47 | r0
@@ -131,12 +133,102 @@ run_terms_test(void)
 	idx_terms_close(&idx);
 }
 
+static void
+run_terms_dup_test(void)
+{
+	char *testdb_path = get_tmpfile(NULL);
+	tokenset_t *tokens;
+	nxs_index_t idx;
+	int ret;
+
+	memset(&idx, 0, sizeof(idx));
+
+	ret = idx_terms_open(&idx, testdb_path);
+	assert(ret == 0);
+
+	// Add terms
+	tokens = get_test_tokenset(test_tokens,
+	    __arraycount(test_tokens), true);
+	assert(tokens != NULL);
+
+	ret = idx_terms_add(&idx, tokens);
+	assert(ret == 0);
+	tokenset_destroy(tokens);
+
+	// Add the same terms again
+	tokens = get_test_tokenset(test_tokens,
+	    __arraycount(test_tokens), true);
+	assert(tokens != NULL);
+
+	ret = idx_terms_add(&idx, tokens);
+	assert(ret == 0);
+	tokenset_destroy(tokens);
+
+	// Verify the file contents, it should be the same.
+	ret = mmap_cmp_file(testdb_path, terms_db_exp, sizeof(terms_db_exp));
+	assert(ret == 0);
+	idx_terms_close(&idx);
+}
+
+static int
+run_terms_verify_header(nxs_t *nxs, const void *header, size_t len)
+{
+	char *testdb_path = get_tmpfile(NULL);
+	nxs_index_t idx;
+	FILE *fp;
+	int ret;
+
+	fp = fopen(testdb_path, "w");
+	assert(fp);
+
+	ret = fwrite(header, len, 1, fp);
+	assert(ret == 1);
+	fclose(fp);
+
+	memset(&idx, 0, sizeof(idx));
+	idx.nxs = nxs;
+	return idx_terms_open(&idx, testdb_path);
+}
+
+static void
+run_terms_verify_test(void)
+{
+	char *basedir = get_tmpdir();
+	void *header;
+	nxs_t *nxs;
+	int ret;
+
+	header = calloc(1, IDX_SIZE_STEP);
+	assert(header);
+
+	nxs = nxs_open(basedir);
+	assert(nxs);
+
+	// Incomplete header
+	ret = run_terms_verify_header(nxs, header, 1);
+	assert(ret == -1 && nxs_get_error(nxs, NULL) == NXS_ERR_SYSTEM);
+
+	// Invalid mark (just zeros in the header)
+	ret = run_terms_verify_header(nxs, header, IDX_SIZE_STEP);
+	assert(ret == -1 && nxs_get_error(nxs, NULL) == NXS_ERR_FATAL);
+
+	// Valid mark, but invalid ABI version
+	memcpy(header, NXS_T_MARK, sizeof(NXS_T_MARK) - 1);
+	ret = run_terms_verify_header(nxs, header, IDX_SIZE_STEP);
+	assert(ret == -1 && nxs_get_error(nxs, NULL) == NXS_ERR_FATAL);
+
+	nxs_close(nxs);
+	free(header);
+}
+
 int
 main(void)
 {
 	(void)get_tmpdir();
 	run_idxterm_test();
 	run_terms_test();
+	run_terms_dup_test();
+	run_terms_verify_test();
 	puts("OK");
 	return 0;
 }

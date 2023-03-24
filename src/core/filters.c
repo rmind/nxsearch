@@ -97,7 +97,7 @@ nxs_filter_register(nxs_t *nxs, const char *name,
 	filter_entry_t *filtent;
 
 	if (filter_lookup(nxs, name)) {
-		nxs_decl_errx(nxs, NXS_ERR_INVALID,
+		nxs_decl_errx(nxs, NXS_ERR_EXISTS,
 		    "filter `%s' already exists", name);
 		return -1;
 	}

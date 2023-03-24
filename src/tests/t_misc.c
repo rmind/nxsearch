@@ -23,6 +23,7 @@ run_params_tests(void)
 	const char *s, **arr;
 	uint64_t val;
 	size_t count;
+	bool flag;
 	nxs_t nxs;
 	int ret;
 
@@ -38,6 +39,9 @@ run_params_tests(void)
 	assert(ret == 0);
 
 	ret = nxs_params_set_uint(params, "n", 0xdeadbeef);
+	assert(ret == 0);
+
+	ret = nxs_params_set_bool(params, "sync", true);
 	assert(ret == 0);
 
 	ret = nxs_params_set_strlist(params, "filters",
@@ -61,12 +65,28 @@ run_params_tests(void)
 	ret = nxs_params_get_uint(params, "n", &val);
 	assert(ret == 0 && val == 0xdeadbeef);
 
+	ret = nxs_params_get_bool(params, "sync", &flag);
+	assert(ret == 0 && flag == true);
+
 	arr = nxs_params_get_strlist(params, "filters", &count);
 	assert(arr && count == 3);
 	assert(strcmp(arr[0], "a") == 0);
 	assert(strcmp(arr[1], "b") == 0);
 	assert(strcmp(arr[2], "c") == 0);
 	free(arr);
+
+	/*
+	 * Not present.
+	 */
+
+	s = nxs_params_get_str(params, "not-present-1");
+	assert(s == NULL);
+
+	ret = nxs_params_get_uint(params, "not-present-2", &val);
+	assert(ret == -1);
+
+	ret = nxs_params_get_bool(params, "not-present-3", &flag);
+	assert(ret == -1);
 
 	nxs_params_release(params);
 }
@@ -98,11 +118,33 @@ run_resp_tests(void)
 	free(s);
 }
 
+static void
+run_loglevel_tests(void)
+{
+	int ret;
+
+	ret = app_set_loglevel("debug");
+	assert(ret == 0);
+	ASSERT(app_log_level == LOG_DEBUG);
+
+	ret = app_set_loglevel("error");
+	assert(ret == 0);
+	ASSERT(app_log_level == LOG_ERR);
+
+	ret = app_set_loglevel("ERROR");
+	assert(ret == 0);
+	ASSERT(app_log_level == LOG_ERR);
+
+	ret = app_set_loglevel("ER");
+	assert(ret == -1);
+}
+
 int
 main(void)
 {
 	run_params_tests();
 	run_resp_tests();
+	run_loglevel_tests();
 	puts("OK");
 	return 0;
 }
