@@ -9,7 +9,7 @@
  * Document-term index.
  *
  * This module manages the document-term index (dtmap).  It is generally
- * an append only structure which follows the general idxmap synchronization
+ * an append-only structure which follows the general idxmap synchronization
  * logic.  The index contains the mappings of document IDs to the set of
  * term IDs and their occurrence counters.
  *
@@ -19,11 +19,11 @@
  *
  *	On addition and removal of the document, the term index sync must
  *	precede the document-term index sync.  The term index must be synced
- *	with the dtmap lock held, because new terms and documents can be
- *	added between the two syncs and the newly consumed documents would
- *	reference them (therefore, dtmap_insert() would fail as it could not
- *	find the references terms).  Acquiring the dtmap lock for both syncs
- *	prevents this race condition.
+ *	with the dtmap lock held because new terms and documents can be
+ *	added between the two syncs.  In such case, the newly consumed
+ *	documents would reference them; therefore, dtmap_insert() would
+ *	fail as it would not find the referenced terms.  Acquiring the dtmap
+ *	lock around both syncs prevents this race condition.
  *
  * Document deletion
  *
@@ -32,8 +32,8 @@
  *	2) adding a new record block for the document ID being deleted with
  *	the document length being set to zero.
  *
- *	The former ensures that fresh opening of the index will skip the
- *	records for the deleted documents.  The latter will notify active
+ *	The former ensures that a fresh opening of the index will skip the
+ *	records of the deleted documents.  The latter will notify active
  *	index references to remove the document from the in-memory structure.
  */
 

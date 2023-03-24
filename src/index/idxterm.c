@@ -13,7 +13,7 @@
  * - Resolves (associates) tokens to the term objects which contain
  * the term IDs and other metadata.
  *
- * - Tacks the documents where the term occurs, i.e. provides the
+ * - Tracks the documents where the term occurs, i.e. provides the
  * following mapping: term_id => [doc IDs ...].
  */
 

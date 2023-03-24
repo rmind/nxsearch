@@ -22,10 +22,11 @@
  *	transform each token, typically using various linguistic methods,
  *	in order to accommodate the searching logic.
  *
- *	- Resolving the tokens to get the terms (i.e. the objects tracking
- *	the processed tokens already present in the index).  If the term
- *	is not in the index, then it gets added to the "staging" list which
- *	and then added to the term list (index) by idx_terms_add().
+ *	- Resolving the tokens to get the terms (i.e. the objects which
+ *	track the normalized tokens which have already been added to the
+ *	index).  If the term is not in the index, then it gets added to
+ *	the "staging" list which and then added to the term list (index)
+ *	by idx_terms_add().
  *
  *	- Adding the document record with the set of term IDs (and their
  *	frequency in the document) to the document-term index ("dtmap").
@@ -35,11 +36,11 @@
  *	There are two data files which form the index:
  *
  *	- Terms list (nxsterms.db) which contains the full list of all
- *	indexed terms.  The term ID is determined by the term order in
- *	the index starting from 1.
+ *	terms added to the index.  The term ID is determined by the term
+ *	order in the index starting from 1.
  *
- *	- Document-term mapping (nxsdtmap.db) contains the mappings of
- *	document IDs to the set of terms from the aforementioned list,
+ *	- Document-term mapping (nxsdtmap.db) which contains the mappings
+ *	of document IDs to the set of terms from the aforementioned list,
  *	referenced by their IDs.  The term IDs, associated with a document,
  *	are accompanied by a count which represents the term occurrences
  *	in the document.
@@ -55,11 +56,12 @@
  *
  * Searching
  *
- *	The document search also involves tokenization of the query string
- *	with the filters applied.  The tokens are resolved to terms using
- *	the term index.  Then the reverse (term-document map) index is used
- *	to obtain the list of document IDs where the term is present.  The
- *	relevant counters are provided to the ranking algorithm to produce
+ *	The document search involves query processing using lexer/parser
+ *	which produce an intermediate representation and tokens.  After
+ *	applying the filter logic, the tokens are resolved to the terms.
+ *	Then the reverse (term-document map) index is used to obtain the
+ *	list of document IDs where the term is present.  The necessary
+ *	counters are provided to the ranking algorithm which then produces
  *	the relevance score for each document.
  *
  *	The nxs_index_search() API function and query handling is located

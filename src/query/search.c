@@ -9,7 +9,7 @@
  * Searching.
  *
  * - Parses the query into the intermediate representation (IR);
- * - Run the query logic processing the IR to find the matching documents;
+ * - Runs the query logic processing the IR to find the matching documents;
  * - Scores the documents.
  *
  * Consider the following query:
