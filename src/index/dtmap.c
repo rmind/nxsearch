@@ -19,11 +19,11 @@
  *
  *	On addition and removal of the document, the term index sync must
  *	precede the document-term index sync.  The term index must be synced
- *	with the dtmap lock held because new terms and documents can be
- *	added between the two syncs.  In such case, the newly consumed
- *	documents would reference them; therefore, dtmap_insert() would
- *	fail as it would not find the referenced terms.  Acquiring the dtmap
- *	lock around both syncs prevents this race condition.
+ *	with the dtmap lock held because new terms and documents can be added
+ *	between the two syncs.  In such case, the newly consumed documents
+ *	would reference them; therefore, dtmap_build_tdmap() would fail as
+ *	it would not find the referenced terms.  Acquiring the dtmap lock
+ *	around both syncs prevents this race condition.
  *
  * Document deletion
  *
@@ -385,7 +385,7 @@ dtmap_deletion(nxs_index_t *idx, nxs_doc_id_t doc_id, uint32_t doc_total_len)
 
 static int
 dtmap_build_tdmap(nxs_index_t *idx, const nxs_doc_id_t doc_id,
-    mmrw_t *mm, const unsigned n)
+    mmrw_t *mm, const unsigned n, const unsigned flags)
 {
 	const uintptr_t tdmap_offset = MMRW_GET_OFFSET(mm);
 	nxs_term_id_t term_id;
@@ -404,8 +404,11 @@ dtmap_build_tdmap(nxs_index_t *idx, const nxs_doc_id_t doc_id,
 			goto err;
 		}
 		if ((term = idxterm_lookup_by_id(idx, term_id)) == NULL) {
-			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
-			    "idxterm_lookup_by_id on term %u failed", term_id);
+			if ((flags & DTMAP_PARTIAL_SYNC) == 0) {
+				nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
+				    "idxterm_lookup_by_id on term %u failed",
+				    term_id);
+			}
 			goto err;
 		}
 		if (idxterm_add_doc(term, doc_id) == -1) {
@@ -495,7 +498,7 @@ idx_dtmap_sync(nxs_index_t *idx, unsigned flags)
 		    mmrw_fetch32(&mm, &n) == -1) {
 			nxs_decl_errx(idx->nxs, NXS_ERR_FATAL,
 			    "corrupted dtmap index", NULL);
-			goto err;
+			goto out;
 		}
 
 		/*
@@ -506,7 +509,7 @@ idx_dtmap_sync(nxs_index_t *idx, unsigned flags)
 			ASSERT(doc_total_len || n == 0);
 
 			if (mmrw_advance(&mm, n * (4 + 4)) == -1) {
-				goto err;
+				goto out;
 			}
 			consumed_len += IDXDT_META_LEN(n);
 			continue;
@@ -519,22 +522,22 @@ idx_dtmap_sync(nxs_index_t *idx, unsigned flags)
 		if ((doc = idxdoc_create(idx, doc_id, offset)) == NULL) {
 			nxs_decl_err(idx->nxs, NXS_ERR_SYSTEM,
 			    "idxdoc_create failed", NULL);
-			goto err;
+			goto out;
 		}
-		if (dtmap_build_tdmap(idx, doc_id, &mm, n) == -1) {
+		if (dtmap_build_tdmap(idx, doc_id, &mm, n, flags) == -1) {
 			idxdoc_destroy(idx, doc);
 			if (flags & DTMAP_PARTIAL_SYNC) {
 				/* No error if partial sync is allowed. */
 				ret = 0;
-				goto err;
+				goto out;
 			}
-			goto err;
+			goto out;
 		}
 		consumed_len += IDXDT_META_LEN(n);
 	}
 	ASSERT(consumed_len == target_len);
 	ret = 0;
-err:
+out:
 	idx->dt_consumed += consumed_len;
 	app_dbgx("consumed = %zu", consumed_len);
 	return ret;
