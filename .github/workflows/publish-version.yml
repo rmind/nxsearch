@@ -4,9 +4,7 @@ on:
     types: [published]
 
 env:
-  RELEASE_VERSION: ${{github.event.release.name}}
   BASE_IMAGE_NAME: rmind/nxsearch-svc
-  RELEASE_IMAGE_NAME: ${BASE_IMAGE_NAME}:${RELEASE_VERSION}
 
 jobs:
   update:
@@ -32,9 +30,18 @@ jobs:
         env:
           DOCKER_BUILDKIT: 1
         run: |
+
+          #
+          # NOTE: remove spaces and smaller than 128 characters.
+          #       see more: https://docs.docker.com/engine/reference/commandline/tag/
+          RELEASE_TAG=${BASE_IMAGE_NAME}:${{github.event.release.tag_name}}
+          RELEASE_TAG=${RELEASE_TAG//[[:blank:]]/}
+          RELEASE_TAG="${RELEASE_TAG:0:127}"
+
           docker pull ${BASE_IMAGE_NAME}:ci || echo "Can't download"
+          echo "Pushing release ${RELEASE_TAG}"
           docker buildx build \
-            --tag ${RELEASE_IMAGE_NAME} \
+            --tag ${RELEASE_TAG} \
             --cache-from ${BASE_IMAGE_NAME}:ci \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
             --target nxsearch-svc \
