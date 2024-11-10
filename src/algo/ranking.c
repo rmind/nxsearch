@@ -75,7 +75,7 @@ tf_idf(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 
 	term_freq = idxdoc_get_termcount(idx, doc, term->id);
 	doc_count = idx_get_doc_count(idx);
-	doc_freq = roaring_bitmap_get_cardinality(term->doc_bitmap);
+	doc_freq = roaring64_bitmap_get_cardinality(term->doc_bitmap);
 	ASSERT(doc_freq > 0);
 
 	/*
@@ -147,7 +147,7 @@ bm25(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 
 	term_freq = idxdoc_get_termcount(idx, doc, term->id);
 	doc_count = idx_get_doc_count(idx);
-	doc_freq = roaring_bitmap_get_cardinality(term->doc_bitmap);
+	doc_freq = roaring64_bitmap_get_cardinality(term->doc_bitmap);
 	ASSERT(doc_freq > 0);
 
 	/*

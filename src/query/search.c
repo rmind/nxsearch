@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Mindaugas Rasiukevicius <rmind at noxt eu>
+ * Copyright (c) 2022-2024 Mindaugas Rasiukevicius <rmind at noxt eu>
  * All rights reserved.
  *
  * Use is subject to license terms, as specified in the LICENSE file.
@@ -115,10 +115,10 @@ get_search_params(nxs_index_t *idx, nxs_params_t *params, search_params_t *sp)
  * get_expr_bitmap: recursive process AND/OR/NOT expressions and produce
  * the resulting document bitmap.
  */
-static roaring_bitmap_t *
+static roaring64_bitmap_t *
 get_expr_bitmap(nxs_index_t *idx, expr_t *expr, unsigned r)
 {
-	roaring_bitmap_t *result;
+	roaring64_bitmap_t *result;
 	expr_t *subexpr;
 
 	ASSERT(expr != NULL);
@@ -135,9 +135,9 @@ get_expr_bitmap(nxs_index_t *idx, expr_t *expr, unsigned r)
 
 		if (token) {
 			const idxterm_t *term = token->idxterm;
-			return roaring_bitmap_copy(term->doc_bitmap);
+			return roaring64_bitmap_copy(term->doc_bitmap);
 		}
-		return roaring_bitmap_create();
+		return roaring64_bitmap_create();
 	}
 	ASSERT(expr->nitems > 0);
 
@@ -147,28 +147,28 @@ get_expr_bitmap(nxs_index_t *idx, expr_t *expr, unsigned r)
 	}
 
 	for (unsigned i = 1; i < expr->nitems; i++) {
-		roaring_bitmap_t *elm;
+		roaring64_bitmap_t *elm;
 
 		subexpr = expr->elements[i];
 		if ((elm = get_expr_bitmap(idx, subexpr, r + 1)) == NULL) {
-			roaring_bitmap_free(result);
+			roaring64_bitmap_free(result);
 			return NULL;
 		}
 
 		switch (expr->type) {
 		case EXPR_OP_AND:
-			roaring_bitmap_and_inplace(result, elm);
+			roaring64_bitmap_and_inplace(result, elm);
 			break;
 		case EXPR_OP_OR:
-			roaring_bitmap_or_inplace(result, elm);
+			roaring64_bitmap_or_inplace(result, elm);
 			break;
 		case EXPR_OP_NOT:
-			roaring_bitmap_andnot_inplace(result, elm);
+			roaring64_bitmap_andnot_inplace(result, elm);
 			break;
 		default:
 			abort();
 		}
-		roaring_bitmap_free(elm);
+		roaring64_bitmap_free(elm);
 	}
 	return result;
 }
@@ -212,8 +212,8 @@ run_query_logic(query_t *query, ranking_func_t rank, nxs_resp_t *resp)
 {
 	nxs_index_t *idx = query->idx;
 	tokenset_t *tokens = query->tokens;
-	roaring_uint32_iterator_t *bm_iter;
-	roaring_bitmap_t *doc_bitmap;
+	roaring64_iterator_t *bm_iter;
+	roaring64_bitmap_t *doc_bitmap;
 	int ret = -1;
 
 	/*
@@ -232,9 +232,9 @@ run_query_logic(query_t *query, ranking_func_t rank, nxs_resp_t *resp)
 	if (!doc_bitmap) {
 		return -1;
 	}
-	bm_iter = roaring_create_iterator(doc_bitmap);
-	while (bm_iter->has_value) {
-		const nxs_doc_id_t doc_id = bm_iter->current_value;
+	bm_iter = roaring64_iterator_create(doc_bitmap);
+	while (roaring64_iterator_has_value(bm_iter)) {
+		const nxs_doc_id_t doc_id = roaring64_iterator_value(bm_iter);
 		token_t *token;
 
 		TAILQ_FOREACH(token, &tokens->list, entry) {
@@ -247,7 +247,7 @@ run_query_logic(query_t *query, ranking_func_t rank, nxs_resp_t *resp)
 			/*
 			 * Skip if this term is not used in the document.
 			 */
-			if (!roaring_bitmap_contains(
+			if (!roaring64_bitmap_contains(
 			    term->doc_bitmap, doc_id)) {
 				continue;
 			}
@@ -268,12 +268,12 @@ run_query_logic(query_t *query, ranking_func_t rank, nxs_resp_t *resp)
 				goto out;
 			}
 		}
-		roaring_advance_uint32_iterator(bm_iter);
+		roaring64_iterator_advance(bm_iter);
 	}
 	ret = 0;
 out:
-	roaring_free_uint32_iterator(bm_iter);
-	roaring_bitmap_free(doc_bitmap);
+	roaring64_iterator_free(bm_iter);
+	roaring64_bitmap_free(doc_bitmap);
 	return ret;
 }
 

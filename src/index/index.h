@@ -12,7 +12,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
-#include <roaring/roaring.h>
+#include <roaring/roaring64.h>
 
 #include "nxs.h"
 #include "tokenizer.h"
@@ -45,7 +45,7 @@ typedef struct idxterm {
 	TAILQ_ENTRY(idxterm)	entry;
 
 	/* Bitmap of the documents in which this term occurs. */
-	roaring_bitmap_t *	doc_bitmap;
+	roaring64_bitmap_t *	doc_bitmap;
 	uint16_t		value_len;
 	char			value[];
 } idxterm_t;

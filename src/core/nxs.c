@@ -500,11 +500,6 @@ nxs_index_add(nxs_index_t *idx, nxs_params_t *params __unused,
 		    "document ID must be non-zero", NULL);
 		return -1;
 	}
-	if (doc_id > UINT32_MAX) {
-		nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
-		    "document ID must be not greater than UINT32_MAX", NULL);
-		return -1;
-	}
 
 	/*
 	 * Check whether the document already exists.

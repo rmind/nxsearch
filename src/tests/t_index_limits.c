@@ -80,7 +80,7 @@ verify_terms_doc(nxs_index_t *idx)
 		assert(strcmp(term->value, val) == 0);
 
 		// Check that the term has the document associated.
-		assert(roaring_bitmap_contains(term->doc_bitmap, DOC_ID));
+		assert(roaring64_bitmap_contains(term->doc_bitmap, DOC_ID));
 
 		// Check the document term count.
 		c = idxdoc_get_termcount(idx, doc, term_id);

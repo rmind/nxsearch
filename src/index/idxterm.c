@@ -114,7 +114,7 @@ idxterm_create(const char *token, const size_t len, const size_t offset)
 		return NULL;
 	}
 	term->id = 0;
-	term->doc_bitmap = roaring_bitmap_create();
+	term->doc_bitmap = roaring64_bitmap_create();
 	term->offset = offset;
 
 	memcpy(term->value, token, len);
@@ -143,7 +143,7 @@ idxterm_destroy(nxs_index_t *idx, idxterm_t *term)
 		TAILQ_REMOVE(&idx->term_list, term, entry);
 		idx->term_count--;
 	}
-	roaring_bitmap_free(term->doc_bitmap);
+	roaring64_bitmap_free(term->doc_bitmap);
 	free(term);
 }
 
@@ -315,7 +315,7 @@ idxterm_decr_total(nxs_index_t *idx, const idxterm_t *term, unsigned count)
 int
 idxterm_add_doc(idxterm_t *term, nxs_doc_id_t doc_id)
 {
-	roaring_bitmap_add(term->doc_bitmap, doc_id);
+	roaring64_bitmap_add(term->doc_bitmap, doc_id);
 	app_dbgx("term %u => doc %"PRIu64, term->id, doc_id);
 	return 0;
 }
@@ -323,6 +323,6 @@ idxterm_add_doc(idxterm_t *term, nxs_doc_id_t doc_id)
 void
 idxterm_del_doc(idxterm_t *term, nxs_doc_id_t doc_id)
 {
-	roaring_bitmap_remove(term->doc_bitmap, doc_id);
+	roaring64_bitmap_remove(term->doc_bitmap, doc_id);
 	app_dbgx("unlinking doc %"PRIu64" from term %u", doc_id, term->id);
 }

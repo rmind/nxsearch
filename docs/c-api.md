@@ -74,9 +74,9 @@ The `nxs_index_t *` is an active reference to an index.
   * Create new index with a given `name` and parameters. If `params` is `NULL`,
   then the default parameters will be used.  Returns the index reference or
   `NULL` on failure.  Currently, the following parameters are supported:
-    * `algo`: ranking algorithm; it may be set to "BM25" (default) or "TF-IDF".
+    * `algo`: ranking algorithm; it may be set to `BM25` (default) or `TF-IDF`.
     * `lang`: language of the content in the index which should be two-letter
-    ISO 639-1 code; "en" (English) is the default.
+    ISO 639-1 code; `en` (English) is the default.
     * `filters`: a list of filters (in the specified order) to apply when
     tokenizing; default is: "normalizer", "stopwords", "stemmer".
 
