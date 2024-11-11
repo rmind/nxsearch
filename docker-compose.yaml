@@ -1,6 +1,5 @@
-version: '3'
-
 services:
+
   app:
     build:
       context: .
@@ -20,6 +19,7 @@ services:
       #- ./svc-src/nxsearch_storage.lua:/usr/local/openresty/lualib/nxsearch_storage.lua
       # - ./compose/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf
       # - ./compose/openapi.json:/app/public_html/openapi.json
+
   lib:
     build:
       context: .
@@ -31,3 +31,12 @@ services:
     volumes:
       - ./data:/nxsearch/data
       - ./src:/src
+
+  stdlib:
+    # standalone library
+    build:
+      context: .
+      dockerfile: compose/lib.Dockerfile
+    image: nxsearch-stdlib
+    volumes:
+      - ./src:/lib-src
