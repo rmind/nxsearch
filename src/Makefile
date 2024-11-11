@@ -97,9 +97,9 @@ USE_LUA?=	1
 ifeq ($(USE_LUA),1)
 CFLAGS+=	-fPIC $(shell pkg-config --cflags luajit)
 LDFLAGS+=	-fPIC $(shell pkg-config --cflags --libs luajit)
-endif
 
 LUA_OBJS+=	core/lua.o
+endif
 
 #
 # objs
@@ -109,7 +109,9 @@ OBJS+=		core/nxs.o
 OBJS+=		core/tokenizer.o
 OBJS+=		core/filters.o
 OBJS+=		core/filters_builtin.o
+ifeq ($(USE_LUA),1)
 OBJS+=		core/filters_lua.o
+endif
 OBJS+=		core/params.o
 OBJS+=		core/results.o
 
@@ -180,16 +182,22 @@ ALL_OBJS:=	$(shell echo $(OBJS) $(EXT_AOBJ))
 
 $(LIB).la:	LDFLAGS+=	-rpath $(LIBDIR)
 
+INCS=		core/nxs.h
+LIBDIR?=	/usr/local/lib
+INCDIR?=	/usr/local/include
+
 install/%.la:	ILIBDIR=	$(DESTDIR)/$(LIBDIR)
-install:	IBINDIR=	$(DESTDIR)/$(BINDIR)
+install:	IINCDIR=	$(DESTDIR)/$(INCDIR)/
 install:	LUA_ILIBDIR=	$(DESTDIR)/$(LUA_LIBDIR)/
 
 all: $(ALL_OBJS) utils/benchmark.o
 	$(CC) $(CFLAGS) $^ -o $(BENCHMARK_BIN) $(LDFLAGS)
 
-lib: $(LIB).la
+#
+# standalone library:
+#
 
-lua-lib: $(LUALIB).so
+lib: $(EXT_AOBJ) $(LIB).la
 
 %.lo: %.c
 	libtool --mode=compile --tag CC $(CC) $(CFLAGS) -c $<
@@ -197,8 +205,18 @@ lua-lib: $(LUALIB).so
 %.la: $(shell echo $(OBJS) | sed 's/\.o/\.lo/g')
 	libtool --mode=link --tag CC $(CC) $(LDFLAGS) -o $@ $(notdir $^) $(EXT_AOBJ)
 
+#
+# Lua library target:
+#
+
+lua-lib: $(LUALIB).so
+
 %.so: $(ALL_OBJS) $(LUA_OBJS)
 	$(CC) -fPIC -shared -o $@ $^ $(LDFLAGS)
+
+#
+# parser/lexer:
+#
 
 query/scan.c: query/grammar.c
 	re2c -W -8 query/scan.re -o $@
@@ -206,25 +224,39 @@ query/scan.c: query/grammar.c
 query/grammar.o: CFLAGS+= -Wno-unused-parameter -Wno-unused-variable \
     -Wno-missing-prototypes -Wno-missing-declarations
 
+query/grammar.lo: CFLAGS+= -Wno-unused-parameter -Wno-unused-variable \
+    -Wno-missing-prototypes -Wno-missing-declarations
+
 query/grammar.c:
 	lemon -p query/grammar.y
+
+#
+# external dependencies:
+#
 
 libs/CRoaring/build/src/libroaring.a:
 	@ echo Building libroaring
 	cd libs/CRoaring && mkdir -p build && cd build && \
-	    cmake -DENABLE_ROARING_TESTS=OFF .. && cmake --build .
+	    cmake -DCMAKE_CXX_FLAGS="-fPIC" -DCMAKE_C_FLAGS="-fPIC" \
+	    -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DENABLE_ROARING_TESTS=OFF .. && \
+	    cmake --build .
 
 libs/yyjson/build/libyyjson.a:
 	@ echo Building yyjson
 	cd libs/yyjson && mkdir -p build && cd build && \
-	    cmake -DCMAKE_C_FLAGS="-fPIC" -DYYJSON_BUILD_TESTS=OFF .. && \
-	    VERBOSE=1 cmake --build .
+	    cmake -DCMAKE_C_FLAGS="-fPIC" -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
+	    -DYYJSON_BUILD_TESTS=OFF .. && \
+	    cmake --build .
+
+#
+# library installation:
+#
 
 install/%.la: %.la
 	mkdir -p $(ILIBDIR)
 	libtool --mode=install install -c $(notdir $@) $(ILIBDIR)/$(notdir $@)
 
-install: $(addprefix install/,$(LIB).la)
+install: lib $(addprefix install/,$(LIB).la)
 	libtool --mode=finish $(LIBDIR)
 	mkdir -p $(IINCDIR) && install -c $(INCS) $(IINCDIR)
 

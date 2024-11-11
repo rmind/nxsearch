@@ -3,13 +3,13 @@ on: [push]
 
 jobs:
   build_and_tests:
-    name: Build and run tests lib
+    name: Build and run the tests
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
 
-      - name: Checkout submodules
+      - name: Checkout Git submodules
         run: git submodule update --init --recursive
 
       - name: Set up Docker Buildx
@@ -21,7 +21,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: build
+      - name: Build and run unit tests
         shell: bash
         env:
           DOCKER_BUILDKIT: 1
@@ -35,7 +35,7 @@ jobs:
             --output type=docker \
             -f compose/svc.Dockerfile .
 
-      - name: Integration test
+      - name: Run integration test
         shell: bash
         run: |
           docker run -d \
@@ -45,6 +45,6 @@ jobs:
           sh ./tools/svc_test.sh
           docker rm -f test-svc
 
-      - name: push
+      - name: Push the CI image
         shell: bash
         run: docker push rmind/nxsearch-svc:ci
