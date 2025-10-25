@@ -2,12 +2,12 @@
 
 ![TESTS](https://github.com/rmind/nxsearch/actions/workflows/tests.yaml/badge.svg)
 
-**Work in progress**. Upstream at: https://github.com/rmind/nxsearch
-
 **nxsearch** is a full-text search engine library which is also provided
 with a web server integration.
 
 The engine is written in C11 and is distributed under the 2-clause BSD license.
+
+Upstream at: https://github.com/rmind/nxsearch
 
 ## Features
 
@@ -45,6 +45,25 @@ curl -d "cat cat cat" http://127.0.0.1:8000/test-idx/add/3
 
 # Run a query:
 curl -s -d "cat" http://127.0.0.1:8000/test-idx/search | jq
+```
+
+### Python
+
+```python
+import nxsearch
+from nxsearch import NxsResourceExistsError
+
+nxs = nxsearch.init("./nxs-data")
+index = nxs.open("animal-articles")
+
+index.add(1, "cat dog cow")
+index.add(2, "dog cow")
+index.add(3, "cat cat cat")
+index.add(4, "cat's catnip")
+
+with index.search("cat") as result:
+    for item in result:
+        print(item)
 ```
 
 ## Documentation

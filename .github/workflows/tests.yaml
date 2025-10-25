@@ -42,7 +42,7 @@ jobs:
             --name test-svc \
             -p "127.0.0.1:8000:8000" \
             rmind/nxsearch-svc:ci
-          sh ./tools/svc_test.sh
+          sleep 2 && ./tools/svc_test.sh
           docker rm -f test-svc
 
       - name: Push the CI image
