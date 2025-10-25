@@ -11,3 +11,4 @@
 .DS_Store
 
 compose/openapi.json
+__pycache__

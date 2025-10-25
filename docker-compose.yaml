@@ -40,3 +40,14 @@ services:
     image: nxsearch-stdlib
     volumes:
       - ./src:/lib-src
+
+  pynxsearch:
+    # Python library
+    build:
+      context: .
+      dockerfile: compose/pynxsearch.Dockerfile
+    depends_on:
+      - stdlib
+    image: pynxsearch
+    volumes:
+      - ./:/src

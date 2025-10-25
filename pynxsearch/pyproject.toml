@@ -1,0 +1,36 @@
+[project]
+name = "nxsearch"
+version = "0.1.0"
+description = "nxsearch - a full-text search engine library"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "BSD-2-Clause"
+keywords = ["fts", "full text search", "tf-idf", "bm25"]
+dependencies = []
+
+[project.urls]
+github = "https://github.com/rmind/nxsearch"
+
+[dependency-groups]
+dev = [
+    "cython>=3.2.0",
+    "pytest>=8.4.2",
+    "ruff>=0.14.1",
+    "setuptools>=82.0.0",
+]
+
+[build-system]
+requires = ["cython>=3.2.0", "setuptools>=82.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+# See: https://github.com/astral-sh/uv/issues/10950
+nxsearch = ["*.pyx", "*.pxd"]
+
+[[tool.setuptools.ext-modules]]
+name = "nxsearch.nxsearch"
+sources = ["nxsearch/*.pyx"]
+libraries = ["nxsearch"]
+
+[tool.ruff]
+line-length = 80

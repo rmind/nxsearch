@@ -1,4 +1,4 @@
-FROM debian:11.5-slim
+FROM debian:13.1-slim
 
 RUN apt-get update -y && \
     apt-get install -y curl vim less && \
@@ -13,5 +13,3 @@ COPY ./src /build-lib
 RUN make distclean && \
     LIBDIR=/usr/lib INCDIR=/usr/include USE_LUA=0 \
     make install
-
-WORKDIR /build

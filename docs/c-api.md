@@ -42,9 +42,12 @@ condition or a flaw in the application.
 
 The `nxs_params_t` object is used to pass the index or query parameters.
 It is a container for key-value pairs representing some configuration.
+The available parameters are described in the section below.
 
 * `nxs_params_t *nxs_params_create(void)`
   * Create a parameters object, which is initially just an empty container.
+  Note: it is the caller's responsibility to free the resource by invoking
+  `nxs_params_release()`.
 
 * `nxs_params_t *nxs_params_fromjson(nxs_t *nxs, const char *text, size_t len)`
   * Create a parameters object populated from from the JSON string, specified
@@ -70,7 +73,7 @@ It is a container for key-value pairs representing some configuration.
 
 The `nxs_index_t *` is an active reference to an index.
 
-* `nxs_index_t *nxs_index_create(nxs_t *, const char *name, nxs_params_t *params)`
+* `nxs_index_t *nxs_index_create(nxs_t *nxs, const char *name, nxs_params_t *params)`
   * Create new index with a given `name` and parameters. If `params` is `NULL`,
   then the default parameters will be used.  Returns the index reference or
   `NULL` on failure.  Currently, the following parameters are supported:
@@ -92,8 +95,8 @@ The `nxs_index_t *` is an active reference to an index.
   * Destroy the index, specified by `name`, deleting all of its data.
 
 * `nxs_params_t *nxs_index_get_params(nxs_index_t *idx)`
-  Get the current parameters of the index. This is an active reference which
-  must not be destroyed with `nxs_params_release()`.
+  * Get the current parameters of the index. This is an active reference which
+  must not be destroyed (i.e. do not call `nxs_params_release()` on it).
 
 ## Add/remove documents
 
