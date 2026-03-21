@@ -32,8 +32,9 @@ jobs:
         run: |
 
           #
-          # NOTE: remove spaces and smaller than 128 characters.
-          #       see more: https://docs.docker.com/engine/reference/commandline/tag/
+          # NOTE: Remove spaces and cap at 128 characters.
+          # See more: https://docs.docker.com/engine/reference/commandline/tag/
+          #
           RELEASE_TAG=${BASE_IMAGE_NAME}:${{github.event.release.tag_name}}
           RELEASE_TAG=${RELEASE_TAG//[[:blank:]]/}
           RELEASE_TAG="${RELEASE_TAG:0:127}"

@@ -8,6 +8,8 @@
 #ifndef _STRBUF_UTILS_H_
 #define _STRBUF_UTILS_H_
 
+#include <sys/types.h>
+
 /*
  * Default string buffer size.  An average length of the word should
  * be well less than 32 characters.  Double the buffer, however, for
