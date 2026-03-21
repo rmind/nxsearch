@@ -1,7 +1,7 @@
 #
 # nxsearch library image
 #
-FROM debian:11.5-slim AS nxsearch-lib
+FROM debian:12-slim AS nxsearch-lib
 
 #
 # Install dependencies.
@@ -47,14 +47,14 @@ RUN npm install swagger-inline --save-dev && \
 #
 # nxsearch-svc image
 #
-# OpenResty on Debian (11.x -- Bullseye)
-FROM openresty/openresty:bullseye AS nxsearch-svc
+# OpenResty on Debian (12.x -- Bookworm)
+FROM openresty/openresty:bookworm AS nxsearch-svc
 
 RUN \
     apt-get update && \
     apt-get install -y \
         git \
-        libicu67 libstemmer0d luarocks && \
+        libicu72 libstemmer0d luarocks && \
     luarocks install resty-route 0.1-2 && \
     luarocks install luafilesystem 1.8.0-1 && \
     luarocks install lua-path 0.3.1-2 &&  \

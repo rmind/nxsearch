@@ -51,6 +51,10 @@ curl -s -d "cat" http://127.0.0.1:8000/test-idx/search | jq
 
 You can also use the nxsearch as a Python library.
 
+```shell
+pip install nxsearch
+```
+
 ```python
 import nxsearch
 from nxsearch import NxsResourceExistsError

@@ -8,6 +8,8 @@
 #ifndef _MMRW_UTILS_H_
 #define _MMRW_UTILS_H_
 
+#include <sys/types.h>
+
 typedef struct {
 	void *		baseptr;
 	size_t		length;
