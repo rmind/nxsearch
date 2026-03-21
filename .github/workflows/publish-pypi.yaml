@@ -11,23 +11,43 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        #os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
 
     steps:
       - uses: actions/checkout@v6
         with:
-          path: pynxearch
-      - name: Set up QEMU (Linux cross-compile for arm64/aarch64)
-        if: runner.os == 'Linux' && runner.arch == 'X64'
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: all
+          submodules: 'recursive'
+
+      #- name: Set up QEMU (to cross-compile)
+      #  if: runner.os == 'Linux' && runner.arch == 'X64'
+      #  uses: docker/setup-qemu-action@v3
+      #  with:
+      #    platforms: all
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.22.0
+        uses: pypa/cibuildwheel@v3.4.0
+        with:
+          package-dir: pynxsearch
+          config-file: "{package}/pyproject.toml"
         env:
+          CIBW_SKIP: "*-musllinux* *-manylinux2014"
           CIBW_ARCHS_LINUX: x86_64 aarch64
           CIBW_ARCHS_MACOS: x86_64 arm64
+          CIBW_BEFORE_ALL_LINUX: |
+            uname -a
+            apt-get install -y \
+              build-essential libtool libtool-bin pkg-config cmake \
+              libicu-dev libstemmer-dev re2c lemon
+            cd {project}/src && make distclean
+            LIBDIR=/usr/lib INCDIR=/usr/include USE_LUA=0 make install
+          CIBW_BEFORE_ALL_MACOS: |
+            uname -a
+            brew install \
+                libtool cmake \
+                icu4c snowball re2c lemon
+            cd {project}/src && make distclean
+            LIBDIR=/usr/lib INCDIR=/usr/include USE_LUA=0 make install
 
       - name: Upload wheels as artifacts
         uses: actions/upload-artifact@v4
@@ -35,27 +55,27 @@ jobs:
           name: wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
-  build_sdist:
-    name: Build source distribution
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-
-      - name: Build sdist
-        run: uv build
-
-      - name: Upload sdist as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sdist
-          path: dist/*.tar.gz
+  #build_sdist:
+  #  name: Build source distribution
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #    - uses: actions/checkout@v6
+  #      with:
+  #        submodules: 'recursive'
+  #    - name: Install uv
+  #      uses: astral-sh/setup-uv@v7
+  #    - name: Build sdist
+  #      run: uv build
+  #    - name: Upload sdist as artifact
+  #      uses: actions/upload-artifact@v4
+  #      with:
+  #        name: sdist
+  #        path: dist/*.tar.gz
 
   publish:
     name: Publish to PyPI
-    needs: [build_wheels, build_sdist]
+    #needs: [build_wheels, build_sdist]
+    needs: [build_wheels]
     runs-on: ubuntu-latest
     environment:
       name: pypi

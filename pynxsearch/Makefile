@@ -12,6 +12,6 @@ tests:
 	uv run pytest tests
 
 clean:
-	rm -rf ./dist $(PROJ).egg-info $(PROJ)/*.c $(PROJ)/*.so
+	rm -rf ./dist ./build $(PROJ).egg-info $(PROJ)/*.c $(PROJ)/*.so
 
 .PHONY: all lint tests clean

@@ -27,8 +27,6 @@ endif
 # Common C compiler flags.
 #
 CFLAGS+=	-std=gnu11 -O2 -g -Wall -Wextra -Werror
-CFLAGS+=	-D_POSIX_C_SOURCE=200809L
-
 CFLAGS+=	-I core/ -I index/ -I algo/ -I query/ -I utils/
 
 #
@@ -73,8 +71,14 @@ endif
 #
 
 ifeq ($(SYSNAME),Linux)
-CFLAGS+=	-D_GNU_SOURCE -D_DEFAULT_SOURCE
+CFLAGS+=	-D_POSIX_C_SOURCE=200809L -D_GNU_SOURCE -D_DEFAULT_SOURCE
 endif
+ifeq ($(SYSNAME),Darwin)
+CFLAGS+=	-D__DARWIN_C_LEVEL=__DARWIN_C_FULL
+LIBTOOL=	glibtool
+endif
+
+LIBTOOL?=	libtool
 
 #
 # Dependencies: compiler flags and libraries to link.
@@ -82,11 +86,14 @@ endif
 
 LDFLAGS+=	-lm
 
+ifeq ($(SYSNAME),Linux)
 # ICU library
 LDFLAGS+=	$(shell pkg-config --libs --cflags icu-uc icu-io)
-
 # Snowball stemmer
 LDFLAGS+=	-lstemmer
+endif
+ifeq ($(SYSNAME),Darwin)
+endif
 
 #
 # Lua
@@ -200,10 +207,10 @@ all: $(ALL_OBJS) utils/benchmark.o
 lib: $(EXT_AOBJ) $(LIB).la
 
 %.lo: %.c
-	libtool --mode=compile --tag CC $(CC) $(CFLAGS) -c $<
+	$(LIBTOOL) --mode=compile --tag CC $(CC) $(CFLAGS) -c $<
 
 %.la: $(shell echo $(OBJS) | sed 's/\.o/\.lo/g')
-	libtool --mode=link --tag CC $(CC) $(LDFLAGS) -o $@ $(notdir $^) $(EXT_AOBJ)
+	$(LIBTOOL) --mode=link --tag CC $(CC) $(LDFLAGS) -o $@ $(notdir $^) $(EXT_AOBJ)
 
 #
 # Lua library target:
@@ -254,14 +261,14 @@ libs/yyjson/build/libyyjson.a:
 
 install/%.la: %.la
 	mkdir -p $(ILIBDIR)
-	libtool --mode=install install -c $(notdir $@) $(ILIBDIR)/$(notdir $@)
+	$(LIBTOOL) --mode=install install -c $(notdir $@) $(ILIBDIR)/$(notdir $@)
 
 install: lib $(addprefix install/,$(LIB).la)
-	libtool --mode=finish $(LIBDIR)
+	$(LIBTOOL) --mode=finish $(LIBDIR)
 	mkdir -p $(IINCDIR) && install -c $(INCS) $(IINCDIR)
 
 clean:
-	libtool --mode=clean rm
+	$(LIBTOOL) --mode=clean rm
 	rm -f query/scan.c query/grammar.c query/grammar.h query/grammar.out
 	rm -rf .libs *.o *.so *.lo *.la utils/benchmark.o
 	rm -f $(BENCHMARK_BIN) $(OBJS) $(TEST_OBJS) $(TESTS)
