@@ -49,12 +49,14 @@ curl -s -d "cat" http://127.0.0.1:8000/test-idx/search | jq
 
 ### Python
 
+You can also use the nxsearch as a Python library.
+
 ```python
 import nxsearch
 from nxsearch import NxsResourceExistsError
 
 nxs = nxsearch.init("./nxs-data")
-index = nxs.open("animal-articles")
+index = nxs.open("animal-articles", create=True)
 
 index.add(1, "cat dog cow")
 index.add(2, "dog cow")
@@ -70,6 +72,6 @@ with index.search("cat") as result:
 
 - Swagger UI with the endpoint documentation is provided at `/docs` URL.
 
-- The Lua filters API can be found [HERE](docs/lua-filters-api.md).
-
 - The C API documentation can be found [HERE](docs/c-api.md).
+
+- The Lua filters API can be found [HERE](docs/lua-filters-api.md).
