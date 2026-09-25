@@ -11,6 +11,7 @@ from libc.errno cimport errno
 from libc.stdlib cimport free
 
 from dataclasses import dataclass
+from pathlib import Path
 from os import strerror
 import json
 
@@ -32,7 +33,7 @@ class NxsResultItem:
 @cython.final
 cdef class NxsIndexParams:
     """
-    A class for wrap the parameters.
+    A class for wrapping the parameters.
     """
     cdef nxs_params_t *_c_nxs_params
 
@@ -293,4 +294,9 @@ cdef class Nxs:
 
 
 def init(basedir):
+    """
+    Initialize a new nxsearch instance using the specified base directory.
+    """
+    Path(basedir).mkdir(parents=True, exist_ok=True)
+    nxs_set_loglevel(NULL)  # disable any logging
     return Nxs(str(basedir))

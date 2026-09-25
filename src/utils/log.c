@@ -13,6 +13,8 @@
 
 #include "utils.h"
 
+#define	LOG_DISABLE	(-1)
+
 int		app_log_level = LOG_NOTICE;
 static pid_t	app_pid;
 
@@ -32,6 +34,10 @@ app_set_loglevel(const char *level)
 	};
 
 	app_pid = getpid();
+	if (!level) {
+		app_log_level = LOG_DISABLE;
+		return 0;
+	}
 
 	for (unsigned i = 0; i < __arraycount(log_levels); i++) {
 		if (strcasecmp(log_levels[i].name, level) == 0) {
@@ -51,6 +57,9 @@ _app_log(int level, const char *file, int line,
 	int err = 0, ret;
 	va_list ap;
 
+	if (level == LOG_DISABLE) {
+		return;
+	}
 	if (level & LOG_EMSG) {
 		err = errno;
 	}

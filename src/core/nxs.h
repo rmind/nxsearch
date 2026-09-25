@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Mindaugas Rasiukevicius <rmind at noxt eu>
+ * Copyright (c) 2022-2026 Mindaugas Rasiukevicius <rmind at noxt eu>
  * All rights reserved.
  *
  * Use is subject to license terms, as specified in the LICENSE file.
@@ -8,11 +8,12 @@
 #ifndef _NXSLIB_H_
 #define _NXSLIB_H_
 
-#include <sys/cdefs.h>
 #include <inttypes.h>
 #include <stdbool.h>
 
-__BEGIN_DECLS
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 /*
  * General nxsearch library API.
@@ -26,6 +27,7 @@ typedef struct nxs nxs_t;
 nxs_t *		nxs_open(const char *);
 void		nxs_close(nxs_t *);
 
+int		nxs_set_loglevel(const char *);
 int		nxs_luafilter_load(nxs_t *, const char *, const char *);
 
 /*
@@ -100,6 +102,9 @@ unsigned	nxs_resp_resultcount(const nxs_resp_t *);
 char *		nxs_resp_tojson(nxs_resp_t *, size_t *);
 void		nxs_resp_release(nxs_resp_t *);
 
-__END_DECLS
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif

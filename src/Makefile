@@ -26,7 +26,7 @@ endif
 #
 # Common C compiler flags.
 #
-CFLAGS+=	-std=gnu11 -O2 -g -Wall -Wextra -Werror
+CFLAGS+=	-std=c11 -O2 -g -Wall -Wextra -Werror
 CFLAGS+=	-I core/ -I index/ -I algo/ -I query/ -I utils/
 
 #
@@ -40,7 +40,7 @@ CFLAGS+=	-Wold-style-definition
 CFLAGS+=	-Wsuggest-attribute=noreturn -Wjump-misses-init
 CFLAGS+=	-Wduplicated-cond -Wmisleading-indentation -Wnull-dereference
 CFLAGS+=	-Wduplicated-branches -Wrestrict
-CFLAGS+=	-Wno-error=cpp
+CFLAGS+=	-Wno-error=cpp -Wno-gnu-folding-constant  # to be updated
 
 #
 # Compiler-specific flags.
@@ -96,6 +96,8 @@ endif
 ifeq ($(SYSNAME),Darwin)
 CFLAGS+=	$(shell pkg-config --cflags icu-uc icu-io)
 LDFLAGS+=	$(shell pkg-config --libs --cflags icu-uc icu-io)
+CFLAGS+=	-I $(shell brew --prefix snowball)/include
+LDFLAGS+=	-L $(shell brew --prefix snowball)/lib
 endif
 
 #
