@@ -1,7 +1,7 @@
 name: Publish to Docker Registry
 on:
   release:
-    types: [published]
+    types: [released]
 
 env:
   BASE_IMAGE_NAME: rmind/nxsearch-svc
@@ -11,44 +11,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
-
-      - name: Checkout submodules
-        run: git submodule update --init --recursive
+        uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: build
-        shell: bash
-        env:
-          DOCKER_BUILDKIT: 1
-        run: |
+      - name: Generate image tags and labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.BASE_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.event.release.tag_name, 'v0.') }}
+          flavor: |
+            latest=false
 
-          #
-          # NOTE: Remove spaces and cap at 128 characters.
-          # See more: https://docs.docker.com/engine/reference/commandline/tag/
-          #
-          RELEASE_TAG=${BASE_IMAGE_NAME}:${{github.event.release.tag_name}}
-          RELEASE_TAG=${RELEASE_TAG//[[:blank:]]/}
-          RELEASE_TAG="${RELEASE_TAG:0:127}"
-
-          docker pull ${BASE_IMAGE_NAME}:ci || echo "Can't download"
-          echo "Pushing release ${RELEASE_TAG}"
-          docker buildx build \
-            --tag ${RELEASE_TAG} \
-            --cache-from ${BASE_IMAGE_NAME}:ci \
-            --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --target nxsearch-svc \
-            --output type=docker \
-            -f compose/svc.Dockerfile .
-
-      - name: push
-        shell: bash
-        run: docker push ${RELEASE_IMAGE_NAME}
+      - name: Build and push release image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: compose/svc.Dockerfile
+          target: nxsearch-svc
+          push: true  # publish to Docker Hub
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=nxsearch-svc

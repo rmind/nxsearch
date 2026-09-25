@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Mindaugas Rasiukevicius <rmind at noxt eu>
+ * Copyright (c) 2022-2026 Mindaugas Rasiukevicius <rmind at noxt eu>
  * All rights reserved.
  *
  * Use is subject to license terms, as specified in the LICENSE file.
@@ -22,11 +22,11 @@
  *	transform each token, typically using various linguistic methods,
  *	in order to accommodate the searching logic.
  *
- *	- Resolving the tokens to get the terms (i.e. the objects which
+ *	- Resolving the tokens to get the terms (i.e. the objects that
  *	track the normalized tokens which have already been added to the
  *	index).  If the term is not in the index, then it gets added to
- *	the "staging" list which and then added to the term list (index)
- *	by idx_terms_add().
+ *	the "staging" list and then added to the term list (index) by
+ *	idx_terms_add().
  *
  *	- Adding the document record with the set of term IDs (and their
  *	frequency in the document) to the document-term index ("dtmap").
@@ -172,6 +172,12 @@ nxs_error_checkpoint(nxs_t *nxs)
 	}
 }
 
+__dso_public int
+nxs_set_loglevel(const char *level)
+{
+	return app_set_loglevel(level);
+}
+
 /*
  * _nxs_decl_error: set the index-level error message and log it.
  * If LOG_EMSG flag is set, then append the system-level error message.
@@ -302,7 +308,9 @@ out:
 __dso_public int
 nxs_index_destroy(nxs_t *nxs, const char *name)
 {
-	const char *idx_files[] = { "params.db", "nxsterms", "nxsdtmap", "" };
+	static const char *idx_files[] = {
+		"params.db", "nxsterms", "nxsdtmap", ""
+	};
 	const unsigned n = __arraycount(idx_files);
 	int ec = 0, ret = -1;
 	char *paths[n];

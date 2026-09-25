@@ -32,22 +32,11 @@ services:
       - ./data:/nxsearch/data
       - ./src:/src
 
-  stdlib:
-    # standalone library
-    build:
-      context: .
-      dockerfile: compose/lib.Dockerfile
-    image: nxsearch-stdlib
-    volumes:
-      - ./src:/lib-src
-
   pynxsearch:
     # Python library
     build:
       context: .
       dockerfile: compose/pynxsearch.Dockerfile
-    depends_on:
-      - stdlib
     image: pynxsearch
     volumes:
       - ./:/src

@@ -51,7 +51,7 @@ darwin)
 	# Darwin
 	#
 	brew install libtool cmake icu4c snowball re2c lemon
-	export PKG_CONFIG_PATH="$(brew --prefix icu4c)/lib/pkgconfig:$PKG_CONFIG_PATH"
+	export PKG_CONFIG_PATH="$(brew --prefix icu4c)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 	;;
 *)
 	echo "ERROR: unsupported image '$os_env'" >&2

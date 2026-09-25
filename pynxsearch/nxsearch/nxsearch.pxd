@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2025 Mindaugas Rasiukevicius <rmind at noxt eu>
+# Copyright (c) 2025-2026 Mindaugas Rasiukevicius <rmind at noxt eu>
 # All rights reserved.
 #
 # Use is subject to license terms, as specified in the LICENSE file.
@@ -14,6 +14,8 @@ cdef extern from "<nxs.h>":
     ctypedef struct nxs_t
     nxs_t *nxs_open(const char *)
     void nxs_close(nxs_t *)
+
+    int nxs_set_loglevel(const char *);
 
     ctypedef enum nxs_err_t:
         NXS_ERR_SUCCESS

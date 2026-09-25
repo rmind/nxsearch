@@ -10,7 +10,7 @@ RUN apt-get update -y && \
     apt-get install -y curl vim less && \
     apt-get install -y build-essential libtool libtool-bin gdb gcovr && \
     apt-get install -y pkg-config cmake debhelper unzip libxml2-utils && \
-    apt-get install -y libjemalloc-dev libicu-dev libstemmer-dev && \
+    apt-get install -y libicu-dev libstemmer-dev && \
     apt-get install -y re2c lemon luajit libluajit-5.1-dev lua-cjson
 
 WORKDIR /nxsearch
