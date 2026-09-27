@@ -13,7 +13,7 @@ COPY ./src /build-lib
 
 RUN make distclean && \
     LIBDIR=/usr/lib INCDIR=/usr/include USE_LUA=0 \
-    make install
+    make -j $(getconf _NPROCESSORS_ONLN) install
 
 WORKDIR /build
 COPY ./pynxsearch /build/pynxsearch

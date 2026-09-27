@@ -48,10 +48,12 @@ musllinux*)
 	;;
 darwin)
 	#
-	# Darwin
+	# Darwin.
 	#
-	brew install libtool cmake icu4c snowball re2c lemon
-	export PKG_CONFIG_PATH="$(brew --prefix icu4c)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+	brew install libtool cmake snowball re2c lemon
+	export PKG_CONFIG_PATH="${DEPS_PREFIX:?missing}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+	export MACOSX_DEPLOYMENT_TARGET=11.0
+	export LD_SHARED_CACHE_ELIGIBLE=NO
 	;;
 *)
 	echo "ERROR: unsupported image '$os_env'" >&2
@@ -64,4 +66,5 @@ esac
 #
 cd "$project_dir/src"
 make distclean
-LIBDIR=/usr/lib INCDIR=/usr/include USE_LUA=0 make install
+LIBDIR=/usr/lib INCDIR=/usr/include USE_LUA=0 \
+    make -j $(getconf _NPROCESSORS_ONLN) install

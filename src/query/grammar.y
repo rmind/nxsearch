@@ -17,7 +17,15 @@
 #include "expr.h"
 #include "query.h"
 #include "utils.h"
+
+// HACK: Unfortunately, lemon broke the API with 52ba0c731d commit.
+#define	NXS_YYREALLOC(x, y, ...) realloc((x), (y))
+#define	NXS_YYFREE(x, ...) free((x))
 }
+%ifdef LEMON_HAS_REALLOC
+%realloc NXS_YYREALLOC
+%free NXS_YYFREE
+%endif
 
 %extra_context { query_t *q }
 

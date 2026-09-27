@@ -26,7 +26,7 @@ endif
 #
 # Common C compiler flags.
 #
-CFLAGS+=	-std=c11 -O2 -g -Wall -Wextra -Werror
+CFLAGS+=	-std=gnu2x -O2 -g -Wall -Wextra -Werror
 CFLAGS+=	-I core/ -I index/ -I algo/ -I query/ -I utils/
 
 #
@@ -42,6 +42,9 @@ CFLAGS+=	-Wduplicated-cond -Wmisleading-indentation -Wnull-dereference
 CFLAGS+=	-Wduplicated-branches -Wrestrict
 CFLAGS+=	-Wno-error=cpp -Wno-gnu-folding-constant  # to be updated
 
+# NOTE: Manually aligned pointers in the memory-mapped files.
+CFLAGS+=	-Wno-address-of-packed-member -Wno-atomic-alignment
+
 #
 # Compiler-specific flags.
 #
@@ -49,8 +52,6 @@ ifeq ($(CC),gcc)
 CFLAGS+=	-Wa,--fatal-warnings -Wl,--fatal-warnings
 endif
 ifeq ($(CC),clang)
-# NOTE: Manually aligned pointers in the memory-mapped files.
-CFLAGS+=	-Wno-address-of-packed-member -Wno-atomic-alignment
 CFLAGS+=	-flto
 LDFLAGS+=	-flto
 endif
@@ -90,15 +91,18 @@ LDFLAGS+=	-lm
 ifeq ($(SYSNAME),Linux)
 # ICU library
 LDFLAGS+=	$(shell pkg-config --libs --cflags icu-uc icu-io)
-# Snowball stemmer
-LDFLAGS+=	-lstemmer
 endif
 ifeq ($(SYSNAME),Darwin)
+# ICU library
 CFLAGS+=	$(shell pkg-config --cflags icu-uc icu-io)
-LDFLAGS+=	$(shell pkg-config --libs --cflags icu-uc icu-io)
-CFLAGS+=	-I $(shell brew --prefix snowball)/include
-LDFLAGS+=	-L $(shell brew --prefix snowball)/lib
+LDFLAGS+=	$(shell pkg-config --libs --cflags icu-uc icu-io icu-i18n)
+
+CFLAGS+=	-I$(shell brew --prefix snowball)/include
+LDFLAGS+=	-L$(shell brew --prefix snowball)/lib
 endif
+
+# Snowball stemmer
+LDFLAGS+=	-lstemmer
 
 #
 # Lua
@@ -111,6 +115,8 @@ CFLAGS+=	-fPIC $(shell pkg-config --cflags luajit)
 LDFLAGS+=	-fPIC $(shell pkg-config --cflags --libs luajit)
 
 LUA_OBJS+=	core/lua.o
+else
+CFLAGS+=	-D NO_USE_LUA
 endif
 
 #
@@ -190,7 +196,7 @@ TESTS:=		$(patsubst tests/%.c,%,$(wildcard tests/t_*.c))
 #
 
 BENCHMARK_BIN=	nxsearch_test
-ALL_OBJS:=	$(shell echo $(OBJS) $(EXT_AOBJ))
+ALL_OBJS:=	$(OBJS) $(EXT_AOBJ)
 
 $(LIB).la:	LDFLAGS+=	-rpath $(LIBDIR)
 
@@ -209,12 +215,13 @@ all: $(ALL_OBJS) utils/benchmark.o
 # standalone library:
 #
 
-lib: $(EXT_AOBJ) $(LIB).la
+lib: $(LIB).la
 
 %.lo: %.c
 	$(LIBTOOL) --mode=compile --tag CC $(CC) $(CFLAGS) -c $<
 
-%.la: $(shell echo $(OBJS) | sed 's/\.o/\.lo/g')
+# Note: EXT_AOBJ must be built before the link step.
+%.la: $(patsubst %.o,%.lo,$(OBJS)) | $(EXT_AOBJ)
 	$(LIBTOOL) --mode=link --tag CC $(CC) $(LDFLAGS) -o $@ $(notdir $^) $(EXT_AOBJ)
 
 #
@@ -230,6 +237,11 @@ lua-lib: $(LUALIB).so
 # parser/lexer:
 #
 
+# NOTE: Unfortunately, lemon broke the API; check %realloc/%free support.
+LEMON_FLAGS:=$(shell t=$$(mktemp) || exit; \
+  printf '%%realloc realloc\n%%free free\nstart ::= X.\n' >$$t && \
+  lemon -g $$t >/dev/null 2>&1 && echo -DLEMON_HAS_REALLOC; rm -f $$t)
+
 query/scan.c: query/grammar.c
 	re2c -W -8 query/scan.re -o $@
 
@@ -240,7 +252,7 @@ query/grammar.lo: CFLAGS+= -Wno-unused-parameter -Wno-unused-variable \
     -Wno-missing-prototypes -Wno-missing-declarations
 
 query/grammar.c:
-	lemon -p query/grammar.y
+	lemon $(LEMON_FLAGS) -p query/grammar.y
 
 #
 # external dependencies:
