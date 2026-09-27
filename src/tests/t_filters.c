@@ -102,6 +102,10 @@ run_filter_action_tests(void)
 	nxs_close(nxs);
 }
 
+#if defined(NO_USE_LUA)
+#define	run_lua_tests()
+#else
+
 static void
 run_lua_test(const char *code)
 {
@@ -154,6 +158,7 @@ run_lua_tests(void)
 	run_lua_test(code);
 	free(code);
 }
+#endif
 
 int
 main(void)

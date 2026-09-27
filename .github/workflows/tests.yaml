@@ -6,9 +6,9 @@ defaults:
     shell: bash
 
 jobs:
-  build_and_tests:
-    name: Build and run the tests
-    runs-on: ubuntu-latest
+  build_and_tests_linux:
+    name: Build and run the tests (Linux)
+    runs-on: ubuntu-24.04  # NOTE: bump in publish-pypi.yaml too
     steps:
       - name: Check out the repo
         uses: actions/checkout@v6
@@ -49,7 +49,40 @@ jobs:
           cache-from: type=gha,scope=pynxsearch
           cache-to: type=gha,mode=max,scope=pynxsearch
 
-      - name: Build the Python tests
+      - name: Run the Python tests
         run: |
           docker run --rm rmind/pynxsearch:ci \
               uv run pytest --color=yes -ra tests
+
+  build_and_tests_macos:
+    name: Build and run the tests (MacOS)
+    runs-on: macos-15  # NOTE: bump in publish-pypi.yaml too
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'
+
+      - name: Install dependencies
+        id: deps-macos
+        uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-name: wheel-deps
+          create-args: >-
+            -c conda-forge
+            icu
+          init-shell: none  # don't activate the env
+          cache-environment: true
+          post-cleanup: none
+
+      - name: Build-test
+        env:
+          DEPS_PREFIX: ${{ steps.deps-macos.outputs.environment-path }}
+        run: |
+          set -x
+          brew install libtool cmake snowball re2c lemon
+          export PKG_CONFIG_PATH="${DEPS_PREFIX}/lib/pkgconfig"
+
+          cd src
+          make distclean
+          USE_LUA=0 make -j $(getconf _NPROCESSORS_ONLN) lib

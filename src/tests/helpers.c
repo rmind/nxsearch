@@ -191,7 +191,7 @@ print_search_results(const char *query,
 
 	nxs_resp_iter_reset(resp);
 	while (nxs_resp_iter_result(resp, &doc_id, &score)) {
-		printf("DOC %lu, SCORE %f\n", doc_id, score);
+		printf("DOC %"PRIu64", SCORE %f\n", doc_id, score);
 	}
 }
 

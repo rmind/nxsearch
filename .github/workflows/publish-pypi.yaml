@@ -13,15 +13,29 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # https://docs.github.com/en/actions/reference/runners/github-hosted-runners
           - { os: linux, arch: x86_64,  runner: ubuntu-24.04 }
           - { os: linux, arch: aarch64, runner: ubuntu-24.04-arm }
-          #- { os: macos, arch: x86_64,  runner: macos-15-intel }
-          #- { os: macos, arch: arm64,   runner: macos-15 }
+          - { os: macos, arch: x86_64,  runner: macos-15-intel }
+          - { os: macos, arch: arm64,   runner: macos-15 }
 
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: 'recursive'
+
+      - name: Install dependencies (MacOS)
+        if: matrix.os == 'macos'
+        id: deps-macos
+        uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-name: wheel-deps
+          create-args: >-
+            -c conda-forge
+            icu
+          init-shell: none  # don't activate the env
+          cache-environment: true
+          post-cleanup: none
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v4.2.1
@@ -29,6 +43,7 @@ jobs:
           package-dir: pynxsearch
           config-file: "{package}/pyproject.toml"
         env:
+          DEPS_PREFIX: ${{ steps.deps-macos.outputs.environment-path }}
           CIBW_ARCHS: ${{ matrix.arch }}  # native
           #
           # Current defaults are manylinux_2_28 and musllinux_1_2.
@@ -43,7 +58,6 @@ jobs:
             sh {package}/cibuildwheel.sh {project}
           CIBW_BEFORE_ALL_MACOS: |
             uname -a && cc --version
-            MACOSX_DEPLOYMENT_TARGET=11.0
             sh {package}/cibuildwheel.sh {project}
 
       - name: Upload wheels as artifacts
