@@ -110,6 +110,9 @@
     __atomic_compare_exchange_n((p), (e), (d), \
     true, __ATOMIC_RELAXED, __ATOMIC_RELAXED)
 
+#define	atomic_add_relaxed(p, v)	\
+    __atomic_fetch_add((p), (v), __ATOMIC_RELEASE)
+
 /*
  * Byte-order conversions.
  */

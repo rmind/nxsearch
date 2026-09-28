@@ -42,6 +42,7 @@ cdef extern from "<nxs.h>":
     ctypedef uint64_t nxs_doc_id_t
     int nxs_index_add(nxs_index_t *, nxs_params_t *, nxs_doc_id_t, const char *, size_t)
     int nxs_index_remove(nxs_index_t *, nxs_doc_id_t)
+    nxs_doc_id_t nxs_index_last_doc_id(const nxs_index_t *)
 
     ctypedef struct nxs_resp_t
     nxs_resp_t *nxs_index_search(nxs_index_t *, nxs_params_t *, const char *, size_t)

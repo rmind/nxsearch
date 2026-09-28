@@ -100,9 +100,9 @@ run_test(int c)
 
 	/*
 	 * Concurrent term addition.  Note: even though nxsearch as a
-	 * whole is not considered multi-threading safe, many of its parts
-	 * are and, in this case, we can use threads to stress test the
-	 * index map structure.
+	 * whole is not considered multi-threading safe, most of its
+	 * components are and, in this case, we can use threads to stress
+	 * test the index map structure.
 	 */
 	pthread_barrier_init(&barrier, NULL, nworkers);
 	for (unsigned i = 0; i < nworkers; i++) {

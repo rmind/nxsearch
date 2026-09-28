@@ -3,7 +3,7 @@
 ## General
 
 The public API is provided by the `<nxs.h>` header.  The library is not
-mult-thread safe but the underlying structures support concurrency which
+multi-thread safe but the underlying structures support concurrency which
 can be utilized using separate processes.  A single library instance is
 represented by the `nxs_t *` reference.
 
@@ -27,8 +27,8 @@ represented by the `nxs_t *` reference.
 The error code is represented by the `nxs_err_t` enumeration.  The list
 of symbolic error names defined:
 
-* `NXS_ERR_SUCCESS`: indicate the success of last operation i.e. no error.
-The value is this error code can be assumed to be zero.
+* `NXS_ERR_SUCCESS`: indicates the success of the last operation i.e. no error.
+The value of this error code can be assumed to be zero.
 * `NXS_ERR_FATAL`: unspecified fatal error; generally not expected to occur,
 unless index files get corrupted, there is an unusual system-level error
 condition or a flaw in the application.
@@ -50,7 +50,7 @@ The available parameters are described in the section below.
   `nxs_params_release()`.
 
 * `nxs_params_t *nxs_params_fromjson(nxs_t *nxs, const char *text, size_t len)`
-  * Create a parameters object populated from from the JSON string, specified
+  * Create a parameters object populated from the JSON string, specified
   by `text` and its length by `len`.
 
 * `void nxs_params_release(nxs_params_t *params)`
@@ -60,7 +60,7 @@ The available parameters are described in the section below.
   * Set the key to the given string value.  Returns `0` on success or non-zero
   on error.
 
-* `int nxs_params_set_uint(nxs_params_t *params, const char *key, uint64_t *val)`
+* `int nxs_params_set_uint(nxs_params_t *params, const char *key, uint64_t val)`
   * Set the key to the given integer value.  Returns `0` on success or non-zero
   on error.
 
@@ -102,12 +102,21 @@ The `nxs_index_t *` is an active reference to an index.
 
 * `int nxs_index_add(nxs_index_t *idx, nxs_params_t *params,
   nxs_doc_id_t id, const char *text, size_t len)`
-  * Index the given document.  The caller must provide a unique document ID,
-  specified by `id` which must be a non-zero 64-bit integer.  The document
-  content is provided by `text` (with its length by `len` in bytes) which may
-  be in UTF-8.  Returns 0 on success or non-zero on failure.  Currently, no
-  parameters are supported and the `params` value should be NULL, but this
-  may change in the future.
+  * Index the given document.  If `id` is set to zero, then a unique
+  document ID will be assigned on creation (see `nxs_index_last_doc_id()`
+  for more details); otherwise, the caller must provide a unique document
+  ID (non-zero 64-bit integer).  The document content is provided by `text`
+  (with its length by `len` in bytes) which may be in UTF-8.  Returns 0 on
+  success or non-zero on failure.  Currently, no parameters are supported
+  and the `params` value should be NULL, but this may change in the future.
+
+* `nxs_doc_id_t nxs_index_last_doc_id(const nxs_index_t *idx)`
+  * Get the last document ID.  Zero means no document was added since index
+  reference instantiation.  Currently, the value is assigned using a linearly
+  incremented atomic counter.  Mixing manually assigned document IDs with
+  automatically generated IDs is strongly discouraged (i.e. on addition,
+  either always provide `id` or always set it to zero).  Note: the value
+  returned by this function may change even if `nxs_index_add()` fails.
 
 * `int nxs_index_remove(nxs_index_t *idx, nxs_doc_id_t id)`
   * Remove the document from the index.  Returns 0 on success or non-zero
@@ -144,7 +153,7 @@ The results can also be iterated using the following API:
 
 * `bool nxs_resp_iter_result(nxs_resp_t *resp, nxs_doc_id_t *id, float *score)`
   * Returns `true` and the current document ID with its associated score
-  and advanced the iterator to next item.  Returns `false` when the end is
+  and advances the iterator to the next item.  Returns `false` when the end is
   reached (or if there are no results).
 
 * `unsigned nxs_resp_resultcount(const nxs_resp_t *resp)`
@@ -153,7 +162,7 @@ The results can also be iterated using the following API:
 ### Query syntax
 
 nxsearch supports logical operators, grouping and quoting in its query syntax.
-Use the `OR`, `AND` as well as `AND NOT` keywords for the logical operators.
+Use the `AND`, `OR`, and `AND NOT` keywords for the logical operators.
 The regular brackets `(` and `)` are used to group the expressions.
 For example:
 ```

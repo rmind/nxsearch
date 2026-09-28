@@ -14,7 +14,7 @@ can be registered by HTTP POST-ing the source code.  The `store` flag may
 be used to save the filter persistently (but it will require the service
 restart so that the filter would be picked up by all workers).  Caution:
 this feature is disabled by default since it also allows posting malicious
-Lua code, therefore enable with cautious.
+Lua code, so enable it only when the source is trusted.
 
 ## API
 

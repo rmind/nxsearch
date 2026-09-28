@@ -97,9 +97,14 @@ run_index_request_checks(void)
 	idx = nxs_index_create(nxs, TEST_IDX, NULL);
 	assert(idx);
 
-	// Zero document ID
+	// Zero document IDs should result in generated IDs.
 	ret = nxs_index_add(idx, NULL, 0, "x", 1);
-	assert(ret == -1 && nxs_get_error(nxs, NULL) == NXS_ERR_INVALID);
+	assert(ret == 0);
+	assert(nxs_index_last_doc_id(idx) == 1);
+
+	ret = nxs_index_add(idx, NULL, 0, "x", 1);
+	assert(ret == 0);
+	assert(nxs_index_last_doc_id(idx) == 2);
 
 	// Document ID already exists
 	ret = nxs_index_add(idx, NULL, 1001, "x", 1);

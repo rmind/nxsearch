@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Mindaugas Rasiukevicius <rmind at noxt eu>
+ * Copyright (c) 2022-2026 Mindaugas Rasiukevicius <rmind at noxt eu>
  * All rights reserved.
  *
  * Use is subject to license terms, as specified in the LICENSE file.
@@ -70,6 +70,27 @@ idxdoc_lookup(nxs_index_t *idx, nxs_doc_id_t doc_id)
 	doc = rhashmap_get(idx->dt_map, &doc_id, sizeof(nxs_doc_id_t));
 	app_dbgx("doc ID %"PRIu64" => %p", doc_id, doc);
 	return doc;
+}
+
+/*
+ * idx_dtmap_obtain_id: obtain a document ID for addition.
+ *
+ * => Use to auto-generate new document IDs.
+ * => The ID may be discarded i.e. it doesn't have to be used.
+ */
+nxs_doc_id_t
+idxdoc_obtain_id(nxs_index_t *idx)
+{
+	idxmap_t *idxmap = &idx->dt_memmap;
+	idxdt_hdr_t *hdr = idxmap->baseptr;
+	nxs_doc_id_t doc_id;
+
+	ASSERT(idxmap->fd > 0 && hdr != NULL);
+
+	doc_id = atomic_add_relaxed(&hdr->next_doc_id, 1) + 1;
+	ASSERT(doc_id > 0);
+
+	return doc_id;
 }
 
 /*

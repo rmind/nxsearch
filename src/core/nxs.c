@@ -503,11 +503,10 @@ nxs_index_add(nxs_index_t *idx, nxs_params_t *params __unused,
 	int ret = -1;
 
 	nxs_clear_error(idx->nxs);
-	if (doc_id == 0) {
-		nxs_decl_errx(idx->nxs, NXS_ERR_INVALID,
-		    "document ID must be non-zero", NULL);
-		return -1;
-	}
+
+	// Obtain a new document ID, if not specified.
+	doc_id = doc_id ? doc_id : idxdoc_obtain_id(idx);
+	idx->last_doc_id = doc_id;  // may use thread-local storage
 
 	/*
 	 * Check whether the document already exists.
@@ -567,4 +566,15 @@ nxs_index_remove(nxs_index_t *idx, nxs_doc_id_t doc_id)
 		return -1;
 	}
 	return 0;
+}
+
+/*
+ * nxs_index_last_doc_id: get the last added document ID.
+ *
+ * => Zero means no document was added since index run-time instantiation.
+ */
+__dso_public nxs_doc_id_t
+nxs_index_last_doc_id(const nxs_index_t *idx)
+{
+	return idx->last_doc_id;
 }

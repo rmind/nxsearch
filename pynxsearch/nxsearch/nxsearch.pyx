@@ -130,6 +130,13 @@ cdef class NxsIndex:
         params: Optional[Dict] = None,
         create: bool = False
     ):
+        """
+        Create new index with a given name and parameters.
+
+        :param params: If None, then the default parameters will be used.
+        :param create: If True, then create a new index.
+        """
+
         self.nxs_ref = nxs_ref  # acquire the reference first
         c_nxs = (<Nxs?>nxs_ref)._c_nxs
         bname = str(name).encode()
@@ -142,16 +149,12 @@ cdef class NxsIndex:
             )
 
         if self._c_nxs_index is NULL:
-            self._throw_error()
-            return
+            self.nxs_ref._throw_error()
 
     def __dealloc__(self):
         if self._c_nxs_index:
             nxs_index_close(self._c_nxs_index)
         self.nxs_ref = None  # release the reference *after* index close
-
-    def _throw_error(self):
-        return self.nxs_ref._throw_error()
 
     def get_params(self) -> Dict:
         """
@@ -175,31 +178,44 @@ cdef class NxsIndex:
 
     def add(
         self,
-        doc_id: int,
         content: str,
+        doc_id: int | None = None,
         params: Optional[Dict] = None
     ) -> int:
         """
-        Index the given document. The caller must provide a unique document ID,
-        specified by `doc_id` which must be a non-zero 64-bit integer.
+        Index the given document.
 
-        Returns the document ID on success.
+        :param content: The document content.
+        :param doc_id: If set to zero, then a unique document ID will be
+        assigned on creation; otherwise, the caller must provide a unique
+        document ID that is a positive number.
+        :param params: Should be None, but this may change in the future.
+
+        :returns: Returns the document ID on success.
         """
 
-        if not isinstance(doc_id, int):
-            raise TypeError("parameter `doc_id` is not an integer type")
-        if doc_id <= 0:
-            raise TypeError("parameter `doc_id` must be a positive integer")
+        if doc_id is not None:
+            if not isinstance(doc_id, int):
+                raise TypeError(
+                    "parameter `doc_id` is not an integer type"
+                )
+            if doc_id < 0:
+                raise TypeError(
+                    "parameter `doc_id` must not be a negative value"
+                )
+
         if not isinstance(content, str):
             raise TypeError("parameter `content` is not a string type")
 
-        cdef nxs_doc_id_t c_doc_id = doc_id
+        cdef nxs_doc_id_t c_doc_id = doc_id or 0
         bcontent = str(content).encode()
         if nxs_index_add(
             self._c_nxs_index, NULL, c_doc_id, bcontent, len(bcontent)
         ) != 0:
-            return self._throw_error()
-        return doc_id
+            return self.nxs_ref._throw_error()
+
+        return nxs_index_last_doc_id(self._c_nxs_index)
+
 
     def remove(self, doc_id: int):
         """
@@ -212,7 +228,7 @@ cdef class NxsIndex:
             raise TypeError("parameter `doc_id` must be a positive integer")
         cdef nxs_doc_id_t c_doc_id = doc_id
         if nxs_index_remove(self._c_nxs_index, c_doc_id) != 0:
-            return self._throw_error()
+            return self.nxs_ref._throw_error()
 
     def search(self, query: str, params: Optional[Dict] = None) -> NxsResult:
         """
@@ -224,7 +240,7 @@ cdef class NxsIndex:
         bquery = str(query).encode()
         resp = nxs_index_search(self._c_nxs_index, NULL, bquery, len(bquery))
         if resp is NULL:
-            return self._throw_error()
+            return self.nxs_ref._throw_error()
         return NxsResult.get_instance(self, resp)
 
 
