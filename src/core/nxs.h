@@ -85,6 +85,8 @@ int		nxs_index_add(nxs_index_t *, nxs_params_t *, nxs_doc_id_t,
 		    const char *, size_t);
 int		nxs_index_remove(nxs_index_t *, nxs_doc_id_t);
 
+nxs_doc_id_t	nxs_index_last_doc_id(const nxs_index_t *);
+
 /*
  * Query and response API.
  */

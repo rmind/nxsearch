@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Mindaugas Rasiukevicius <rmind at noxt eu>
+ * Copyright (c) 2022-2026 Mindaugas Rasiukevicius <rmind at noxt eu>
  * All rights reserved.
  *
  * Use is subject to license terms, as specified in the LICENSE file.
@@ -85,6 +85,7 @@ struct nxs_index {
 	rhashmap_t *		dt_map;
 	TAILQ_HEAD(, idxdoc)	dt_list;
 	size_t			dt_count;
+	nxs_doc_id_t		last_doc_id;
 
 	/*
 	 * Term-document map (the reverse index).
@@ -133,6 +134,7 @@ idxdoc_t *	idxdoc_create(nxs_index_t *, nxs_doc_id_t, uint64_t);
 void		idxdoc_destroy(nxs_index_t *, idxdoc_t *);
 idxdoc_t *	idxdoc_lookup(nxs_index_t *, nxs_doc_id_t);
 
+nxs_doc_id_t	idxdoc_obtain_id(nxs_index_t *);
 int		idxdoc_get_doclen(const nxs_index_t *, const idxdoc_t *);
 int		idxdoc_get_termcount(const nxs_index_t *,
 		    const idxdoc_t *, nxs_term_id_t);

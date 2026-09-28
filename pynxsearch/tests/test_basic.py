@@ -17,10 +17,10 @@ def test_nxsearch_basic(tmp_path):
         pass
     index = nxs.open("animal-articles", create=True)
 
-    index.add(1, "cat dog cow")
-    index.add(2, "dog cow")
-    index.add(3, "cat cat cat")
-    index.add(4, "cat's catnip")
+    index.add("cat dog cow", doc_id=1)
+    index.add("dog cow", doc_id=2)
+    index.add("cat cat cat", doc_id=3)
+    index.add("cat's catnip", doc_id=4)
 
     with index.search("cat") as result:
         results = [item for item in result]
@@ -38,6 +38,16 @@ def test_nxsearch_basic(tmp_path):
             score=pytest.approx(0.10551118105649948),
         ),
     ]
+
+
+def test_nxsearch_auto_doc_id(tmp_path):
+    nxs = nxsearch.init(tmp_path)
+    index = nxs.open("animal-articles", create=True)
+    index.add("cat")
+    index.add("cats")
+    with index.search("cat") as result:
+        doc_ids = {item.document_id for item in result}
+    assert doc_ids == {1, 2}
 
 
 def test_nxsearch_missing(tmp_path):

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Mindaugas Rasiukevicius <rmind at noxt eu>
+ * Copyright (c) 2022-2026 Mindaugas Rasiukevicius <rmind at noxt eu>
  * All rights reserved.
  *
  * Use is subject to license terms, as specified in the LICENSE file.
@@ -10,7 +10,7 @@
 
 #include "utils.h"
 
-#define	NXS_ABI_VER		1
+#define	NXS_ABI_VER		2
 
 /*
  * Term index (list).
@@ -110,6 +110,12 @@ typedef struct {
 	uint64_t	data_len;
 
 	/*
+	 * Next document ID.  This is linearly incremented 64-bit number
+	 * used to allocate the document ID.
+	 */
+	uint64_t	next_doc_id;
+
+	/*
 	 * Total number of seen tokens (including repetitions/duplicates)
 	 * in all documents in the index.  Also, the total document count.
 	 */
@@ -119,7 +125,7 @@ typedef struct {
 
 } __attribute__((packed)) idxdt_hdr_t;
 
-static_assert(sizeof(idxdt_hdr_t) == 32, "ABI guard");
+static_assert(sizeof(idxdt_hdr_t) == 40, "ABI guard");
 static_assert(sizeof(idxdt_hdr_t) % 8 == 0, "alignment guard");
 
 #define	IDXDT_DATA_PTR(h, off)	\
