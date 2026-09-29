@@ -32,7 +32,7 @@ struct test_case_type test_case_1 = {
 	}
 };
 
-// Acronims and emojis.
+// Acronyms and emojis.
 struct test_case_type test_case_2 = {
 	"We will play with I.B.M.",
 	{ "we", "will", "play", "with", "i.b.m", NULL }

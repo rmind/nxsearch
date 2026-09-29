@@ -109,7 +109,7 @@ run_test(int c)
 	run_with_index(terms_testdb_path, dtmap_testdb_path, true, terms_init);
 
 	/*
-	 * NOTE: See the comments in t_strss_terms.c test.
+	 * NOTE: See the comments in t_stress_terms.c test.
 	 */
 	pthread_barrier_init(&barrier, NULL, nworkers);
 	for (unsigned i = 0; i < nworkers; i++) {

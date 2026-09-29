@@ -24,7 +24,7 @@
  * above.  This ensures that only consistent state of the header will be
  * globally visible.
  *
- * - The file may be grow only with the exclusive lock held.  To minimize
+ * - The file may only be grown with the exclusive lock held.  To minimize
  * the lock contention and frequent remaps, the file is extended in larger
  * chunks defined by the IDX_SIZE_STEP constant.
  *

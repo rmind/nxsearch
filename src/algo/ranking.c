@@ -118,7 +118,7 @@ bm25(const nxs_index_t *idx, const idxterm_t *term, const idxdoc_t *doc)
 	 * by a constant b using the 1 – b + b * dl / adl formula, where b
 	 * is between 0 and 1.
 	 *
-	 * - BM2 also uses probabilistic IDF, defined as:
+	 * - BM25 also uses probabilistic IDF, defined as:
 	 *
 	 *	log((N - doc_freq(t) + .5) / (doc_freq(t) + .5))
 	 *

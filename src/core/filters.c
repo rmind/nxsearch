@@ -10,9 +10,9 @@
  *
  * They are used to transform tokens such that they are more suitable
  * for searching.  This module implements an interface to register filters
- * and create pipelines which be invoked by the tokenizer.
+ * and create pipelines which can be invoked by the tokenizer.
  *
- * See description of filter_ops_t in the filters.h headers.
+ * See description of filter_ops_t in the filters.h header.
  */
 
 #include <stdio.h>
@@ -134,7 +134,7 @@ filter_pipeline_create(nxs_t *nxs, nxs_params_t *params)
 	 *
 	 * Note: support no filters in which case the count will be zero.
 	 * We will allocate all the structures to keep the code simple,
-	 * but is will effectively be a NOP.
+	 * but it will effectively be a NOP.
 	 */
 	filters = nxs_params_get_strlist(params, "filters", &count);
 	ASSERT(filters || count == 0);

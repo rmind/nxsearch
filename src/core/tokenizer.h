@@ -24,7 +24,7 @@
 typedef struct token {
 	/*
 	 * Token: list entry, counter of how many times the token
-	 * was seen and the string buffer storing the value of
+	 * was seen and the string buffer storing the value
 	 * after the filter pipeline processing.
 	 */
 	TAILQ_ENTRY(token)	entry;

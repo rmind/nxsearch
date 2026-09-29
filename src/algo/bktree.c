@@ -235,7 +235,7 @@ bktree_search(bktree_t *bkt, unsigned tolerance,
 	deque_push(dq, node);
 
 	/*
-	 * Search: compute D and look for nodes matching D - N and D + N,
+	 * Search: compute D and look for nodes matching D - N and D + N.
 	 */
 	while ((node = deque_pop_front(dq)) != NULL) {
 		unsigned i, min_d, max_d;

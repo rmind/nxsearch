@@ -257,7 +257,7 @@ tokenize(filter_pipeline_t *fp, nxs_params_t *params,
 	}
 
 	/*
-	 * TODO: Use word brake rules to customize.  See:
+	 * TODO: Use word break rules to customize.  See:
 	 *
 	 * https://unicode-org.github.io/icu/userguide/boundaryanalysis/break-rules.html
 	 * https://github.com/unicode-org/icu/blob/main/icu4c/source/data/brkitr/rules/word.txt

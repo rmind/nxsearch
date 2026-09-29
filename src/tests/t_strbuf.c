@@ -69,7 +69,7 @@ run_basic_tests(void)
 	free(ls);
 
 	/*
-	 * It is permited to call strbuf_acquire() again.
+	 * It is permitted to call strbuf_acquire() again.
 	 * Test with a smaller string this time.
 	 */
 	ret = strbuf_acquire(&sb, "x", 1);

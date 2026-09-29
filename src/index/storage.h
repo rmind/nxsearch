@@ -31,7 +31,7 @@
  *	+-----+---------+-----+-------+-------------+
  *	|  2  |   len   |  1  |  ...  |      8      |
  *
- * The total count must 64-bit aligned, therefore padding must be added
+ * The total count must be 64-bit aligned, therefore padding must be added
  * to enforce the alignment where needed.
  *
  * CAUTION: All values must be converted to big-endian for storage.

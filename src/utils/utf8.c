@@ -24,7 +24,7 @@
 #include "utils.h"
 
 /*
- * UCI Rule for transliteration.  See more:
+ * ICU Rule for transliteration.  See more:
  * https://unicode-org.github.io/icu/userguide/transforms/general/
  */
 static const char NFKD_RULE[] =

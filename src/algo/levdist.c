@@ -8,7 +8,7 @@
 /*
  * Levenshtein distance.
  *
- * It is a for metric measuring the difference between two strings,
+ * It is a metric measuring the difference between two strings,
  * defined as: the minimum number of mutations required to change one
  * string into the other.  Levenshtein distance mutations are removal,
  * insertion and substitution.
@@ -26,7 +26,7 @@
  *	    )
  *
  * The actual implementation is based on the optimized version of the
- * Wagner–Fischer algorithm which.  Instead of the full matrix, it uses
+ * Wagner–Fischer algorithm.  Instead of the full matrix, it uses
  * only the relevant row and two variables necessary to compute the
  * final value.
  */

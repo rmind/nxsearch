@@ -100,7 +100,7 @@ fs_is_dir(const char *path)
 }
 
 /*
- * flock_owned: check that the file-lock is owned.
+ * f_lock_owned: check that the file-lock is owned.
  *
  * WARNING: May only be used to check whether the current process owns the
  * lock for diagnostic purposes and must not be used for locking decisions.

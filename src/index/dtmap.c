@@ -367,7 +367,7 @@ dtmap_deletion(nxs_index_t *idx, nxs_doc_id_t doc_id, uint32_t doc_total_len)
 	}
 
 	/*
-	 * If the document length is zero, then it is mark that
+	 * If the document length is zero, then it marks that
 	 * this document ID was deleted.  Check the in-memory
 	 * structure and remove it if still present.
 	 */

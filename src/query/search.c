@@ -218,8 +218,8 @@ run_query_logic(query_t *query, ranking_func_t rank, nxs_resp_t *resp)
 
 	/*
 	 * If there are no expressions or meaningful tokens (terms in use),
-	 * then then just return without an error, since such search merely
-	 * produces an empty search results.
+	 * then just return without an error, since such search merely
+	 * produces empty search results.
 	 */
 	if (!query->root || tokens->count == 0) {
 		return 0;
@@ -278,7 +278,7 @@ out:
 }
 
 /*
- * nxs_index_search: perform  a search query on the given index.
+ * nxs_index_search: perform a search query on the given index.
  *
  * => Returns the response object (which must be released by the caller).
  */
