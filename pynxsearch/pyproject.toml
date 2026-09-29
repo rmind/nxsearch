@@ -31,6 +31,8 @@ nxsearch = ["*.pyx", "*.pxd"]
 name = "nxsearch.nxsearch"
 sources = ["nxsearch/*.pyx"]
 libraries = ["nxsearch"]
+include-dirs = ["/usr/local/include"]
+library-dirs = ["/usr/local/lib"]
 
 [tool.ruff]
 line-length = 80

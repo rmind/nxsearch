@@ -59,6 +59,7 @@ jobs:
           CIBW_BEFORE_ALL_MACOS: |
             uname -a && cc --version
             sh {package}/cibuildwheel.sh {project}
+          MACOSX_DEPLOYMENT_TARGET: 11.0
 
       - name: Upload wheels as artifacts
         uses: actions/upload-artifact@v7

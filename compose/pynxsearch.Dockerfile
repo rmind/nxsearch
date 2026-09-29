@@ -11,9 +11,8 @@ RUN pip install --break-system-packages uv
 WORKDIR /build-lib
 COPY ./src /build-lib
 
-RUN make distclean && \
-    LIBDIR=/usr/lib INCDIR=/usr/include USE_LUA=0 \
-    make -j $(getconf _NPROCESSORS_ONLN) install
+RUN make distclean && USE_LUA=0 make -j $(getconf _NPROCESSORS_ONLN) install
+RUN ldconfig || true
 
 WORKDIR /build
 COPY ./pynxsearch /build/pynxsearch

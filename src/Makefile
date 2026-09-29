@@ -77,6 +77,7 @@ CFLAGS+=	-D_POSIX_C_SOURCE=200809L -D_GNU_SOURCE -D_DEFAULT_SOURCE
 endif
 ifeq ($(SYSNAME),Darwin)
 CFLAGS+=	-D__DARWIN_C_LEVEL=__DARWIN_C_FULL
+LDFLAGS+=	-Wl,-not_for_dyld_shared_cache
 LIBTOOL=	glibtool
 endif
 
@@ -204,7 +205,7 @@ INCS=		core/nxs.h
 LIBDIR?=	/usr/local/lib
 INCDIR?=	/usr/local/include
 
-install/%.la:	ILIBDIR=	$(DESTDIR)/$(LIBDIR)
+install:	ILIBDIR=	$(DESTDIR)/$(LIBDIR)
 install:	IINCDIR=	$(DESTDIR)/$(INCDIR)/
 install:	LUA_ILIBDIR=	$(DESTDIR)/$(LUA_LIBDIR)/
 
@@ -276,13 +277,11 @@ libs/yyjson/build/libyyjson.a:
 # library installation:
 #
 
-install/%.la: %.la
-	mkdir -p $(ILIBDIR)
-	$(LIBTOOL) --mode=install install -c $(notdir $@) $(ILIBDIR)/$(notdir $@)
-
-install: lib $(addprefix install/,$(LIB).la)
+install: lib
+	mkdir -p $(ILIBDIR) $(IINCDIR)
+	$(LIBTOOL) --mode=install install -c $(LIB).la $(ILIBDIR)/$(LIB).la
 	$(LIBTOOL) --mode=finish $(LIBDIR)
-	mkdir -p $(IINCDIR) && install -c $(INCS) $(IINCDIR)
+	install -c $(INCS) $(IINCDIR)
 
 clean:
 	$(LIBTOOL) --mode=clean rm
@@ -320,4 +319,4 @@ coverage: tests
 
 debug: all tests
 
-.PHONY: all debug tests clean
+.PHONY: all lib debug tests install clean
