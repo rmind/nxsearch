@@ -1,14 +1,9 @@
 #!/bin/sh
 
-set -eu
+set -eux
 
 project_dir="${1:?project directory required}"
-
-if [ $(uname -s) = "Linux" ]; then
-	os_env="$AUDITWHEEL_PLAT"
-else
-	os_env="darwin"
-fi
+os_env="${AUDITWHEEL_PLAT:-$(uname -s | tr 'A-Z' 'a-z')}"
 
 echo "Preparing build environment for $os_env"
 
@@ -20,6 +15,7 @@ install_lemon()
 	#
 	# No package for AlmaLinux and Alpine.  Just build it.
 	#
+	mkdir -p /usr/local/bin/
 	curl -fsSL -o /tmp/lemon.c \
 	    $github_base_url/sqlite/sqlite/$lemon_tag/tool/lemon.c
 	curl -fsSL -o /usr/local/bin/lempar.c \
@@ -33,7 +29,7 @@ manylinux*)
 	# AlmaLinux (e.g. quay.io/pypa/manylinux_2_34_x86_64 image)
 	#
 	dnf install -y \
-	    libtool pkgconf-pkg-config cmake libxml2 \
+	    sudo curl libtool pkgconf-pkg-config cmake libxml2 \
 	    libicu-devel libstemmer-devel re2c
 	install_lemon
 	;;
@@ -42,7 +38,7 @@ musllinux*)
 	# Alpine (e.g. quay.io/pypa/musllinux_1_2_x86_64 image)
 	#
 	apk add --no-cache \
-	    build-base libtool pkgconf cmake libxml2-utils \
+	    sudo curl build-base libtool pkgconf cmake libxml2-utils \
 	    icu-dev icu-data-full libstemmer-dev re2c
 	install_lemon
 	;;
@@ -51,9 +47,9 @@ darwin)
 	# Darwin.
 	#
 	brew install libtool cmake snowball re2c lemon
+	# For libraries installed by setup-micromamba from GitHub Actions):
 	export PKG_CONFIG_PATH="${DEPS_PREFIX:?missing}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-	export MACOSX_DEPLOYMENT_TARGET=11.0
-	export LD_SHARED_CACHE_ELIGIBLE=NO
+	export LDFLAGS="-Wl,-rpath,$DEPS_PREFIX/lib"
 	;;
 *)
 	echo "ERROR: unsupported image '$os_env'" >&2
@@ -63,8 +59,9 @@ esac
 
 #
 # Build the nxsearch library
+# NOTE: need sudo on MacOS to write to /usr/local.
 #
 cd "$project_dir/src"
 make distclean
-LIBDIR=/usr/lib INCDIR=/usr/include USE_LUA=0 \
-    make -j $(getconf _NPROCESSORS_ONLN) install
+sudo -E PATH="$PATH:/usr/local/bin" \
+    USE_LUA=0 make -j $(getconf _NPROCESSORS_ONLN) install
