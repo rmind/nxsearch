@@ -312,3 +312,37 @@ bktree_destroy(bktree_t *bkt)
 	deque_destroy(dq);
 	free(bkt);
 }
+
+#if 0
+void
+bktree_dump(bktree_t *bkt)
+{
+	bknode_t *node;
+	deque_t *dq;
+
+	if ((node = bkt->root) == NULL) {
+		return;
+	}
+
+	dq = deque_create(0, 0);
+	deque_push(dq, node);
+
+	while ((node = deque_pop_front(dq)) != NULL) {
+		const unsigned nitems = popcount64(node->bitmap);
+		uint64_t bitmap = node->bitmap;
+		unsigned i;
+
+		printf("NODE %p [%s] C = %u\n",
+		    node, (const char *)node->obj, nitems);
+		while ((i = ffs64(bitmap)) != 0) {
+			const uint64_t bit = UINT64_C(1) << --i;
+			void *ival = bknode_get(node, i);
+			printf("  [%u] => %p\n", i, ival);
+			deque_push(dq, ival);
+			bitmap &= ~bit;
+		}
+	}
+	deque_destroy(dq);
+	puts("-");
+}
+#endif
